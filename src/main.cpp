@@ -4,7 +4,6 @@
 #include <PubSubClient.h>
 #include <ACAN2515.h>
 #include <eztime.h>
-#include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
