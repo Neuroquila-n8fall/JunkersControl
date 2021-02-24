@@ -24,7 +24,7 @@ Since every setup is different you have to customize the data processing for you
 This means you should bring a little bit of coding experience with you.
 
 ## Prerequisites
-1) A compatible Bosch-Junkers central gas heating system whith Bosch Heatronic controller and BM1 or BM2 Bus Module equipped.
+1) A compatible Bosch-Junkers central gas heating system with Bosch Heatronic controller and BM1 or BM2 Bus Module equipped.
 1) Access to the data line that exits the bus module. Most of the time you will find a "room thermostat" like TA250 or TA270 which in fact is the control unit for you, the consumer. **It won't work with 1-2-4 Style controls like the TR200**
 2) Awareness to short circuits and bus failures due to wrong wiring
 3) Direct access to the heating itself in case of problems.
