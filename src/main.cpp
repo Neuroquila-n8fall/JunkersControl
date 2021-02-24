@@ -351,20 +351,40 @@ void loop()
     //  intervals of approximately 1 second.
 
     CANMessage msg;
-    char printbuf[100];
+    char printbuf[255];
     double feedTemperature = 0.0F;
     int feedSetpoint = 0;
     switch (currentStep)
     {
     case 0:
-      //Send Setpoint
-      feedTemperature = CalculateFeedTemperature();
-      feedSetpoint = ConvertFeedTemperature(feedTemperature);
+      //Fetch the correct value depending on the current operational state of the heating.
+      if (hcActive)
+      {
+        //Send Setpoint
+        feedTemperature = CalculateFeedTemperature();       
+        feedSetpoint = ConvertFeedTemperature(feedTemperature);
+      }
+      else
+      {
+        //Send Minimum Setpoint
+
+        if (isOnFallback)
+        {
+          //Use fallback value when on fallback mode
+          feedSetpoint = ConvertFeedTemperature(fallbackMinimumFeedTemperature);
+        }
+        else
+        {
+          //Use commanded value when connected
+          feedSetpoint = ConvertFeedTemperature(mqttMinimumFeedTemperature);
+        }
+      }
+
       msg.id = 0x252;
       msg.data[0] = feedSetpoint;
       if (Debug)
       {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Feed Setpoint is %f, INT representation (half steps) is %i", currentStep, feedTemperature, feedSetpoint);
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %f, INT representation (half steps) is %i",currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO" , feedTemperature, feedSetpoint);
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
@@ -393,13 +413,22 @@ void loop()
     case 2:
       //Switch heating on|off
       msg.id = 0x250;
-      msg.data[0] = hcActive;
+      msg.data[0] = mqttHeatingSwitch;
       if (Debug)
       {
         sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, hcActive);
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
+      break;
+
+    case 3:
+      break;
+
+    case 4:
+      break;
+
+    case 5:
       break;
 
     default:
@@ -817,6 +846,8 @@ void callback(char *topic, byte *payload, unsigned int length)
     int i = s.toInt();
     WriteToConsoles("MQTT RCV: On/Off >> " + s + "\r\n");
     mqttHeatingSwitch = (i == 1 ? true : false);
+    //Write value to the "control" level
+    hcActive = mqttHeatingSwitch;
   }
 }
 
