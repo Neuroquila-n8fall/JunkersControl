@@ -599,7 +599,7 @@ void processCan()
       temp = Message.data[0] / 2.0;
       break;
 
-    //[DHW] - [RC] - Max. water temperature (limited by boiler dial setting)
+    //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
     //Data Type: INT
     //Value: Data / 2.0
     case 0x204:
@@ -668,7 +668,7 @@ void processCan()
       client.publish(pub_Season, String(hcSeason).c_str());
       break;
 
-    //[HC] - [Controller] - Heating Operating
+    //[HC] - [RC] - Heating Operating
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x250:
@@ -676,7 +676,7 @@ void processCan()
       client.publish(pub_HcOperation, String(hcActive).c_str());
       break;
 
-    //[HC] - [Controller] - Heating Power
+    //[HC] - [RC] - Heating Power
     //Data Type: INT
     //Value: 0-255 = 0-100%
     case 0x251:
@@ -747,7 +747,7 @@ void processCan()
       mcEconomy = Message.data[0];
       break;
 
-    //[MC] - [RC] - Mixed-Circuit Current Feed Temperature
+    //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature
     //Data Type: INT
     //Value: Data / 2.0
     case 0x440:
