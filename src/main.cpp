@@ -14,7 +14,9 @@
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
 
-//Set this to true to override the TA-Controller. Use with caution.
+//Set this to true to override the RC (TR/TA). Use with caution. Will write
+//  values on the bus and actively steers the heating when turned on.
+//  Will also conflict with any existing Room/Remote Controller on the bus.
 const bool Override = false;
 
 //Set this to true to view debug info
@@ -100,15 +102,33 @@ const char subscription_AuxTemperature[] = "umwelt/temperaturen/aussen";
 const char subscription_AmbientTemperature[] = "heizung/parameters/ambient";
 
 //-- Published Topics
-const char MaxVorlaufTopic[] = "heizung/temperaturen/maxvorlauf";
-const char AktVorlaufTopic[] = "heizung/temperaturen/aktvorlauf";
-const char SollVorlaufTopic[] = "heizung/temperaturen/sollvorlauf";
-const char AussentemperaturTopic[] = "heizung/temperaturen/aussen";
-const char BrennerTopic[] = "heizung/status/brenner";
-const char PumpeTopic[] = "heizung/status/pumpe";
-const char FehlerTopic[] = "heizung/status/fehler";
-const char BetriebsmodusTopic[] = "heizung/status/betriebsmodus";
-const char HeizbetriebTopic[] = "heizung/status/heizbetrieb";
+
+//Maximum Feed Temperature
+const char pub_HcMaxFeedTemperature[] = "heizung/temperaturen/maxvorlauf";
+
+//Current Feed Temperature
+const char pub_CurFeedTemperature[] = "heizung/temperaturen/aktvorlauf";
+
+//Setpoint of feed Temperature
+const char pub_SetpointFeedTemperature[] = "heizung/temperaturen/sollvorlauf";
+
+//The Temperature on the Outside
+const char pub_OutsideTemperature[] = "heizung/temperaturen/aussen";
+
+//Flame status
+const char pub_GasBurner[] = "heizung/status/brenner";
+
+//Heating Circuit Pump Status
+const char pub_HcPump[] = "heizung/status/pumpe";
+
+//General Error Flag
+const char pub_Error[] = "heizung/status/fehler";
+
+//Seasonal Operation Flag
+const char pub_Season[] = "heizung/status/betriebsmodus";
+
+//Heating Operating
+const char pub_HcOperation[] = "heizung/status/heizbetrieb";
 
 //-- MQTT Endpoint
 const char *mqttServer = mqttSERVER;
@@ -165,16 +185,16 @@ int currentStep = 0;
 double temp = 0.00F;
 
 //-- Heating Circuit: Max. Feed Temperature (From Controller)
-double HkMaxVorlauf = 0.00F;
+double hcMaxFeed = 70.00F;
 
 //-- Heating Circuit: Current Feed Temperature (From Controller)
 double HkAktVorlauf = 0.00F;
 
 //-- Heating Circuit: Feed Temperature Setpoint (Control Value)
-double HkSollVorlauf = 0.00F;
+double HkSollVorlauf = 40.00F;
 
 //-- Heating Controller: Current Temperature on the Outside (From Controller)
-double Aussentemperatur = 0.00F;
+double OutsideTemperatureSensor = 0.00F;
 
 //-- Heating Controller: Flame lit (From Controller)
 bool flame = false;
@@ -183,33 +203,66 @@ bool flame = false;
 uint8_t status = 0x00;
 
 //-- Heating Circuit: Circulation Pump on|off
-bool hkPumpe = false;
-bool wwSpeicherladung = false;
-bool betriebsart = false;
-bool pumpeMisch = false;
-bool mkSparbetrieb = false;
+bool hcPump = false;
 
-int aktWochentag = 0;
-int aktStunde = 0;
-int aktMinute = 0;
-bool heizbetrieb = false;
+//-- Hot Water Battery Mode Status
+bool hwBatteryMode = false;
 
-int heizleistung = 0;
+//-- Heating Seasonal Mode
+bool hcSeason = false;
 
-bool wwSofort = false;
+//-- Mixed-Circuit Pump Status
+bool mcPump = false;
 
-//-- Variables set by subscriptions with factory defaults
+//-- Mixed-Circuit Economy Setting
+bool mcEconomy = false;
+
+//-- Current Day of the week as configured by the CC
+int curDayOfWeek = 0;
+
+//-- Current Hour component
+int curHours = 0;
+
+//-- Current Minutes component
+int curMinutes = 0;
+
+//-- Heating active / operational
+bool hcActive = false;
+
+//-- Analog value of heating power
+int hcHeatingPower = 0;
+
+//-- Hot Water "now" setting.
+bool hwNow = false;
+
+//-- Variables set by MQTT subscriptions with factory defaults at startup
+
+//Feed Temperature
 double mqttFeedTemperatureSetpoint = 50.0F;
-double mqttBasepointTemperature = -15.0F;
-double mqttEndpointTemperature = 21.0F;
+//Basepoint Temperature
+double mqttBasepointTemperature = -10.0F;
+//Endpoint Temperature
+double mqttEndpointTemperature = 31.0F;
+//Ambient Temperature
 double mqttAmbientTemperature = 0.0F;
+//Minimum ("Anti Freeze") Temperature.
 double mqttMinimumFeedTemperature = 10.0F;
+//Wether the heating should be off or not
+bool mqttHeatingSwitch = true;
+//Auxilary Temperature
+double mqttAuxilaryTemperature = 0.0F;
 
 //-- Fallback Values
-double fallbackBasepointTemperature = -15.0F;
-double fallbackEndpointTemperature = 21.0F;
+
+//Basepoint Temperature
+double fallbackBasepointTemperature = -10.0F;
+//Endpoint Temperature
+double fallbackEndpointTemperature = 31.0F;
+//Ambient Temperature
 double fallbackAmbientTemperature = 0.0F;
+//Minimum ("Anti Freeze") Temperature.
 double fallbackMinimumFeedTemperature = 10.0F;
+//Enforces the fallback values when set to TRUE
 bool isOnFallback = false;
 
 //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
@@ -340,10 +393,10 @@ void loop()
     case 2:
       //Switch heating on|off
       msg.id = 0x250;
-      msg.data[0] = heizbetrieb;
+      msg.data[0] = hcActive;
       if (Debug)
       {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, heizbetrieb);
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, hcActive);
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
@@ -396,7 +449,7 @@ void loop()
           //Activate Heating Profile by overwriting the fields with fallback values
           mqttBasepointTemperature = fallbackBasepointTemperature;
           mqttEndpointTemperature = fallbackEndpointTemperature;
-          heizbetrieb = true;
+          hcActive = true;
           return; //important!
         }
       }
@@ -410,7 +463,7 @@ void loop()
           //Set both Base and Endpoint to the anti-freeze setting.
           mqttBasepointTemperature = fallbackMinimumFeedTemperature;
           mqttEndpointTemperature = fallbackMinimumFeedTemperature;
-          heizbetrieb = false;
+          hcActive = false;
         }
       }
     }
@@ -462,7 +515,7 @@ void setupCan()
   }
 }
 
-// \brief Process incoming CAN messages
+//Process incoming CAN messages
 void processCan()
 {
   CANMessage Message;
@@ -500,164 +553,203 @@ void processCan()
     WriteToConsoles(consoleMessage);
     WriteToConsoles("\r\n");
 
+    /*************************************
+     * Terms
+     * Controller = Built-in controller of your boiler
+     * RC = The "Room Controller" or "Remote Control" or as I call it the "Consumer Controller" where you usually set up time schedules and temperatures.
+     * HC = Heating Circuit
+     * DHW = Domestic Hot Water
+     * MC = Mixed Circuit
+     * FT = Feed Temperature
+     * Basepoint = Outside temperature at which the heating should deliver the highest possible feed temperature.
+     * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
+    **************************************/
     unsigned int rawTemp = 0;
     switch (Message.id)
     {
 
-    //HK Max. Vorlauf (Vorgegeben durch TA/TR und begrenzt durch Steuerung am Kessel)
-    //Halbgradschritte
+    //[HC] - [Controller] - Max. possible feed temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x200:
       temp = Message.data[0] / 2.0;
-      HkMaxVorlauf = temp;
-      client.publish(MaxVorlaufTopic, String(temp).c_str());
+      hcMaxFeed = temp;
+      client.publish(pub_HcMaxFeedTemperature, String(temp).c_str());
       break;
 
-    //HK Vorlauftemperatur aktuell
-    //Halbgradschritte
+    //[HC] - [Controller] - Current feed temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x201:
       temp = Message.data[0] / 2.0;
-      client.publish(AktVorlaufTopic, String(temp).c_str());
+      client.publish(pub_CurFeedTemperature, String(temp).c_str());
       break;
 
-    //WW Vorlauftemperatur oder Maximaltemperatur bei Schichtbetrieb
-    //Halbgradschritte
+    //[DHW] - [Controller] - Max. possible water temperature -or- target temperature when running in heating battery mode
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x202:
       temp = Message.data[0] / 2.0;
       break;
 
-    //WW aktuell
-    //Halbgradschritte
+    //[DHW] - [Controller] - Current water temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x203:
       temp = Message.data[0] / 2.0;
       break;
 
-    //WW Max. Vorlauf (Vorgegeben durch TA/TR und begrenzt durch Steuerung am Kessel)
-    //Halbgradschritte
+    //[DHW] - [RC] - Max. water temperature (limited by boiler dial setting)
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x204:
       temp = Message.data[0] / 2.0;
       break;
 
-    //WW Vorlauftemperatur (Temperatur des Schichtspeichers) aktuell
-    //Halbgradschritte
+    //[DHW] - [Controller] - Current water feed or battery temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x205:
       temp = Message.data[0] / 2.0;
       break;
 
-    //Fehlercode Heizung
-    //HEX 0 = OK
+    //[Controller] - Error Byte
+    //Data Type: Byte
+    //Value: 0x00 = Operational
+    //       Error codes and their meaning vary between models. See your manual for details.
     case 0x206:
       status = Message.data[0];
-      client.publish(FehlerTopic, String(status).c_str());
+      client.publish(pub_Error, String(status).c_str());
       break;
 
-    //Außentemperaturfühler
-    //Hundertfaches
+    //[Controller] - Current outside temperature
+    //Data Type: Byte Concat
+    //Value: (Data[0] & Data[1]) / 100.0
     case 0x207:
-      //Byte 0 und 1 müssen kombiniert und dann durch 100 geteilt werden um die Temperatur zu erhalten
+      //Concat bytes 0 and 1 and divide the resulting INT by 100
       rawTemp = (Message.data[0] << 8) + Message.data[1];
       temp = rawTemp / 100.0;
-      Aussentemperatur = temp;
-      client.publish(AussentemperaturTopic, String(temp).c_str());
+      OutsideTemperatureSensor = temp;
+      client.publish(pub_OutsideTemperature, String(temp).c_str());
       break;
 
-    //Status Brenner
-    //Bit
+    //Unknown
+    case 0x208:
+      break;
+
+    //[Controller] - Gas Burner Flame Status
+    //Data Type: Bit
+    //Value: 1 = On | 0 = Off
     case 0x209:
       flame = Message.data[0];
-      client.publish(BrennerTopic, String(flame).c_str());
+      client.publish(pub_GasBurner, String(flame).c_str());
       break;
 
-    //HK Pumpe
-    //Bit / Bool
+    //[HC] - [Controller] - HC Pump Operation
+    //Data Type: Bit
+    //Value: 1 = On | 0 = Off
     case 0x20A:
-      hkPumpe = Message.data[0];
-      client.publish(PumpeTopic, String(hkPumpe).c_str());
+      hcPump = Message.data[0];
+      client.publish(pub_HcPump, String(hcPump).c_str());
       break;
 
-    //Speicherladung
-    //Bit
+    //[DHW] - [Controller] - Hot Water Battery Operation
+    //Data Type: Bit
+    //Value: 1 = Enabled | 0 = Disabled
     case 0x20B:
-      wwSpeicherladung = Message.data[0];
+      hwBatteryMode = Message.data[0];
       break;
 
-    //Sommer- Winterbetrieb
-    //Bit. Sommer = 0 | Winter = 1
+    //[HC] - [Controller] - Current Seasonal Operation Mode (Set by Dial on the boiler panel)
+    //Data Type: Bit
+    //Value: 1 = Winter | 0 = Summer
     case 0x20C:
-      betriebsart = Message.data[0];
-      client.publish(BetriebsmodusTopic, String(betriebsart).c_str());
+      hcSeason = Message.data[0];
+      client.publish(pub_Season, String(hcSeason).c_str());
       break;
 
-    //Heizbetrieb / Steuerbefehl Zirkulationspumpe an|aus
-    //Bit / Bool
+    //[HC] - [Controller] - Heating Operating
+    //Data Type: Bit
+    //Value: 1 = On | 0 = Off
     case 0x250:
-      heizbetrieb = Message.data[0];
-      client.publish(HeizbetriebTopic, String(heizbetrieb).c_str());
+      hcActive = Message.data[0];
+      client.publish(pub_HcOperation, String(hcActive).c_str());
       break;
 
-    //HK Soll-Vorlauftemperatur
-    //Halbgradschritte
+    //[HC] - [Controller] - Heating Power
+    //Data Type: INT
+    //Value: 0-255 = 0-100%
+    case 0x251:
+      hcHeatingPower = Message.data[0];
+      break;
+
+    //[HC] - [RC] - Setpoint Feed Temperature
+    //Data Type: INT
+    //Value: Value / 2.0
+    //Set: Value as half-centigrade steps i.e. 35.5
     case 0x252:
       temp = Message.data[0] / 2.0;
-      client.publish(SollVorlaufTopic, String(temp).c_str());
+      client.publish(pub_SetpointFeedTemperature, String(temp).c_str());
       break;
 
-    //Heizleistung
-    //Int, gleitend
-    case 0x251:
-      heizleistung = Message.data[0];
-      break;
-
-    //Sollwert WW TA270
-    //Halbgradschritte
+    //[DHW] - [RC] - Setpoint water temperature
+    //Data Type: INT
+    //Value: Data / 2.0
+    //Set: //Set: Value as half-centigrade steps i.e. 45.5
     case 0x253:
       temp = Message.data[0] / 2.0;
       break;
 
-    //WW-Sofort
-    //Bit / Bool
+    //[DHW] - [RC] - "Hot Water Now" (Warmwasser SOFORT in German)
+    //Data Type: Bit
+    //Value: 1 = Enabled | 0 = Disabled
     case 0x254:
-      wwSofort = Message.data[0];
+      hwNow = Message.data[0];
       break;
 
-    //Uhrzeit & Wochentag
-    //Byte Array
+    //[RC] - Date and Time
+    //Data Type: Multibyte
+    //Value: Data[0] = Day Of Week Number ( 1 = Monday)
+    //       Data[1] = Hours (0-23)
+    //       Data[2] = Minutes (0-59)
+    //       Data[3] = Always '4' - Unknown meaning.
     case 0x256:
-      aktWochentag = Message.data[0];
-      aktStunde = Message.data[1];
-      aktMinute = Message.data[2];
+      curDayOfWeek = Message.data[0];
+      curHours = Message.data[1];
+      curMinutes = Message.data[2];
       break;
 
-    //WW Soll-Vorlauftemperatur DLH Prinzip
-    //Halbgradschritte
+    //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x255:
       temp = Message.data[0] / 2.0;
-      //Nach dieser Nachricht kommt wohl so eine Art "Quittierung" vom TA:
-
-      //CANMessage msg;
-      //msg.id = 0xF9;
-      //can.tryToSend(msg);
       break;
 
-    //Mischkreis Pumpe
-    //Bit / Bool
+    //[MC] - [Controller] - Mixed-Circuit Pump Operation
+    //Data Type: Bit
+    //Value: 1 = On | 0 = Off
     case 0x404:
-      pumpeMisch = Message.data[0];
+      mcPump = Message.data[0];
       break;
 
-    //MK Soll-Vorlauftemperatur
-    //Halbgradschritte
+    //[MC] - [RC] - Setpoint Mixed-Circuit Feed Temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x405:
       temp = Message.data[0] / 2.0;
       break;
 
-    //MK Sparbetrieb
-    //Bit / Bool
+    //[MC] - [RC] - Mixed-Circuit Economy Setting
+    //Data Type: Bit
+    //Value: 1 = On | 0 = Off
     case 0x407:
-      mkSparbetrieb = Message.data[0];
+      mcEconomy = Message.data[0];
       break;
 
-    //MK Ist-Vorlauftemperatur
-    //Halbgradschritte
+    //[MC] - [RC] - Mixed-Circuit Current Feed Temperature
+    //Data Type: INT
+    //Value: Data / 2.0
     case 0x440:
       temp = Message.data[0] / 2.0;
       break;
@@ -668,13 +760,16 @@ void processCan()
 // \brief Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
-
+  payload[length] = '\0';
+  String s = String((char *)payload);
+  if (!s)
+  {
+    return;
+  }
   // Example for performing an action on topic receive.
   if (strcmp(topic, subTopic_Example) == 0)
   {
     // Transform payload into an integer
-    payload[length] = '\0';
-    String s = String((char *)payload);
     int i = s.toInt();
     // Do something with 'i'
   }
@@ -683,18 +778,15 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, subscription_AuxTemperature) == 0)
   {
     // Transform payload into a double
-    payload[length] = '\0';
-    String s = String((char *)payload);
     double d = s.toDouble();
     WriteToConsoles("MQTT RCV: AuxTemp >> " + s + "\r\n");
+    mqttAuxilaryTemperature = d;
   }
 
   //Read Heating Basepoint
   if (strcmp(topic, subscription_FeedBaseSetpoint) == 0)
   {
     // Transform payload into a double
-    payload[length] = '\0';
-    String s = String((char *)payload);
     double d = s.toDouble();
     WriteToConsoles("MQTT RCV: BasePoint >> " + s + "\r\n");
     mqttBasepointTemperature = d;
@@ -704,8 +796,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, subscription_FeedCutOff) == 0)
   {
     // Transform payload into a double
-    payload[length] = '\0';
-    String s = String((char *)payload);
     double d = s.toDouble();
     WriteToConsoles("MQTT RCV: Endpoint (Cut-Off) >> " + s + "\r\n");
     mqttEndpointTemperature = d;
@@ -715,8 +805,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, subscription_FeedMinimum) == 0)
   {
     // Transform payload into a double
-    payload[length] = '\0';
-    String s = String((char *)payload);
     double d = s.toDouble();
     WriteToConsoles("MQTT RCV: Feed Min (Anti-Freeze) >> " + s + "\r\n");
     mqttMinimumFeedTemperature = d;
@@ -726,11 +814,9 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, subscription_OnOff) == 0)
   {
     // Transform payload into an integer
-    payload[length] = '\0';
-    String s = String((char *)payload);
     int i = s.toInt();
     WriteToConsoles("MQTT RCV: On/Off >> " + s + "\r\n");
-    heizbetrieb = (i == 1 ? true : false);
+    mqttHeatingSwitch = (i == 1 ? true : false);
   }
 }
 
@@ -866,6 +952,7 @@ void reconnectMqtt()
   }
 }
 
+//Returns a client id for MQTT communication
 String generateClientId()
 {
   String macAddress = WiFi.macAddress();
@@ -877,6 +964,7 @@ String generateClientId()
   return clientId;
 }
 
+//Checks for new Telnet connections
 void CheckForConnections()
 {
   //Check if we're having a new client connection
@@ -901,15 +989,18 @@ void CheckForConnections()
   }
 }
 
+//Write messages to both Serial and Telnet Clients
 void WriteToConsoles(String message)
 {
   Serial.print(message);
-  if (TelnetRemoteClient.connected())
+  //Print Message only if a client is connected and there is no data in the receive buffer.
+  if (TelnetRemoteClient.connected() && TelnetRemoteClient.available() == 0)
   {
     TelnetRemoteClient.print(message);
   }
 }
 
+//Read commands from Telnet clients.
 void ReadFromTelnet()
 {
   //Very basic implementation. Does the job but isn't perfect...
@@ -940,7 +1031,7 @@ double CalculateFeedTemperature()
 {
   //Map the current ambient temperature to the desired feed temperature:
   //        Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
-  if (!heizbetrieb)
+  if (!hcActive)
   {
     if (isOnFallback)
     {
@@ -949,24 +1040,23 @@ double CalculateFeedTemperature()
     else
     {
       return mqttMinimumFeedTemperature;
-    }    
+    }
   }
 
-  //The map() function will freeze the ESP if the values are the same. 
+  //The map() function will freeze the ESP if the values are the same.
   //  We will return the base value instead of calculating.
   if (mqttBasepointTemperature == mqttEndpointTemperature)
   {
     return mqttBasepointTemperature;
   }
-  
-  
-  double linearTemp = map_Generic(Aussentemperatur, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, HkMaxVorlauf);
+
+  double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
 
   double halfRounded = llround(linearTemp * 2) / 2.0;
   if (Debug)
   {
     char printbuf[255];
-    sprintf(printbuf, "DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", Aussentemperatur, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, HkMaxVorlauf, linearTemp, halfRounded);
+    sprintf(printbuf, "DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed, linearTemp, halfRounded);
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
   }
