@@ -413,7 +413,7 @@ void loop()
     case 2:
       //Switch heating on|off
       //WRONG: Could be 0x253 to trigger on economy!
-      msg.id = 0x250;
+      msg.id = 0x253;
       msg.data[0] = mqttHeatingSwitch;
       if (Debug)
       {
@@ -424,7 +424,6 @@ void loop()
       break;
 
     case 3:
-    //Set Feed Temperature
       break;
 
     case 4:
