@@ -412,6 +412,7 @@ void loop()
 
     case 2:
       //Switch heating on|off
+      //WRONG: Could be 0x253 to trigger on economy!
       msg.id = 0x250;
       msg.data[0] = mqttHeatingSwitch;
       if (Debug)
@@ -423,6 +424,7 @@ void loop()
       break;
 
     case 3:
+    //Set Feed Temperature
       break;
 
     case 4:
@@ -1057,7 +1059,12 @@ void ReadFromTelnet()
   }
 }
 
-//-- Takes the parameters and calculates the desired feed temperature using the outside temperature sensor
+//-- Takes the parameters and calculates the desired feed temperature.
+//   This calculation takes in the desired base temperature at which the heating 
+//   should perform 100% of the reported maximum feed temperature and when it should perform at the minimum temperature.
+//   The calculation maps endpoint and basepoint to minimum temperature and maximum feed temperature
+//   The original controller takes a different approach: It lets you decide which temperature should be set when the outside temperature is -15°C or -20°C for some models
+//   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
 double CalculateFeedTemperature()
 {
   //Map the current ambient temperature to the desired feed temperature:
