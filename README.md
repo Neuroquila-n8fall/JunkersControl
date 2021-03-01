@@ -84,8 +84,8 @@ Again, when in doubt, ask a technician.
 - [x] Fallback Mode
 - [ ] Taking Weather conditions into account when calculating the feed temperature
 - [ ] Also taking indoor temperatures into account
-- [ ] Getting the timings right so it doesn't throw off the controller
-- [ ] Testing as a standalone solution
+- [x] Getting the timings right so it doesn't throw off the controller
+- [x] Testing as a standalone solution
 - [ ] Example Configuration for Home Assistant
 
 ## Special Thanks
