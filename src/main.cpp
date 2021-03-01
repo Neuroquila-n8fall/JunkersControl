@@ -208,7 +208,7 @@ bool hcPump = false;
 //-- Hot Water Battery Mode Status
 bool hwBatteryMode = false;
 
-//-- Heating Seasonal Mode
+//-- Heating Seasonal Mode. True = Summer | False = Winter
 bool hcSeason = false;
 
 //-- Mixed-Circuit Pump Status
@@ -227,7 +227,7 @@ int curHours = 0;
 int curMinutes = 0;
 
 //-- Heating active / operational
-bool hcActive = false;
+bool hcActive = true;
 
 //-- Analog value of heating power
 int hcHeatingPower = 0;
@@ -446,6 +446,20 @@ void loop()
 
       break;
 
+
+      //DHW "Now" 
+      case 6:
+      msg.id = 0x254;
+      msg.data[0] = 0x00;
+      break;
+
+      //DHW Temperature Setpoint
+      case 7:
+      msg.id = 0x255;
+      msg.data[0] = 20;
+      break;
+
+
     default:
       //If we reach any undefined number inside the chain, reset to zero
       currentStep = 0;
@@ -614,6 +628,8 @@ void processCan()
      * Basepoint = Outside temperature at which the heating should deliver the highest possible feed temperature.
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
     **************************************/
+
+
     unsigned int rawTemp = 0;
     switch (Message.id)
     {
