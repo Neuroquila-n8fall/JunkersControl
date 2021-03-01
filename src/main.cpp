@@ -357,38 +357,8 @@ void loop()
     switch (currentStep)
     {
     case 0:
-      //Fetch the correct value depending on the current operational state of the heating.
-      if (hcActive)
-      {
-        //Send Setpoint
-        feedTemperature = CalculateFeedTemperature();       
-        feedSetpoint = ConvertFeedTemperature(feedTemperature);
-      }
-      else
-      {
-        //Send Minimum Setpoint
-
-        if (isOnFallback)
-        {
-          //Use fallback value when on fallback mode
-          feedSetpoint = ConvertFeedTemperature(fallbackMinimumFeedTemperature);
-        }
-        else
-        {
-          //Use commanded value when connected
-          feedSetpoint = ConvertFeedTemperature(mqttMinimumFeedTemperature);
-        }
-      }
-
-      msg.id = 0x252;
-      msg.data[0] = feedSetpoint;
-      if (Debug)
-      {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %f, INT representation (half steps) is %i",currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO" , feedTemperature, feedSetpoint);
-        String message(printbuf);
-        WriteToConsoles(message + "\r\n");
-      }
-
+      //Request Data
+      msg.id = 0xF9;
       break;
 
     case 1:
@@ -411,25 +381,69 @@ void loop()
       break;
 
     case 2:
-      //Switch heating on|off
-      //WRONG: Could be 0x253 to trigger on economy!
+      //Switch economy mode. This is always the opposite of the desired operational state
       msg.id = 0x253;
-      msg.data[0] = mqttHeatingSwitch;
+      msg.data[0] = !mqttHeatingSwitch;
       if (Debug)
       {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, hcActive);
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !mqttHeatingSwitch);
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
       break;
 
     case 3:
+      //Heating Operation Switch
+      msg.id = 0x250;
+      msg.data[0] = mqttHeatingSwitch;
+      if (Debug)
+      {
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, mqttHeatingSwitch);
+        String message(printbuf);
+        WriteToConsoles(message + "\r\n");
+      }
       break;
-
+    //Temperature regulation mode
+    // 1 = Weather guided | 0 = Room Temperature Guided
     case 4:
+      msg.id = 0x258;
+      msg.data[0] = !mqttHeatingSwitch;
       break;
 
     case 5:
+
+      //Fetch the correct value depending on the current operational state of the heating.
+      if (hcActive)
+      {
+        //Send Setpoint
+        feedTemperature = CalculateFeedTemperature();
+        feedSetpoint = ConvertFeedTemperature(feedTemperature);
+      }
+      else
+      {
+        //Send Minimum Setpoint
+
+        if (isOnFallback)
+        {
+          //Use fallback value when on fallback mode
+          feedSetpoint = ConvertFeedTemperature(fallbackMinimumFeedTemperature);
+        }
+        else
+        {
+          //Use commanded value when connected
+          feedSetpoint = ConvertFeedTemperature(mqttMinimumFeedTemperature);
+        }
+      }
+
+      msg.id = 0x252;
+      msg.data[0] = feedSetpoint;
+      if (Debug)
+      {
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
+        String message(printbuf);
+        WriteToConsoles(message + "\r\n");
+      }
+
       break;
 
     default:
@@ -441,6 +455,12 @@ void loop()
     //Send message if not empty and override is true.
     if (msg.id != 0 && Override)
     {
+      if (Debug)
+      {
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Sending CAN Message", currentStep);
+        String message(printbuf);
+        WriteToConsoles(message + "\r\n");
+      }
       can.tryToSend(msg);
     }
 
@@ -1059,7 +1079,7 @@ void ReadFromTelnet()
 }
 
 //-- Takes the parameters and calculates the desired feed temperature.
-//   This calculation takes in the desired base temperature at which the heating 
+//   This calculation takes in the desired base temperature at which the heating
 //   should perform 100% of the reported maximum feed temperature and when it should perform at the minimum temperature.
 //   The calculation maps endpoint and basepoint to minimum temperature and maximum feed temperature
 //   The original controller takes a different approach: It lets you decide which temperature should be set when the outside temperature is -15°C or -20°C for some models
