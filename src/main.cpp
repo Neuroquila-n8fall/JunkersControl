@@ -17,7 +17,7 @@
 //Set this to true to override the RC (TR/TA). Use with caution. Will write
 //  values on the bus and actively steers the heating when turned on.
 //  Will also conflict with any existing Room/Remote Controller on the bus.
-const bool Override = false;
+const bool Override = true;
 
 //Set this to true to view debug info
 const bool Debug = true;
@@ -351,14 +351,20 @@ void loop()
     //  intervals of approximately 1 second.
 
     CANMessage msg;
+    //This was the culprit of messages not arriving as they should.
+    //We have to set up the length of the message first. The heating doesn't care about that much but the library does!
+    msg.len = 8;
+    //These are here for reference only and are the default values of the ctr
+    msg.ext = false;
+    msg.rtr = false;
+    msg.idx = 0;
+
     char printbuf[255];
     double feedTemperature = 0.0F;
     int feedSetpoint = 0;
     switch (currentStep)
     {
     case 0:
-      //Request Data
-      msg.id = 0xF9;
       break;
 
     case 1:
@@ -392,25 +398,14 @@ void loop()
       }
       break;
 
-    case 3:
-      //Heating Operation Switch
-      msg.id = 0x250;
-      msg.data[0] = mqttHeatingSwitch;
-      if (Debug)
-      {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Operation: %d", currentStep, mqttHeatingSwitch);
-        String message(printbuf);
-        WriteToConsoles(message + "\r\n");
-      }
-      break;
     //Temperature regulation mode
     // 1 = Weather guided | 0 = Room Temperature Guided
-    case 4:
+    case 3:
       msg.id = 0x258;
-      msg.data[0] = !mqttHeatingSwitch;
+      msg.data[0] = 1;
       break;
 
-    case 5:
+    case 4:
 
       //Fetch the correct value depending on the current operational state of the heating.
       if (hcActive)
@@ -443,22 +438,30 @@ void loop()
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
-
+      //Report Feed Temperature back
+      if (Override)
+      {
+        client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
+      }      
+      
       break;
 
-
-      //DHW "Now" 
-      case 6:
+    //DHW "Now"
+    case 5:
       msg.id = 0x254;
-      msg.data[0] = 0x00;
+      msg.data[0] = 0x01;
       break;
 
-      //DHW Temperature Setpoint
-      case 7:
+    //DHW Temperature Setpoint
+    case 6:
       msg.id = 0x255;
       msg.data[0] = 20;
       break;
 
+    case 7:
+      //Request? Data
+      msg.id = 0xF9;
+      break;
 
     default:
       //If we reach any undefined number inside the chain, reset to zero
@@ -476,6 +479,35 @@ void loop()
         WriteToConsoles(message + "\r\n");
       }
       can.tryToSend(msg);
+
+      //Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
+      char dataBuf[9];
+      String data;
+
+      for (int x = 0; x < msg.len; x++)
+      {
+        //A little bit of trickery to assemble the data bytes into a nicely formatted string
+        sprintf(dataBuf, "%02X (%i)", msg.data[x], msg.data[x]);
+        //Convert char array to string
+        String temp(dataBuf);
+        //Get rid of trailing spaces
+        temp.trim();
+        //Concat
+        data += temp;
+        //Add tab between data
+        if (x < msg.len - 1)
+        {
+          data += "\t";
+        }
+      }
+
+      //Print string
+      sprintf(printbuf, "CAN: [%04X] Data:\t", msg.id);
+      String consoleMessage(printbuf);
+      consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
+      consoleMessage += data;
+      WriteToConsoles(consoleMessage);
+      WriteToConsoles("\r\n");
     }
 
     //Increase counter
@@ -628,7 +660,6 @@ void processCan()
      * Basepoint = Outside temperature at which the heating should deliver the highest possible feed temperature.
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
     **************************************/
-
 
     unsigned int rawTemp = 0;
     switch (Message.id)
