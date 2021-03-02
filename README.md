@@ -1,6 +1,6 @@
-#JunkersControl
+# JunkersControl
 
-##Table of contents
+## Table of contents
 - [Purpose and Aim](#purpose-and-aim)
   - [Cerasmart-er](#cerasmart-er)
 - [Contribution](#contribution)
