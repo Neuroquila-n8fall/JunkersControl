@@ -1,0 +1,42 @@
+input_boolean:
+  heizung_betrieb:
+    name: Heizungsbetrieb
+    initial: true
+  heizung_boost:
+    name: Boost
+    initial: false
+  heizung_fastheatup:
+    name: Schnellaufheizung
+    initial: false
+
+input_number:
+  heizung_fusspunkt:
+    name: "Fußpunkt Heizung"
+    min: -30
+    max: 75
+    mode: slider
+    unit_of_measurement: "°C"
+  heizung_endpunkt:
+    name: "Endpunkt Heizung"
+    min: 0
+    max: 75
+    mode: slider
+    unit_of_measurement: "°C"
+  heizung_minimum:
+    name: "Minimale Vorlauftemperatur Heizung"
+    min: 0
+    max: 75
+    mode: slider
+    unit_of_measurement: "°C"
+  heizung_boostdauer:
+    name: "Dauer der Boost-Funktion"
+    min: 0
+    max: 3600
+    mode: box
+    unit_of_measurement: "s"
+  heizung_zieltemperatur:
+    name: "Ziel Raumtemperatur"
+    min: 0
+    max: 35
+    mode: box
+    unit_of_measurement: "°C"

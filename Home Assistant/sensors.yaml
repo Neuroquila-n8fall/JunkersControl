@@ -1,0 +1,242 @@
+- platform: mqtt
+  name: "Testsensor"
+  state_topic: "test"
+- platform: mqtt
+  name: "Vorlauftemperatur Heizung"
+  state_topic: "heizung/temperaturen/vorlauf"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Nachlauftemperatur Heizung"
+  state_topic: "heizung/temperaturen/nachlauf"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Abgastemperatur Heizung"
+  state_topic: "heizung/temperaturen/abgas"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Umgebungstemperatur Heizung"
+  state_topic: "heizung/temperaturen/umgebung"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Maximale Vorlauftemperatur Heizung"
+  state_topic: "heizung/temperaturen/maxvorlauf"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Aktuelle Vorlauftemperatur Heizung"
+  state_topic: "heizung/temperaturen/aktvorlauf"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Soll-Vorlauftemperatur Heizung"
+  state_topic: "heizung/temperaturen/sollvorlauf"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Außentemperaturfühler Heizung"
+  state_topic: "heizung/temperaturen/aussen"
+  unit_of_measurement: "°C"
+- platform: mqtt
+  name: "Heizung Brenner"
+  state_topic: "heizung/status/brenner"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Pumpe"
+  state_topic: "heizung/status/pumpe"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Saisonaler Betriebsmodus"
+  state_topic: "heizung/status/betriebsmodus"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Fehler"
+  state_topic: "heizung/status/fehler"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Heizbetrieb"
+  state_topic: "heizung/status/heizbetrieb"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Boost"
+  state_topic: "heizung/status/boost"
+  force_update: true
+- platform: mqtt
+  name: "Heizung Schnellaufheizung"
+  state_topic: "heizung/status/schnellaufheizung"
+  force_update: true
+- platform: template
+  sensors:
+    heizung_brenner_zustand:
+      friendly_name: "Brenner"
+      value_template: >-
+        {% set value = is_state('sensor.heizung_brenner','1') %}
+        {% if value %}
+        An
+        {% else %}
+        Aus
+        {% endif %}
+      icon_template: >-
+        {% set value = is_state('sensor.heizung_brenner','1') %}
+        {% if value %}
+        mdi:fire
+        {% else %}
+        mdi:fire-off
+        {% endif %}
+    heizung_pumpe_zustand:
+      friendly_name: "Pumpe"
+      value_template: >-
+        {% set value = is_state('sensor.heizung_pumpe','1') %}
+        {% if value %}
+        An
+        {% else %}
+        Aus
+        {% endif %}
+      icon_template: >-
+        {% set value = is_state('sensor.heizung_pumpe','1') %}
+        {% if value %}
+        mdi:autorenew
+        {% else %}
+        mdi:sync-off
+        {% endif %}
+    heizung_heizbetrieb_zustand:
+      friendly_name: "Heizbetrieb"
+      value_template: >-
+        {% set value = is_state('sensor.heizung_heizbetrieb','1') %}
+        {% if value %}
+        An
+        {% else %}
+        Aus
+        {% endif %}
+      icon_template: >-
+        {% set value = is_state('sensor.heizung_heizbetrieb','1') %}
+        {% if value %}
+        mdi:radiator
+        {% else %}
+        mdi:radiator-disabled
+        {% endif %}
+    heizung_saisonmodus_zustand:
+      friendly_name: "Saisonaler Heizbetrieb"
+      value_template: >-
+        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','0') %}
+        {% if value %}
+        Sommer
+        {% else %}
+        Winter
+        {% endif %}
+      icon_template: >-
+        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','0') %}
+        {% if value %}
+        mdi:weather-sunny
+        {% else %}
+        mdi:weather-snowy
+        {% endif %}
+    heizung_fehler_zustand:
+      friendly_name: "Fehler"
+      value_template: >-
+        {% set value = states.heizung_fehler.state | upper %}
+        {% if value == "NONE" %}
+        Betrieb
+        {% elif value == "161" %}
+        A1: Kennfeldpumpe trockengelaufen
+        {% elif value == "162" %}
+        A2: Abgasaustritt: Brennkammer
+        {% elif value == "163" %}
+        A3: Abgas-NTC defekt: Strömungssicherung
+        {% elif value == "164" %}
+        A4: Abgasaustritt: Strömungssicherung
+        {% elif value == "166" %}
+        A6: Abgas-NTC defekt: Brennkammer
+        {% elif value == "167" %}
+        A7: Warmwasser-NTC defekt 
+        {% elif value == "168" %}
+        A8: CAN-Kommunikation unterbrochen
+        {% elif value == "170" %}
+        AA: Sekundär-Wärmetauscher verkalkt
+        {% elif value == "172" %}
+        AC: Modul nicht erkannt.
+        {% elif value == "173" %}
+        AD: Speicher-NTC 1 nicht erkannt 
+        {% elif value == "177" %}
+        B1: Kodierstecker nicht erkannt
+        {% elif value == "202" %}
+        CA: Turbinendrehzahl zu hoch
+        {% elif value == "204" %}
+        CC: Außentemperatur-NTC nicht erkannt
+        {% elif value == "209" %}
+        D1: LSM Verriegelt
+        {% elif value == "211" %}
+        D3: Brücke 8-9 nicht erkannt
+        {% elif value == "226" %}
+        E2: Vorlauftemperatur-NTC defekt
+        {% elif value == "229" %}
+        E5: Brenner-NTC Temperatur überschritten
+        {% elif value == "231" %}
+        E7: Brenner-NTC defekt
+        {% elif value == "233" %}
+        E9: STB im Vorlauf hat ausgelöst. Druck auf 1-2 Bar prüfen.
+        {% elif value == "234" %}
+        EA: Im Betrieb: Flamme wird nicht erkannt
+        {% elif value == "240" %}
+        F0: Interner Fehler
+        {% elif value == "247" %}
+        F7: Obwohl Gerät ausgeschaltet: Flamme wird erkannt
+        {% elif value == "250" %}
+        FA: Nach Gasabschaltung: Flamme wird erkannt
+        {% elif value == "252" %}
+        FC: Textdisplay nicht erkannt
+        {% elif value == "253" %}
+        FD: Entstörtaste irrtümlich gedrückt
+        {% endif %}
+      icon_template: >-
+        {% set value = states.heizung_fehler.state | upper %}
+        {% if value == "NONE" %}
+        mdi:check
+        {% else %}
+        mdi:alert-circle
+        {% endif %}
+- platform: template
+  sensors:
+    heating_parameters_preview:
+      friendly_name: "Vorschau aktuelle Vorlauftemperatur"
+      icon_template: mdi:thermometer
+      unit_of_measurement: "°C"
+      value_template: >-
+        {% set from_min =  states('input_number.heizung_endpunkt')|float %}
+        {% set from_max =  states('input_number.heizung_fusspunkt')|float %}
+        {% set to_min =  states('input_number.heizung_minimum')|float %}
+        {% set to_max =  states('sensor.maximale_vorlauftemperatur_heizung')|float %}
+        {% set input_value = states('sensor.aussentemperaturfuhler_heizung')|float %}
+        {{ ((input_value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min) | round(2) }}
+- platform: template
+  sensors:
+    heating_boost_active:
+      friendly_name: "Boostfunktion aktiv"
+      icon_template: >-
+        {% set value = states.sensor.heizung_boost.state | upper %}
+        {% if value == "on" %}
+        mdi:fire
+        {% else %}
+        mdi:cancel
+        {% endif %}
+      value_template: >-
+        {% set value = states.sensor.heizung_boost.state | upper %}
+        {% if value == "on" %}
+        An
+        {% else %}
+        Aus
+        {% endif %}
+- platform: template
+  sensors:
+    heating_fastheatup_active:
+      friendly_name: "Schnellaufheizung aktiv"
+      icon_template: >-
+        {% set value = states.sensor.heizung_schnellaufheizung.state | upper %}
+        {% if value == "on" %}
+        mdi:fast-forward
+        {% else %}
+        mdi:cancel
+        {% endif %}
+      value_template: >-
+        {% set value = states.sensor.heizung_schnellaufheizung.state | upper %}
+        {% if value == "on" %}
+        An
+        {% else %}
+        Aus
+        {% endif %}

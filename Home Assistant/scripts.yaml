@@ -1,0 +1,57 @@
+mqtt_set_heizungsparameter:
+  alias: Heizungsparameter setzen
+  icon: mdi:send
+  sequence:
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/fusspunkt
+      payload_template: '{{ states(''input_number.heizung_fusspunkt'') | int  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/endpunkt
+      payload_template: '{{ states(''input_number.heizung_endpunkt'') | int  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/minimum
+      payload_template: '{{ states(''input_number.heizung_minimum'') | int  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/boostduration
+      payload_template: '{{ states(''input_number.heizung_boostdauer'') | int  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/control/operation
+      payload_template: '{% set betrieb = states(''input_boolean.heizung_betrieb'')
+        %} {% if betrieb == ''on'' %} 1 {% else %} 0 {% endif %}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/ambient
+      payload_template: '{{ states(''sensor.wandthermostat_kueche_temperature'') |
+        float  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/targetambient
+      payload_template: '{{ states(''input_number.heizung_zieltemperatur'') | float  }}'
+  mode: single
+mqtt_set_heizungboost:
+  alias: Boost
+  icon: mdi:fire
+  sequence:
+  - service: homeassistant.toggle
+    entity_id: input_boolean.heizung_boost
+  - service: mqtt.publish
+    data:
+      topic: heizung/control/boost
+      payload_template: '{% set boost = states(''input_boolean.heizung_boost'') %}
+        {% if boost == ''on'' %} 1 {% else %} 0 {% endif %}'
+  mode: single
+mqtt_set_heizungfast:
+  alias: Schnellaufheizung
+  icon: mdi:fast-forward
+  sequence:
+  - service: mqtt.publish
+    data:
+      topic: heizung/control/fastheatup
+      payload_template: '{% set fast = states(''input_boolean.heizung_fastheatup'')
+        %} {% if fast == ''on'' %} 1 {% else %} 0 {% endif %}'
+  mode: single
