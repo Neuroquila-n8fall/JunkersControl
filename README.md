@@ -1,4 +1,5 @@
 #JunkersControl
+
 ##Table of contents
 - [Purpose and Aim](#purpose-and-aim)
   - [Cerasmart-er](#cerasmart-er)
@@ -13,7 +14,7 @@
 - [Todo](#todo)
 - [Special Thanks](#special-thanks)
 
-
+![Alt_Text](https://github.com/Neuroquila-n8fall/JunkersControl/blob/master/assets/example_ha_dashboard.jpg)
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
