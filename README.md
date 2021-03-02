@@ -62,6 +62,7 @@ Again, when in doubt, ask a technician.
 6) Ideally an ESP32 Kit but if you are just interested in the CAN-Stuff you can of course throw away all the MQTT and WiFi and just use a bog standard arduino.
 7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen")
 8) A MQTT broker (i.e. Mosquitto)
+9) Visual Studio Code & Platform.IO Add-On are recommended!
 
 ## Features
 - Control the parameters like base and endpoint values which are responsible for selecting the right feed temperature. This will calculate the required feed temperature like the original. See `mqtt_config.h` for related topics.
