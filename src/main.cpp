@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <arduino_secrets.h>
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ACAN2515.h>
@@ -8,287 +8,28 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
+//Main Header
+#include <main.h>
+//Secrets
+#include <arduino_secrets.h>
+//Template Functions
 #include <templates.h>
+//Include MQTT Topics
+#include <mqtt_config.h>
+//CAN Module Settings
+#include <can_config.h>
+//Telnet
+#include <telnet.h>
+//Heating Parameters
+#include <heating.h>
+//WiFi
+#include <wifi_config.h>
 
-//——————————————————————————————————————————————————————————————————————————————
-//  Operation
-//——————————————————————————————————————————————————————————————————————————————
-
-//Set this to true to override the RC (TR/TA). Use with caution. Will write
-//  values on the bus and actively steers the heating when turned on.
-//  Will also conflict with any existing Room/Remote Controller on the bus.
-const bool Override = true;
-
-//Set this to true to view debug info
-const bool Debug = true;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Structs
-//——————————————————————————————————————————————————————————————————————————————
-
-struct HeatingScheduleEntry
-{
-  int StartHour;
-  int StartMinute;
-  int DayOfWeek;
-  bool heat;
-};
-
-//——————————————————————————————————————————————————————————————————————————————
-//  MCP2515 SPI Pin Assignment
-//——————————————————————————————————————————————————————————————————————————————
-
-static const byte MCP2515_SCK = 18;  // SCK input of MCP2515
-static const byte MCP2515_MOSI = 23; // SDI input of MCP2515
-static const byte MCP2515_MISO = 19; // SDO output of MCP2515
-static const byte MCP2515_CS = 5;    // CS input of MCP2515 (adapt to your design)
-static const byte MCP2515_INT = 17;  // INT output of MCP2515 (adapt to your design)
-
-//——————————————————————————————————————————————————————————————————————————————
-//  MCP2515 Driver object
-//——————————————————————————————————————————————————————————————————————————————
-
-ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
-
-//——————————————————————————————————————————————————————————————————————————————
-//  MCP2515 Quartz: adapt to your design
-//——————————————————————————————————————————————————————————————————————————————
-
-static const uint32_t QUARTZ_FREQUENCY = 16UL * 1000UL * 1000UL; // 16 MHz
-
-//——————————————————————————————————————————————————————————————————————————————
-//  WiFi Settings
-const char *ssid = SECRET_SSID;
-const char *pass = SECRET_PASS;
-const char hostName[] = "FXHEATCTRL01";
-//-- WiFi Check interval for status output
-const int wifiRetryInterval = 30000;
-//-- Wifi Client object
-WiFiClient espClient;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  NTP Time Object
 //——————————————————————————————————————————————————————————————————————————————
 Timezone myTZ;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  MQTT Topics
-//——————————————————————————————————————————————————————————————————————————————
-
-//-- Subscriptions
-
-//Example Topic
-const char subTopic_Example[] = "heizung/control/something";
-
-//Heating ON|OFF Control
-const char subscription_OnOff[] = "heizung/control/operation";
-
-//Heating Setpoint Feed
-const char subscription_FeedSetpoint[] = "heizung/control/sollvorlauf";
-
-//Heating Adaption: Feed Temperature @ -15°C (ZSR24-6)
-const char subscription_FeedBaseSetpoint[] = "heizung/parameters/fusspunkt";
-
-//Heating Adaption: Feed Cut-Off Temperature based on outside temperature reading
-const char subscription_FeedCutOff[] = "heizung/parameters/endpunkt";
-
-//Heating Adaption: Minimum Temperature of Feed (Anti-Freeze)
-const char subscription_FeedMinimum[] = "heizung/parameters/minimum";
-
-//Secondary Outside Temperature Source
-const char subscription_AuxTemperature[] = "umwelt/temperaturen/aussen";
-
-//Ambient Temperature Source
-const char subscription_AmbientTemperature[] = "heizung/parameters/ambient";
-
-//-- Published Topics
-
-//Maximum Feed Temperature
-const char pub_HcMaxFeedTemperature[] = "heizung/temperaturen/maxvorlauf";
-
-//Current Feed Temperature
-const char pub_CurFeedTemperature[] = "heizung/temperaturen/aktvorlauf";
-
-//Setpoint of feed Temperature
-const char pub_SetpointFeedTemperature[] = "heizung/temperaturen/sollvorlauf";
-
-//The Temperature on the Outside
-const char pub_OutsideTemperature[] = "heizung/temperaturen/aussen";
-
-//Flame status
-const char pub_GasBurner[] = "heizung/status/brenner";
-
-//Heating Circuit Pump Status
-const char pub_HcPump[] = "heizung/status/pumpe";
-
-//General Error Flag
-const char pub_Error[] = "heizung/status/fehler";
-
-//Seasonal Operation Flag
-const char pub_Season[] = "heizung/status/betriebsmodus";
-
-//Heating Operating
-const char pub_HcOperation[] = "heizung/status/heizbetrieb";
-
-//-- MQTT Endpoint
-const char *mqttServer = mqttSERVER;
-const char *mqttUsername = mqttUSERNAME;
-const char *mqttPassword = mqttPASSWORD;
-
-//-- MQTT Client (uses Wifi Client)
-PubSubClient client(espClient);
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Constants for heating control
-//——————————————————————————————————————————————————————————————————————————————
-
-//Basepoint for linear temperature calculation
-const int calcHeatingBasepoint = -15;
-
-//Endpoint for linear temperature calculation
-const int calcHeatingEndpoint = 21;
-
-//Switch-On Temperature Threshold. The Heating should start to heat if the ambient temperature is lower than this value.
-const int calcTriggerAntiFreeze = 10;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Server for remote console. We're using the telnet port here
-//——————————————————————————————————————————————————————————————————————————————
-
-const uint TelnetServerPort = 23;
-WiFiServer TelnetServer(TelnetServerPort);
-WiFiClient TelnetRemoteClient;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Variables
-//——————————————————————————————————————————————————————————————————————————————
-
-//-- OTA Flag
-bool otaRunning = false;
-
-//-- WiFi Status Timer Variable
-unsigned long wifiConnectMillis = 0L;
-
-//-- One-Second Interval Timer Variable
-unsigned long oneSecondTimer = 0L;
-
-//-- Five-Second Interval Timer Variable
-unsigned long fiveSecondTimer = 0L;
-
-//-- Thirty-Second Interval Timer Variable
-unsigned long thirtySecondTimer = 0L;
-
-//-- Step-Counter
-int currentStep = 0;
-
-//-- Temperature
-double temp = 0.00F;
-
-//-- Heating Circuit: Max. Feed Temperature (From Controller)
-double hcMaxFeed = 70.00F;
-
-//-- Heating Circuit: Current Feed Temperature (From Controller)
-double HkAktVorlauf = 0.00F;
-
-//-- Heating Circuit: Feed Temperature Setpoint (Control Value)
-double HkSollVorlauf = 40.00F;
-
-//-- Heating Controller: Current Temperature on the Outside (From Controller)
-double OutsideTemperatureSensor = 0.00F;
-
-//-- Heating Controller: Flame lit (From Controller)
-bool flame = false;
-
-//-- Heating Controller: Status. 0x0 = Operational. Error Flags vary between models!
-uint8_t status = 0x00;
-
-//-- Heating Circuit: Circulation Pump on|off
-bool hcPump = false;
-
-//-- Hot Water Battery Mode Status
-bool hwBatteryMode = false;
-
-//-- Heating Seasonal Mode. True = Summer | False = Winter
-bool hcSeason = false;
-
-//-- Mixed-Circuit Pump Status
-bool mcPump = false;
-
-//-- Mixed-Circuit Economy Setting
-bool mcEconomy = false;
-
-//-- Current Day of the week as configured by the CC
-int curDayOfWeek = 0;
-
-//-- Current Hour component
-int curHours = 0;
-
-//-- Current Minutes component
-int curMinutes = 0;
-
-//-- Heating active / operational
-bool hcActive = true;
-
-//-- Analog value of heating power
-int hcHeatingPower = 0;
-
-//-- Hot Water "now" setting.
-bool hwNow = false;
-
-//-- Variables set by MQTT subscriptions with factory defaults at startup
-
-//Feed Temperature
-double mqttFeedTemperatureSetpoint = 50.0F;
-//Basepoint Temperature
-double mqttBasepointTemperature = -10.0F;
-//Endpoint Temperature
-double mqttEndpointTemperature = 31.0F;
-//Ambient Temperature
-double mqttAmbientTemperature = 0.0F;
-//Minimum ("Anti Freeze") Temperature.
-double mqttMinimumFeedTemperature = 10.0F;
-//Wether the heating should be off or not
-bool mqttHeatingSwitch = true;
-//Auxilary Temperature
-double mqttAuxilaryTemperature = 0.0F;
-
-//-- Fallback Values
-
-//Basepoint Temperature
-double fallbackBasepointTemperature = -10.0F;
-//Endpoint Temperature
-double fallbackEndpointTemperature = 31.0F;
-//Ambient Temperature
-double fallbackAmbientTemperature = 0.0F;
-//Minimum ("Anti Freeze") Temperature.
-double fallbackMinimumFeedTemperature = 10.0F;
-//Enforces the fallback values when set to TRUE
-bool isOnFallback = false;
-
-//-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
-HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
-HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Function Definition. Required by Platform.io Compiler.
-//——————————————————————————————————————————————————————————————————————————————
-
-void connectWifi();
-void ota();
-void reconnectMqtt();
-void setupCan();
-void processCan();
-void callback(char *topic, byte *payload, unsigned int length);
-String generateClientId();
-void CheckForConnections();
-void WriteToConsoles(String message);
-void ReadFromTelnet();
-
-void SyncTimeIfRequired();
-bool TimeIsSynced();
-
-double CalculateFeedTemperature();
-int ConvertFeedTemperature(double temperature);
 
 void setup()
 {
@@ -311,8 +52,9 @@ void setup()
 
 void loop()
 {
-
+  //store the current timer millis
   unsigned long currentMillis = millis();
+  //Connect WiFi (if disconnected)
   connectWifi();
   //-------------------------------------
   //-- NOTE: The code below won't be reached until the WiFi has connected within connectWifi().
@@ -333,13 +75,47 @@ void loop()
   CheckForConnections();
   //Read Telnet commands
   ReadFromTelnet();
-
+  //——————————————————————————————————————————————————————————————————————————————
   //Actions performed every second
+  //——————————————————————————————————————————————————————————————————————————————
   if (currentMillis - oneSecondTimer >= 1000)
   {
+    char printbuf[255];
     oneSecondTimer = currentMillis;
     //Ensure that we are connected to MQTT
     reconnectMqtt();
+
+    //Boost Function
+    if (mqttBoost)
+    {
+      //Countdown to zero and switch off boost if 0
+      if (boostTimeCountdown > 0)
+      {
+        boostTimeCountdown--;
+        if (Debug)
+        {
+          sprintf(printbuf, "DEBUG BOOST: Time: %i Left: %i \r\n", mqttBoostDuration, boostTimeCountdown);
+          String message(printbuf);
+          WriteToConsoles(message);
+        }
+      }
+      else
+      {
+        mqttBoost = false;
+      }
+    }
+
+    //If we didn't spot a controller message on the network for x seconds we will take over control.
+    //As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
+    if (currentMillis - controllerMessageTimer >= controllerMessageTimeout)
+    {
+      //Bail out if we already set this...
+      if (!Override)
+      {
+        Override = true;
+        WriteToConsoles("No other controller on the network. Enabling Override.\r\n");
+      }
+    }
 
     //Send desired Values to the heating controller
     //Note that it cannot perform unrealistic actions.
@@ -359,7 +135,6 @@ void loop()
     msg.rtr = false;
     msg.idx = 0;
 
-    char printbuf[255];
     double feedTemperature = 0.0F;
     int feedSetpoint = 0;
     switch (currentStep)
@@ -407,28 +182,10 @@ void loop()
 
     case 4:
 
-      //Fetch the correct value depending on the current operational state of the heating.
-      if (hcActive)
-      {
-        //Send Setpoint
-        feedTemperature = CalculateFeedTemperature();
-        feedSetpoint = ConvertFeedTemperature(feedTemperature);
-      }
-      else
-      {
-        //Send Minimum Setpoint
-
-        if (isOnFallback)
-        {
-          //Use fallback value when on fallback mode
-          feedSetpoint = ConvertFeedTemperature(fallbackMinimumFeedTemperature);
-        }
-        else
-        {
-          //Use commanded value when connected
-          feedSetpoint = ConvertFeedTemperature(mqttMinimumFeedTemperature);
-        }
-      }
+      //Get raw Setpoint
+      feedTemperature = CalculateFeedTemperature();
+      //Transform it into the int representation
+      feedSetpoint = ConvertFeedTemperature(feedTemperature);
 
       msg.id = 0x252;
       msg.data[0] = feedSetpoint;
@@ -438,12 +195,19 @@ void loop()
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
-      //Report Feed Temperature back
+      //Report Values back to the Broker if on Override.
       if (Override)
       {
+        //Report back Operational State
+        client.publish(pub_HcOperation, hcActive ? "1" : "0");
+        //Report back feed setpoint
         client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
-      }      
-      
+        //Report back Boost status
+        client.publish(pub_Boost, mqttBoost ? "1" : "0");
+        //Report back Fastheatup status
+        client.publish(pub_Fastheatup, mqttFastHeatup ? "1" : "0");
+      }
+
       break;
 
     //DHW "Now"
@@ -514,13 +278,17 @@ void loop()
     currentStep++;
   }
 
+  //——————————————————————————————————————————————————————————————————————————————
   //Actions performed every five seconds
+  //——————————————————————————————————————————————————————————————————————————————
   if (currentMillis - fiveSecondTimer >= 5000)
   {
     fiveSecondTimer = currentMillis;
   }
 
+  //——————————————————————————————————————————————————————————————————————————————
   //Actions performed every thirty seconds
+  //——————————————————————————————————————————————————————————————————————————————
   if (currentMillis - thirtySecondTimer >= 30000)
   {
     thirtySecondTimer = currentMillis;
@@ -528,6 +296,8 @@ void loop()
     // Run on fallback values when the connection to the server has been lost.
     if (TimeIsSynced() && !client.connected())
     {
+
+      //Note: negate this statement to try out the fallback mode.
       if (!Debug)
       {
         //Activate fallback
@@ -570,6 +340,42 @@ void loop()
       isOnFallback = false;
       WriteToConsoles("Connection established. Switching over to SCADA!\r\n");
     }
+  }
+}
+
+//Simply takes all current states into account and dispatches the setpoint message immediately.
+void SetFeedTemperature()
+{
+  CANMessage msg;
+  //This was the culprit of messages not arriving as they should.
+  //We have to set up the length of the message first. The heating doesn't care about that much but the library does!
+  msg.len = 8;
+  //These are here for reference only and are the default values of the ctr
+  msg.ext = false;
+  msg.rtr = false;
+  msg.idx = 0;
+
+  char printbuf[255];
+  double feedTemperature = 0.0F;
+  int feedSetpoint = 0;
+
+  //Get raw Setpoint
+  feedTemperature = CalculateFeedTemperature();
+  //Transform it into the int representation
+  feedSetpoint = ConvertFeedTemperature(feedTemperature);
+
+  msg.id = 0x252;
+  msg.data[0] = feedSetpoint;
+  if (Debug)
+  {
+    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", feedTemperature, feedSetpoint);
+    String message(printbuf);
+    WriteToConsoles(message + "\r\n");
+  }
+  //Report Feed Temperature back
+  if (Override)
+  {
+    client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
   }
 }
 
@@ -617,6 +423,7 @@ void processCan()
   CANMessage Message;
   if (can.receive(Message))
   {
+    unsigned long curMillis = millis();
     //Buffer for sending console output. 100 chars should be enough for now:
     //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
     char printBuf[100];
@@ -641,6 +448,15 @@ void processCan()
       }
     }
 
+    //Check for other controllers on the network by watching out for messages that are greater than 0x250
+    if (Message.id > 0x250)
+    {
+      //Switch off override if another controller sends messages on the network.
+      Override = false;
+      controllerMessageTimer = curMillis;
+      WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
+    }
+
     //Print string
     sprintf(printBuf, "CAN: [%04X] Data:\t", Message.id);
     String consoleMessage(printBuf);
@@ -662,6 +478,7 @@ void processCan()
     **************************************/
 
     unsigned int rawTemp = 0;
+    char errorCode[2];
     switch (Message.id)
     {
 
@@ -716,7 +533,8 @@ void processCan()
     //       Error codes and their meaning vary between models. See your manual for details.
     case 0x206:
       status = Message.data[0];
-      client.publish(pub_Error, String(status).c_str());
+      String(status).toCharArray(errorCode, 2);
+      client.publish(pub_Error, errorCode);
       break;
 
     //[Controller] - Current outside temperature
@@ -907,6 +725,30 @@ void callback(char *topic, byte *payload, unsigned int length)
     mqttMinimumFeedTemperature = d;
   }
 
+  //Read Ambient Temperature
+  if (strcmp(topic, subscription_AmbientTemperature) == 0)
+  {
+    // Transform payload into a double
+    double d = s.toDouble();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Ambient >> " + s + "\r\n");
+    }
+    mqttAmbientTemperature = d;
+  }
+
+  //Read Target Ambient Temperature
+  if (strcmp(topic, subscription_TargetAmbientTemperature) == 0)
+  {
+    // Transform payload into a double
+    double d = s.toDouble();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Ambient Target >> " + s + "\r\n");
+    }
+    mqttTargetAmbientTemperature = d;
+  }
+
   //Read Heating on|off
   if (strcmp(topic, subscription_OnOff) == 0)
   {
@@ -916,6 +758,48 @@ void callback(char *topic, byte *payload, unsigned int length)
     mqttHeatingSwitch = (i == 1 ? true : false);
     //Write value to the "control" level
     hcActive = mqttHeatingSwitch;
+  }
+
+  //Read Boost on|off
+  if (strcmp(topic, subscription_OnDemandBoost) == 0)
+  {
+    // Transform payload into an integer
+    int i = s.toInt();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Boost >> " + s + "\r\n");
+    }
+    mqttBoost = (i == 1 ? true : false);
+    //Start Immediately.
+    SetFeedTemperature();
+  }
+
+  //Read Boost Duration
+  if (strcmp(topic, subscription_OnDemandBoostDuration) == 0)
+  {
+    // Transform payload into an integer
+    int i = s.toInt();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Boost Duration >> " + s + "\r\n");
+    }
+    mqttBoostDuration = i;
+  }
+
+  //Read FastHeatup on|off
+  if (strcmp(topic, subscription_FastHeatup) == 0)
+  {
+    // Transform payload into an integer
+    int i = s.toInt();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Fast Heatup >> " + s + "\r\n");
+    }
+    mqttFastHeatup = (i == 1 ? true : false);
+    //Start Immediately.
+    SetFeedTemperature();
+    //Set reference Temperature
+    referenceAmbientTemperature = mqttAmbientTemperature;
   }
 }
 
@@ -1034,11 +918,15 @@ void reconnectMqtt()
       client.subscribe(subTopic_Example);
       client.subscribe(subscription_AuxTemperature);
       client.subscribe(subscription_AmbientTemperature);
+      client.subscribe(subscription_TargetAmbientTemperature);
       client.subscribe(subscription_FeedBaseSetpoint);
       client.subscribe(subscription_FeedCutOff);
       client.subscribe(subscription_FeedSetpoint);
       client.subscribe(subscription_FeedMinimum);
       client.subscribe(subscription_OnOff);
+      client.subscribe(subscription_OnDemandBoost);
+      client.subscribe(subscription_OnDemandBoostDuration);
+      client.subscribe(subscription_FastHeatup);
     }
     else
     {
@@ -1133,6 +1021,7 @@ void ReadFromTelnet()
 //   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
 double CalculateFeedTemperature()
 {
+  char printbuf[255];
   //Map the current ambient temperature to the desired feed temperature:
   //        Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
   if (!hcActive)
@@ -1154,12 +1043,81 @@ double CalculateFeedTemperature()
     return mqttBasepointTemperature;
   }
 
-  double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
+  //Return max feed temperature when boost is requested.
+  if (mqttBoost)
+  {
+    return hcMaxFeed;
+  }
 
+  //Map Value
+  double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
+  //Add Adaption
+  linearTemp += mqttFeedAdaption;
+  //Round value to half steps
   double halfRounded = llround(linearTemp * 2) / 2.0;
+
+  //Return max feed temperature if fast heatup is on and the ambient temperature hasn't been reached yet.
+  if (mqttFastHeatup)
+  {
+    //Target Temperature hasn't been reached
+    if (mqttAmbientTemperature < mqttTargetAmbientTemperature)
+    {
+
+      //Let's tune this so the heating hasn't to work that hard all the way
+      //  We can take the temperature difference as reference and map the max feed temperature accordingly
+      //First we calculate the difference between desired temperature (target) and actual value
+      double tempDiff = mqttTargetAmbientTemperature - mqttAmbientTemperature;
+
+      //Sanity check: max feed equals calculated
+      if (hcMaxFeed == linearTemp)
+      {
+        //Bail out.
+        return hcMaxFeed;
+      }
+
+      //Note: We don't have to check the target and current ambient temperature as this case is already handled by the initial comparison
+
+      //Now we map the difference, which is decreasing over time, to the fixed range between reference (=starting point) and target ambient
+      //  We map it according to the maximum available feed temperature and the currently calculated temperature.
+      //Previous checks will prevent any divisions by zero that would otherwise stop the MC from operating
+      double fhTemp = map_Generic(tempDiff, 0, tempDiff, linearTemp, hcMaxFeed);
+      //Expected Values:
+      //Room Temperature is 17°C
+      //Target is 21°C
+      //Difference is 4°C
+      //Calculated Feed is 50°
+      //Max is 75°C
+      //Result: ( ( 4   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 4   -   0 )   +   50 = 75
+
+      //Room Temperature is 21°C
+      //Target is 21°C
+      //Difference is 0°C
+      //Calculated Feed is 50°
+      //Max is 75°C
+      //Result: ( ( 0   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 0   -   0 )   +   50 = 50
+      //Half-Step-Round
+      double hrFhTemp = llround(fhTemp * 2) / 2.0;
+
+      if (Debug)
+      {
+        sprintf(printbuf, "DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f \r\n", mqttAmbientTemperature, mqttTargetAmbientTemperature, fhTemp);
+        String message(printbuf);
+        WriteToConsoles(message);
+      }
+
+      //Return Result.
+      return hrFhTemp;
+    }
+    //If we reached the goal, set it to false again so it won't trigger again when the temperature drops
+    else
+    {
+      mqttFastHeatup = false;
+    }
+  }
+
   if (Debug)
   {
-    char printbuf[255];
+
     sprintf(printbuf, "DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed, linearTemp, halfRounded);
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
@@ -1167,11 +1125,13 @@ double CalculateFeedTemperature()
   return halfRounded;
 }
 
+//Converts the value to its half-step representation (= value times two)
 int ConvertFeedTemperature(double temperature)
 {
   return temperature * 2;
 }
 
+//Sync using NTP, if clock is off
 void SyncTimeIfRequired()
 {
   //Sync Time if required
@@ -1182,6 +1142,7 @@ void SyncTimeIfRequired()
   }
 }
 
+//Returns TRUE if the clock is on point and false if it requires calibration
 bool TimeIsSynced()
 {
   return timeStatus() == timeSet;
