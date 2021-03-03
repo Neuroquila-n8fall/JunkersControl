@@ -1075,12 +1075,15 @@ double CalculateFeedTemperature()
         return hcMaxFeed;
       }
 
+      //This is the initial temperature difference when heatup started. referenceAmbientTemperature is set as soon as mqttFastHeatup is activated
+      double initialReferenceDifference = mqttTargetAmbientTemperature - referenceAmbientTemperature;
+
       //Note: We don't have to check the target and current ambient temperature as this case is already handled by the initial comparison
 
       //Now we map the difference, which is decreasing over time, to the fixed range between reference (=starting point) and target ambient
       //  We map it according to the maximum available feed temperature and the currently calculated temperature.
       //Previous checks will prevent any divisions by zero that would otherwise stop the MC from operating
-      double fhTemp = map_Generic(tempDiff, 0, tempDiff, linearTemp, hcMaxFeed);
+      double fhTemp = map_Generic(tempDiff, 0, initialReferenceDifference, linearTemp, hcMaxFeed);
       //Expected Values:
       //Room Temperature is 17°C
       //Target is 21°C
