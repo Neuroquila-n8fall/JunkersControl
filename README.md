@@ -63,6 +63,7 @@ Again, when in doubt, ask a technician.
 7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen")
 8) A MQTT broker (i.e. Mosquitto)
 9) Visual Studio Code & Platform.IO Add-On are recommended!
+10) Optional: DS18B20 Sensors
 
 ## Features
 - Control the parameters like base and endpoint values which are responsible for selecting the right feed temperature. This will calculate the required feed temperature like the original. See `mqtt_config.h` for related topics.
