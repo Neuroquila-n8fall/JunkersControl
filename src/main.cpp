@@ -7,6 +7,8 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 //Main Header
 #include <main.h>
@@ -24,7 +26,8 @@
 #include <heating.h>
 //WiFi
 #include <wifi_config.h>
-
+//Temperature Sensors
+#include <t_sensors.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  NTP Time Object
@@ -33,21 +36,30 @@ Timezone myTZ;
 
 void setup()
 {
-
   //Setup MQTT client
   client.setServer(mqttServer, 1883);
   client.setCallback(callback);
   client.setKeepAlive(10);
   //Setup Serial
   Serial.begin(115200);
+
   //Setup can module
   setupCan();
+
   //Connect WiFi. This call will block the thread until a result of the connection attempt has been received. This is very important for OTA to work.
   connectWifi();
   //-------------------------------------
   //-- NOTE: The code below won't be reached until the WiFi has connected within connectWifi().
   ota();
   TelnetServer.begin();
+
+  //Initialize the Dallas library
+  sensors.begin();
+  //Set Resolution for all attached sensors
+  sensors.setResolution(feed_sens, TEMPERATURE_PRECISION);
+  sensors.setResolution(return_sens, TEMPERATURE_PRECISION);
+  sensors.setResolution(exhaust_sens, TEMPERATURE_PRECISION);
+  sensors.setResolution(ambient_sens, TEMPERATURE_PRECISION);
 }
 
 void loop()
@@ -284,6 +296,16 @@ void loop()
   if (currentMillis - fiveSecondTimer >= 5000)
   {
     fiveSecondTimer = currentMillis;
+
+    //Request remperatures and report them back to the MQTT broker
+    //  BUG: Either something is wrong on my side or in this combination of all used libraries this doesnt work.
+    //  Output shows always this:
+    //  DEBUG TEMP READING: Feed Sensor: 45.25 °C
+    //  DEBUG TEMP READING: Return Sensor is not reachable! << sometimes works but returns 85
+    //  DEBUG TEMP READING: Exhaust Sensor: 85.00 °C << always 
+    //  DEBUG TEMP READING: Ambient Sensor is not reachable! << works never
+
+    //ReadAndSendTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————
@@ -1162,4 +1184,86 @@ void SyncTimeIfRequired()
 bool TimeIsSynced()
 {
   return timeStatus() == timeSet;
+}
+
+//Reads the attached temperature sensors and publishes the values to MQTT
+void ReadAndSendTemperatures()
+{
+  sensors.requestTemperatures();
+  char printBuf[255];
+  float value = sensors.getTempC(feed_sens);
+  if (value != DEVICE_DISCONNECTED_C)
+  {
+    client.publish(pub_SensorFeed, String(value).c_str());
+    if (Debug)
+    {
+      sprintf(printBuf, "DEBUG TEMP READING: Feed Sensor: %.2f °C\r\n", value);
+      String message(printBuf);
+      WriteToConsoles(message);
+    }
+  }
+  else
+  {
+    if (Debug)
+    {
+      WriteToConsoles("DEBUG TEMP READING: Feed Sensor is not reachable!\r\n");
+    }
+  }
+
+  value = sensors.getTempC(return_sens);
+  if (value != DEVICE_DISCONNECTED_C)
+  {
+    client.publish(pub_SensorReturn, String(value).c_str());
+    if (Debug)
+    {
+      sprintf(printBuf, "DEBUG TEMP READING: Return Sensor: %.2f °C\r\n", value);
+      String message(printBuf);
+      WriteToConsoles(message);
+    }
+  }
+  else
+  {
+    if (Debug)
+    {
+      WriteToConsoles("DEBUG TEMP READING: Return Sensor is not reachable!\r\n");
+    }
+  }
+
+  value = sensors.getTempC(exhaust_sens);
+  if (value != DEVICE_DISCONNECTED_C)
+  {
+    client.publish(pub_SensorExhaust, String(value).c_str());
+    if (Debug)
+    {
+      sprintf(printBuf, "DEBUG TEMP READING: Exhaust Sensor: %.2f °C\r\n", value);
+      String message(printBuf);
+      WriteToConsoles(message);
+    }
+  }
+  else
+  {
+    if (Debug)
+    {
+      WriteToConsoles("DEBUG TEMP READING: Exhaust Sensor is not reachable!\r\n");
+    }
+  }
+
+  value = sensors.getTempC(ambient_sens);
+  if (value != DEVICE_DISCONNECTED_C)
+  {
+    client.publish(pub_SensorAmbient, String(value).c_str());
+    if (Debug)
+    {
+      sprintf(printBuf, "DEBUG TEMP READING: Ambient Sensor: %.2f °C\r\n", value);
+      String message(printBuf);
+      WriteToConsoles(message);
+    }
+  }
+  else
+  {
+    if (Debug)
+    {
+      WriteToConsoles("DEBUG TEMP READING: Ambient Sensor is not reachable!\r\n");
+    }
+  }
 }
