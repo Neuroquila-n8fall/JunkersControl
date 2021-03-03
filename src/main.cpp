@@ -1203,7 +1203,7 @@ void ReadAndSendTemperatures()
       WriteToConsoles("DEBUG TEMP READING: Feed Sensor is not reachable!\r\n");
     }
   }
-
+  sensors.requestTemperatures();
   value = sensors.getTempC(return_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
@@ -1222,7 +1222,7 @@ void ReadAndSendTemperatures()
       WriteToConsoles("DEBUG TEMP READING: Return Sensor is not reachable!\r\n");
     }
   }
-
+  sensors.requestTemperatures();
   value = sensors.getTempC(exhaust_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
@@ -1241,7 +1241,7 @@ void ReadAndSendTemperatures()
       WriteToConsoles("DEBUG TEMP READING: Exhaust Sensor is not reachable!\r\n");
     }
   }
-
+  sensors.requestTemperatures();
   value = sensors.getTempC(ambient_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
