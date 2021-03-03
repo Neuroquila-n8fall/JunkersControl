@@ -96,4 +96,20 @@ const char pub_Boost[] = "heizung/status/boost";
 //Fast Heatup
 const char pub_Fastheatup[] = "heizung/status/schnellaufheizung";
 
+
+
+//-- Topics for Temperature Sensor Readings
+
+//Feed Temperature Topic
+const char pub_SensorFeed[] = "heizung/temperaturen/vorlauf";
+
+//Return Temperature Topic
+const char pub_SensorReturn[] = "heizung/temperaturen/nachlauf";
+
+//Exhaust Temperature Topic
+const char pub_SensorExhaust[] = "heizung/temperaturen/abgas";
+
+//Ambient Temperature Topic
+const char pub_SensorAmbient[] = "heizung/temperaturen/umgebung";
+
 #endif

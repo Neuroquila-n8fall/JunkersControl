@@ -177,4 +177,6 @@ int ConvertFeedTemperature(double temperature);
 
 void SetFeedTemperature();
 
+void ReadAndSendTemperatures();
+
 #endif
