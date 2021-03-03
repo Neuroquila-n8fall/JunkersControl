@@ -298,14 +298,8 @@ void loop()
     fiveSecondTimer = currentMillis;
 
     //Request remperatures and report them back to the MQTT broker
-    //  BUG: Either something is wrong on my side or in this combination of all used libraries this doesnt work.
-    //  Output shows always this:
-    //  DEBUG TEMP READING: Feed Sensor: 45.25 °C
-    //  DEBUG TEMP READING: Return Sensor is not reachable! << sometimes works but returns 85
-    //  DEBUG TEMP READING: Exhaust Sensor: 85.00 °C << always 
-    //  DEBUG TEMP READING: Ambient Sensor is not reachable! << works never
-
-    //ReadAndSendTemperatures();
+    //  Note: If 85.00° is shown or "unreachable" then the wiring is bad.
+    ReadAndSendTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————
