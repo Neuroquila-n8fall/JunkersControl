@@ -58,6 +58,9 @@ const char subscription_OnDemandBoostDuration[] = "heizung/parameters/boostdurat
 //Fast-Heatup
 const char subscription_FastHeatup[] = "heizung/control/fastheatup";
 
+//Adaption
+const char subscription_Adaption[] = "heizung/parameters/adaption";
+
 //-- Published Topics
 
 //Maximum Feed Temperature

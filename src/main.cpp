@@ -749,6 +749,18 @@ void callback(char *topic, byte *payload, unsigned int length)
     mqttTargetAmbientTemperature = d;
   }
 
+  //Read Target Ambient Temperature
+  if (strcmp(topic, subscription_Adaption) == 0)
+  {
+    // Transform payload into a double
+    double d = s.toDouble();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Adaption >> " + s + "\r\n");
+    }
+    mqttFeedAdaption = d;
+  }
+
   //Read Heating on|off
   if (strcmp(topic, subscription_OnOff) == 0)
   {
@@ -919,6 +931,7 @@ void reconnectMqtt()
       client.subscribe(subscription_AuxTemperature);
       client.subscribe(subscription_AmbientTemperature);
       client.subscribe(subscription_TargetAmbientTemperature);
+      client.subscribe(subscription_Adaption);
       client.subscribe(subscription_FeedBaseSetpoint);
       client.subscribe(subscription_FeedCutOff);
       client.subscribe(subscription_FeedSetpoint);
