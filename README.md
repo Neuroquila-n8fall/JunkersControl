@@ -1,20 +1,33 @@
 # JunkersControl
 
 ## Table of contents
-- [Purpose and Aim](#purpose-and-aim)
-  - [Cerasmart-er](#cerasmart-er)
-- [Contribution](#contribution)
-- [Intended Audience](#intended-audience)
-- [A word of warning](#a-word-of-warning)
-  - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
-- [Prerequisites](#prerequisites)
-- [Features](#features)
-- [Hints](#hints)
-- [File Structure](#file-structure)
-- [Todo](#todo)
-- [Special Thanks](#special-thanks)
+- [JunkersControl](#junkerscontrol)
+  - [Table of contents](#table-of-contents)
+  - [Purpose and Aim](#purpose-and-aim)
+    - [Cerasmart-er](#cerasmart-er)
+  - [Contribution](#contribution)
+  - [Intended Audience](#intended-audience)
+  - [A word of warning](#a-word-of-warning)
+    - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
+  - [Prerequisites](#prerequisites)
+  - [Features](#features)
+    - [MQTT](#mqtt)
+    - [Heating Parameters](#heating-parameters)
+    - [Night/Economy Mode](#nighteconomy-mode)
+    - [Switch Off/On](#switch-offon)
+    - [Boost](#boost)
+    - [Fast Heatup](#fast-heatup)
+    - [Fallback and Failsafe](#fallback-and-failsafe)
+    - [Automatic Controller Detection](#automatic-controller-detection)
+    - [External Temperature Sensors](#external-temperature-sensors)
+    - [OTA Updates and Console](#ota-updates-and-console)
+  - [Hints](#hints)
+  - [File Structure](#file-structure)
+  - [Dedicated PCB](#dedicated-pcb)
+  - [Todo](#todo)
+  - [Special Thanks](#special-thanks)
 
-![Alt_Text](https://github.com/Neuroquila-n8fall/JunkersControl/blob/master/assets/example_ha_dashboard.jpg)
+![Alt_Text](/assets/example_ha_dashboard.jpg)
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -66,14 +79,96 @@ Again, when in doubt, ask a technician.
 10) Optional: DS18B20 Sensors
 
 ## Features
-- Control the parameters like base and endpoint values which are responsible for selecting the right feed temperature. This will calculate the required feed temperature like the original. See `mqtt_config.h` for related topics.
-- Because we are in full control over the feed temperature we can also account for weather, humidity and actual room temperatures, if we like.
-- Switch heating to the economy mode i.e. in the night time. Just send `0` or `1` to the topic described inside `mqtt_config.h` named `subscription_OnOff`. It will then select the feed temperature according to `mqttMinimumFeedTemperature` inside `main.h` and enable economy mode.
-- Report of parameters the heating is working with like current feed temperature, maximum feed temperature, outside temperature, hot water temperature
-- OTA Updates and "console" over Telnet so you can see what messages are sent on the bus to further improve your setup
-- Fallback/Failsafe mode which will return to hardcoded values in case the connection to the "mother ship" (MQTT) has been lost for whatever reason. You can specify what should be set inside `heating.h`.
-- Boost function which sets the feed temperature to the maximum reported value for a selected period of time (default: 300 seconds). Change `mqttBoostDuration` inside `main.h` to the desired duration (Seconds!)
-- Fast Heatup function compares a temperature to a given target value and sets the feed temperature to max as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from max as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `main.h` from `true` to `false`
+
+### MQTT
+Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
+The topics are described inside `mqtt_config.h`
+
+### Heating Parameters
+Originally the TAXXX and integrated Heatronic will follow a set of parameters to determine the right feed temperature according to outside temperatures. These values are commonly referred to as "base point" and "end point" and represent a linear regulation by a reference temperature - the environmental temperature on the outside.
+The original controller will take the desired minimum feed temperature at -15°C as the end point and the required feed temperature at 20°C as the base point.
+**The meaning of base and end point is turned around in this project!**
+Why is that so?
+Because we are now looking at the environment temperature(s) and we know what the heating can deliver it is easier to understand what we want to achieve.
+The base point now represents the outside temperature at which the heating should use the maximum possible feed temperature as dialed in by the heating circuit dial on the heating itself
+The end point is basically the temperature at which the heating should switch off.
+![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
+*In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
+
+See `mqttBasepointTemperature` for base point, `mqttEndpointTemperature` for end point or "cut off" temperature. 
+
+### Night/Economy Mode
+There are two ways to switch the economy mode.
+1) Send `0` or `1` to the topic described inside `mqtt_config.h` named `subscription_OnOff`. It will then select the feed temperature according to `mqttMinimumFeedTemperature` inside `main.h` and enable economy mode.
+2) Set `hcActive` to `false` or `true` depending on if you want to switch economy on or off.
+
+### Switch Off/On
+
+See [Night/Economy Mode](#nighteconomy-mode)
+
+Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
+
+### Boost
+Boost function sets the feed temperature to the maximum reported value (`HcMaxFeed`) for a selected period of time (default: 300 seconds). Change `mqttBoostDuration` inside `main.h` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
+Due to the natural lag of a heating system you should fire this function before you boost a specific radiator.
+
+### Fast Heatup
+Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `main.h` from `true` to `false`
+![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
+*This is how the fast heatup function works visually*
+
+### Fallback and Failsafe
+
+The parameters defined within `heating.h` will become active when the connection to the MQTT broker has been lost.
+
+```c++
+//——————————————————————————————————————————————————————————————————————————————
+//  Constants for heating control
+//——————————————————————————————————————————————————————————————————————————————
+
+//Basepoint for linear temperature calculation
+const int calcHeatingBasepoint = -15;
+
+//Endpoint for linear temperature calculation
+const int calcHeatingEndpoint = 21;
+
+//Minimum Feed Temperature. This is the base value for calculations. Setting this as the setpoint will trigger the economy mode.
+const int calcTriggerAntiFreeze = 10;
+
+//-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
+HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
+HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
+```
+
+The `HeatingScheduleEntry` represents a very basic timeslot:
+Trigger Hour, Trigger Minute, Day Of Week, Heating Enabled.
+`Day Of Week` is currently unused.
+
+The aforementioned values say: 
+- Turn on the heating every day at 5:30
+- Turn off the heating every day at 23:30
+
+
+### Automatic Controller Detection
+
+Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending ontrol messages. If there is no controller message on the network for 30 seconds (defined by `controllerMessageTimeout`) it will resume control and the `Override` flag returns to true.
+
+You could implement this as a solution to bring in the original controller when something isn't working as expected and you don't have direct access to the ESP. You could switch back on/plug in the original TAxxx unit to run it in OEM mode.
+Maybe you switch on a relay that triggers the voltage supply for the original controller or you instruct someone to plug the TAxxx unit back in.
+
+
+### External Temperature Sensors
+
+The oneWire and DallasTemperature libraries are included and used to fetch additional temperatures like the return temperature which isn't available on the bus.
+
+See `t_sensors.h` for setting up addresses.
+
+
+### OTA Updates and Console
+
+The standard "Arduino OTA" procedure is included which means you can upload the code to your ESP32 without having to plug in the USB cable. See `platformio.ini` and modify the IP address accordingly.
+
+Debug info can be retrieved sing a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
 ## Hints
 - If you just wanna read then you have to set the variable `Override` to `false`. This way nothing will be sent on the bus but you can read everything.
@@ -102,7 +197,13 @@ Again, when in doubt, ask a technician.
 |___ telnet.h                   >> Telnet Console
 |
 |___ templates.h                >> Helper Template Functions
+|
+|___ t_sensors.h                >> External Temperature Sensors
 ```
+
+## Dedicated PCB
+
+WIP
 
 ## Todo
 - [x] Find a suitable CAN module and library that is able to handle 10kbit/s using the ESP32
@@ -114,7 +215,7 @@ Again, when in doubt, ask a technician.
 - [x] Reading and writing MQTT topics
 - [x] Fallback Mode
 - [ ] Taking Weather conditions into account when calculating the feed temperature
-- [ ] Also taking indoor temperatures into account
+- [x] Also taking indoor temperatures into account
 - [x] Getting the timings right so it doesn't throw off the controller
 - [x] Testing as a standalone solution
 - [x] Example Configuration for Home Assistant
