@@ -1137,6 +1137,13 @@ double CalculateFeedTemperature()
         WriteToConsoles(message);
       }
 
+      //Check if the calculated temperature is higher than the reported maximum feed temperature.
+      if (hrFhTemp > hcMaxFeed)
+      {
+        //Something went wrong. We should play it safe and return the default value instead.
+        return linearTemp;
+      }
+      
       //Return Result.
       return hrFhTemp;
     }
