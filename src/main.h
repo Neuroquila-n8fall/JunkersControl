@@ -119,7 +119,7 @@ double mqttBasepointTemperature = -10.0F;
 //Endpoint Temperature
 double mqttEndpointTemperature = 31.0F;
 //Ambient Temperature
-double mqttAmbientTemperature = 0.0F;
+double mqttAmbientTemperature = 17.0F;
 //Target Ambient Temperature to reach
 double mqttTargetAmbientTemperature = 21.5F;
 //Feed Temperature Adaption Value. Increases or decreases the target feed temperature
@@ -148,7 +148,7 @@ double fallbackBasepointTemperature = -10.0F;
 //Endpoint Temperature
 double fallbackEndpointTemperature = 31.0F;
 //Ambient Temperature
-double fallbackAmbientTemperature = 0.0F;
+double fallbackAmbientTemperature = 17.0F;
 //Minimum ("Anti Freeze") Temperature.
 double fallbackMinimumFeedTemperature = 10.0F;
 //Enforces the fallback values when set to TRUE
