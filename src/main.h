@@ -137,7 +137,7 @@ int mqttBoostDuration = 300;
 //Countdown variable for boost control.
 int boostTimeCountdown = mqttBoostDuration;
 //Fast Heatup. This will max out the feed temperature for a prolongued time until mqttTargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
-bool mqttFastHeatup = true;
+bool mqttFastHeatup = false;
 //Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
 double referenceAmbientTemperature = 17.0F;
 

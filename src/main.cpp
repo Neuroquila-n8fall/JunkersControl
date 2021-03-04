@@ -203,7 +203,7 @@ void loop()
       msg.data[0] = feedSetpoint;
       if (Debug)
       {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
+        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
         String message(printbuf);
         WriteToConsoles(message + "\r\n");
       }
@@ -1140,10 +1140,14 @@ double CalculateFeedTemperature()
       //Check if the calculated temperature is higher than the reported maximum feed temperature.
       if (hrFhTemp > hcMaxFeed)
       {
+        if (Debug)
+        {
+          WriteToConsoles("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible! \r\n");
+        }
         //Something went wrong. We should play it safe and return the default value instead.
         return linearTemp;
       }
-      
+
       //Return Result.
       return hrFhTemp;
     }
