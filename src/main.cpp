@@ -829,6 +829,18 @@ void callback(char *topic, byte *payload, unsigned int length)
     //Set reference Temperature
     referenceAmbientTemperature = mqttAmbientTemperature;
   }
+
+  //Read Dynamic Adaption on|off
+  if (strcmp(topic, subscription_DynamicAdaption) == 0)
+  {
+    // Transform payload into an integer
+    int i = s.toInt();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Dynamic Adaption >> " + s + "\r\n");
+    }
+    mqttDynamicAdaption = (i == 1 ? true : false);
+  }
 }
 
 void connectWifi()
@@ -956,6 +968,7 @@ void reconnectMqtt()
       client.subscribe(subscription_OnDemandBoost);
       client.subscribe(subscription_OnDemandBoostDuration);
       client.subscribe(subscription_FastHeatup);
+      client.subscribe(subscription_DynamicAdaption);
     }
     else
     {
@@ -1080,8 +1093,23 @@ double CalculateFeedTemperature()
 
   //Map Value
   double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
-  //Add Adaption
+
+  //Dynamic Adaption Feature. Only active when fast heatup is inactive!
+  if (mqttDynamicAdaption && !mqttFastHeatup)
+  {
+    double dynamicAdaption = mqttTargetAmbientTemperature - aux_returnTemperature;
+    //In this case we add the manual adaption.
+    dynamicAdaption += mqttFeedAdaption;
+    // ... then we add everything up
+    linearTemp += dynamicAdaption;
+  }
+  else
+  {
+  //Add Manual Adaption
   linearTemp += mqttFeedAdaption;
+  }
+  
+
   //Round value to half steps
   double halfRounded = llround(linearTemp * 2) / 2.0;
 
@@ -1199,6 +1227,7 @@ void ReadAndSendTemperatures()
   float value = sensors.getTempC(feed_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
+    aux_feedTemperature = value;
     client.publish(pub_SensorFeed, String(value).c_str());
     if (Debug)
     {
@@ -1218,6 +1247,7 @@ void ReadAndSendTemperatures()
   value = sensors.getTempC(return_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
+    aux_returnTemperature = value;
     client.publish(pub_SensorReturn, String(value).c_str());
     if (Debug)
     {
@@ -1237,6 +1267,7 @@ void ReadAndSendTemperatures()
   value = sensors.getTempC(exhaust_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
+    aux_exhaustEmperature = value;
     client.publish(pub_SensorExhaust, String(value).c_str());
     if (Debug)
     {
@@ -1256,6 +1287,7 @@ void ReadAndSendTemperatures()
   value = sensors.getTempC(ambient_sens);
   if (value != DEVICE_DISCONNECTED_C)
   {
+    aux_ambientTemperature = value;
     client.publish(pub_SensorAmbient, String(value).c_str());
     if (Debug)
     {

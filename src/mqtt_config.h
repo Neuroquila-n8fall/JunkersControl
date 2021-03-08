@@ -61,6 +61,15 @@ const char subscription_FastHeatup[] = "heizung/control/fastheatup";
 //Adaption
 const char subscription_Adaption[] = "heizung/parameters/adaption";
 
+//Dynamic Adaption based on return temperature sensor and desired target room temperature
+//  This enables a mode in which the feed temperature will be decreased when the return temperature is much higher than required
+//  This is useful when the heating is much more capable than required. 
+//  Example: The return Temperature is 40°, the desired room temperature is 21°: The Adaption is -19° --> Feed setpoint is decreased by 19°
+//  Another one: The Return temperature is 20°, the desired room temperature is 21°: The Adaption is +1° --> Feed setpoint increased by 1°
+const char subscription_DynamicAdaption[] = "heizung/parameters/dynadapt";
+
+
+
 //-- Published Topics
 
 //Maximum Feed Temperature

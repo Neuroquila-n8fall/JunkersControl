@@ -20,6 +20,7 @@
     - [Fallback and Failsafe](#fallback-and-failsafe)
     - [Automatic Controller Detection](#automatic-controller-detection)
     - [External Temperature Sensors](#external-temperature-sensors)
+    - [Dynamic Adaption](#dynamic-adaption)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
   - [File Structure](#file-structure)
@@ -162,6 +163,16 @@ Maybe you switch on a relay that triggers the voltage supply for the original co
 The oneWire and DallasTemperature libraries are included and used to fetch additional temperatures like the return temperature which isn't available on the bus.
 
 See `t_sensors.h` for setting up addresses.
+
+### Dynamic Adaption
+
+Simply put: my heating system is way too powerful and the radiators are not capable of getting rid of the energy fast enough. I figured if I lower the temperature by the difference between return and desired room temperature I can get away with a more dynamic model:
+
+Adaption = Desired target room temperature - feed temperature (+ Manual Adaption)
+
+This means that the setpoint of the feed will be lowered by the difference. You don't have to pump in that much energy when 90% of it returns to the heat exchanger which by itself will always try to steer the feed temperature to the average setpoint.
+
+This kind of adaption is, of course, very simple and rough. As soon as this mode is active, the `mqttAdaption` value will alter the value accordingly so in my instance I put in additional 5° `mqttAdaption` so if the temperature would be lowered to around 35° feed, it will be actually set to 40°.
 
 
 ### OTA Updates and Console

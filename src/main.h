@@ -140,6 +140,8 @@ int boostTimeCountdown = mqttBoostDuration;
 bool mqttFastHeatup = false;
 //Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
 double referenceAmbientTemperature = 17.0F;
+//Dynamic Adaption Flag
+bool mqttDynamicAdaption = false;
 
 //-- Fallback Values
 
@@ -153,6 +155,12 @@ double fallbackAmbientTemperature = 17.0F;
 double fallbackMinimumFeedTemperature = 10.0F;
 //Enforces the fallback values when set to TRUE
 bool isOnFallback = false;
+
+//-- Auxilary Sensor Values (OneWire Sensors)
+double aux_feedTemperature = 0.0F;
+double aux_returnTemperature = 0.0F;
+double aux_ambientTemperature = 0.0F;
+double aux_exhaustEmperature = 0.0F;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Function Definition. Required by Platform.io Compiler.
