@@ -1,15 +1,26 @@
-#ifndef _TELNET_H
-#define _TELNET_H
-
 #include <Arduino.h>
-#include <WiFi.h>
+#include "timesync.h"
+#include <ezTime.h>
 
 //——————————————————————————————————————————————————————————————————————————————
-//  Server for remote console. We're using the telnet port here
+//  NTP Time Object
 //——————————————————————————————————————————————————————————————————————————————
+Timezone myTZ;
 
-const uint TelnetServerPort = 23;
-WiFiServer TelnetServer(TelnetServerPort);
-WiFiClient TelnetRemoteClient;
+//Sync using NTP, if clock is off
+void SyncTimeIfRequired()
+{
+  //Sync Time if required
+  timeStatus_t timeStat = timeStatus();
+  if (timeStat != timeSet)
+  {
+    waitForSync();
+  }
+}
 
-#endif
+//Returns TRUE if the clock is on point and false if it requires calibration
+bool TimeIsSynced()
+{
+  return timeStatus() == timeSet;
+}
+

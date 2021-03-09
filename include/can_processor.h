@@ -1,5 +1,5 @@
-#ifndef _CAN_CONFIG_H
-#define _CAN_CONFIG_H
+#ifndef _CAN_PROCESSOR_H
+#define _CAN_PROCESSOR_H
 
 #include <Arduino.h>
 #include <ACAN2515.h>
@@ -17,11 +17,20 @@ static const byte MCP2515_INT = 17;  // INT output of MCP2515 (adapt to your des
 //  MCP2515 Driver object
 //——————————————————————————————————————————————————————————————————————————————
 
-ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
+extern ACAN2515 can;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MCP2515 Quartz: adapt to your design
 //——————————————————————————————————————————————————————————————————————————————
 
 static const uint32_t QUARTZ_FREQUENCY = 16UL * 1000UL * 1000UL; // 16 MHz
+
+//——————————————————————————————————————————————————————————————————————————————
+//  Functions
+//——————————————————————————————————————————————————————————————————————————————
+
+extern void setupCan();
+extern void processCan();
+
+
 #endif

@@ -5,5 +5,7 @@
 .vscode/ipch
 *arduino_secrets.h
 */arduino_secrets.h
+*arduino_secrets.cpp
+*/arduino_secrets.cpp
 *scratchpad.txt
 */scratchpad.txt

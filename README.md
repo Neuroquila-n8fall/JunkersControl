@@ -24,7 +24,6 @@
     - [Calculate yourself](#calculate-yourself)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
-  - [File Structure](#file-structure)
   - [Dedicated PCB](#dedicated-pcb)
   - [Todo](#todo)
   - [Special Thanks](#special-thanks)
@@ -84,7 +83,7 @@ Again, when in doubt, ask a technician.
 
 ### MQTT
 Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
-The topics are described inside `mqtt_config.h`
+The topics are described inside `mqtt.cpp`
 
 ### Heating Parameters
 Originally the TAXXX and integrated Heatronic will follow a set of parameters to determine the right feed temperature according to outside temperatures. These values are commonly referred to as "base point" and "end point" and represent a linear regulation by a reference temperature - the environmental temperature on the outside.
@@ -101,7 +100,7 @@ See `mqttBasepointTemperature` for base point, `mqttEndpointTemperature` for end
 
 ### Night/Economy Mode
 There are two ways to switch the economy mode.
-1) Send `0` or `1` to the topic described inside `mqtt_config.h` named `subscription_OnOff`. It will then select the feed temperature according to `mqttMinimumFeedTemperature` inside `main.h` and enable economy mode.
+1) Send `0` or `1` to the topic described inside `mqtt.cpp` named `subscription_OnOff`. It will then select the feed temperature according to `mqttMinimumFeedTemperature` inside `mqtt.cpp` and enable economy mode.
 2) Set `hcActive` to `false` or `true` depending on if you want to switch economy on or off.
 
 ### Switch Off/On
@@ -111,17 +110,17 @@ See [Night/Economy Mode](#nighteconomy-mode)
 Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
 
 ### Boost
-Boost function sets the feed temperature to the maximum reported value (`HcMaxFeed`) for a selected period of time (default: 300 seconds). Change `mqttBoostDuration` inside `main.h` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
+Boost function sets the feed temperature to the maximum reported value (`HcMaxFeed`) for a selected period of time (default: 300 seconds). Change `mqttBoostDuration` inside `mqtt.cpp` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
 Due to the natural lag of a heating system you should fire this function before you boost a specific radiator.
 
 ### Fast Heatup
-Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `main.h` from `true` to `false`
+Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `mqtt.cpp` from `true` to `false`
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
 *This is how the fast heatup function works visually*
 
 ### Fallback and Failsafe
 
-The parameters defined within `heating.h` will become active when the connection to the MQTT broker has been lost.
+The parameters defined within `heating.cpp` will become active when the connection to the MQTT broker has been lost.
 
 ```c++
 //——————————————————————————————————————————————————————————————————————————————
@@ -192,30 +191,6 @@ Debug info can be retrieved sing a very basic telnet implementation. Simply conn
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
-
-## File Structure
-
-``` 
-+- main.cpp
-|
-|___ main.h                     >> Main header. Variables. Glue
-|
-|___ arduino_secrets.h.template >> Rename to "arduino_secrets.h" and fill in values
-|
-|___ can_config.h               >> CAN Module settings
-|
-|___ mqtt_config.h              >> MQTT Topics
-|
-|___ wifi_config.h              >> WiFi Connection
-|
-|___ heating.h                  >> Base values for heating control
-|
-|___ telnet.h                   >> Telnet Console
-|
-|___ templates.h                >> Helper Template Functions
-|
-|___ t_sensors.h                >> External Temperature Sensors
-```
 
 ## Dedicated PCB
 
