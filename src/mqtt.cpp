@@ -446,7 +446,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   //Read Max Valve Opening
-  if (strcmp(topic, subscription_OverrideSetpoint) == 0)
+  if (strcmp(topic, subscription_ValveScalingMaxOpening) == 0)
   {
     // Transform payload into an integer
     int i = s.toInt();
@@ -458,7 +458,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   //Read Current Max Valve Opening
-  if (strcmp(topic, subscription_OverrideSetpoint) == 0)
+  if (strcmp(topic, subscription_ValveScalingOpening) == 0)
   {
     // Transform payload into an integer
     int i = s.toInt();
