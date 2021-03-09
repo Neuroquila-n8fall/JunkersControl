@@ -142,6 +142,8 @@ bool mqttFastHeatup = false;
 double referenceAmbientTemperature = 17.0F;
 //Dynamic Adaption Flag
 bool mqttDynamicAdaption = false;
+//Take the value from mqttFeedTemperatureSetpoint instead of doing built-in calculations.
+bool mqttOverrideSetpoint = false;
 
 //-- Fallback Values
 

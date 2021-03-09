@@ -21,6 +21,7 @@
     - [Automatic Controller Detection](#automatic-controller-detection)
     - [External Temperature Sensors](#external-temperature-sensors)
     - [Dynamic Adaption](#dynamic-adaption)
+    - [Calculate yourself](#calculate-yourself)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
   - [File Structure](#file-structure)
@@ -173,6 +174,10 @@ Adaption = Desired target room temperature - feed temperature (+ Manual Adaption
 This means that the setpoint of the feed will be lowered by the difference. You don't have to pump in that much energy when 90% of it returns to the heat exchanger which by itself will always try to steer the feed temperature to the average setpoint.
 
 This kind of adaption is, of course, very simple and rough. As soon as this mode is active, the `mqttAdaption` value will alter the value accordingly so in my instance I put in additional 5° `mqttAdaption` so if the temperature would be lowered to around 35° feed, it will be actually set to 40°.
+
+### Calculate yourself
+
+You can do your own calculations and just tell the control to set the temperature accordingly by sending a `1` or `0` via topic `subscription_OverrideSetpoint` to enable or disable this feature and the desired temperature to `subscription_FeedSetpoint`
 
 
 ### OTA Updates and Console

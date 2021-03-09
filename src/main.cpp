@@ -841,6 +841,30 @@ void callback(char *topic, byte *payload, unsigned int length)
     }
     mqttDynamicAdaption = (i == 1 ? true : false);
   }
+
+  //Read feed setpoint override on|off
+  if (strcmp(topic, subscription_OverrideSetpoint) == 0)
+  {
+    // Transform payload into an integer
+    int i = s.toInt();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Feed Setpoint Override >> " + s + "\r\n");
+    }
+    mqttOverrideSetpoint = (i == 1 ? true : false);
+  }
+
+  //Read Feed Setpint Override Temperature
+  if (strcmp(topic, subscription_FeedSetpoint) == 0)
+  {
+    // Transform payload into a double
+    double d = s.toDouble();
+    if (Debug)
+    {
+      WriteToConsoles("MQTT RCV: Feed Setpoint >> " + s + "\r\n");
+    }
+    mqttFeedTemperatureSetpoint = d;
+  }
 }
 
 void connectWifi()
@@ -969,6 +993,7 @@ void reconnectMqtt()
       client.subscribe(subscription_OnDemandBoostDuration);
       client.subscribe(subscription_FastHeatup);
       client.subscribe(subscription_DynamicAdaption);
+      client.subscribe(subscription_OverrideSetpoint);
     }
     else
     {
@@ -1077,6 +1102,13 @@ double CalculateFeedTemperature()
       return mqttMinimumFeedTemperature;
     }
   }
+
+  //Force setpoint set via MQTT
+  if (mqttOverrideSetpoint)
+  {
+    return mqttFeedTemperatureSetpoint;
+  }
+  
 
   //The map() function will freeze the ESP if the values are the same.
   //  We will return the base value instead of calculating.

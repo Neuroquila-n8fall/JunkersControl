@@ -68,6 +68,7 @@ const char subscription_Adaption[] = "heizung/parameters/adaption";
 //  Another one: The Return temperature is 20°, the desired room temperature is 21°: The Adaption is +1° --> Feed setpoint increased by 1°
 const char subscription_DynamicAdaption[] = "heizung/parameters/dynadapt";
 
+const char subscription_OverrideSetpoint[] = "heizung/parameters/overridesetpoint";
 
 
 //-- Published Topics
