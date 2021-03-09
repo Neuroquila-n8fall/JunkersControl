@@ -61,6 +61,15 @@ extern const char subscription_FastHeatup[];
 //Adaption
 extern const char subscription_Adaption[];
 
+//Valve Scaling
+extern const char subscription_ValveScaling[];
+
+//Valve Scaling Max Opening
+extern const char subscription_ValveScalingMaxOpening[];
+
+//Valve Scaling Current Top Opening Value
+extern const char subscription_ValveScalingOpening[];
+
 //Dynamic Adaption based on return temperature sensor and desired target room temperature
 //  This enables a mode in which the feed temperature will be decreased when the return temperature is much higher than required
 //  This is useful when the heating is much more capable than required.
@@ -157,6 +166,12 @@ extern double mqttReferenceAmbientTemperature;
 extern bool mqttDynamicAdaption;
 //Take the value from mqttFeedTemperatureSetpoint instead of doing built-in calculations.
 extern bool mqttOverrideSetpoint;
+//Enable scaling based upon valve opening
+extern bool mqttValveScaling;
+//Maximum valve opening. 80% for Homematic eTRV-2
+extern int mqttMaxValveOpening;
+//The value of the valve that is most open
+extern int mqttValveOpening;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions

@@ -76,8 +76,6 @@ int hcHeatingPower = 0;
 //-- Hot Water "now" setting.
 bool hwNow = false;
 
-
-
 //-- Fallback Values
 
 //Basepoint Temperature
@@ -91,7 +89,6 @@ double fallbackMinimumFeedTemperature = 10.0F;
 //Enforces the fallback values when set to TRUE
 bool isOnFallback = false;
 
-
 //-- Takes the parameters and calculates the desired feed temperature.
 //   This calculation takes in the desired base temperature at which the heating
 //   should perform 100% of the reported maximum feed temperature and when it should perform at the minimum temperature.
@@ -100,148 +97,158 @@ bool isOnFallback = false;
 //   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
 double CalculateFeedTemperature()
 {
-  char printbuf[255];
-  //Map the current ambient temperature to the desired feed temperature:
-  //        Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
-  if (!hcActive)
-  {
-    if (isOnFallback)
+    char printbuf[255];
+    //Map the current ambient temperature to the desired feed temperature:
+    //        Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
+    if (!hcActive)
     {
-      return fallbackMinimumFeedTemperature;
-    }
-    else
-    {
-      return mqttMinimumFeedTemperature;
-    }
-  }
-
-  //Force setpoint set via MQTT
-  if (mqttOverrideSetpoint)
-  {
-    return mqttFeedTemperatureSetpoint;
-  }
-  
-
-  //The map() function will freeze the ESP if the values are the same.
-  //  We will return the base value instead of calculating.
-  if (mqttBasepointTemperature == mqttEndpointTemperature)
-  {
-    return mqttBasepointTemperature;
-  }
-
-  //Return max feed temperature when boost is requested.
-  if (mqttBoost)
-  {
-    return hcMaxFeed;
-  }
-
-  //Map Value
-  double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
-
-  //Dynamic Adaption Feature. Only active when fast heatup is inactive!
-  if (mqttDynamicAdaption && !mqttFastHeatup)
-  {
-    double dynamicAdaption = mqttTargetAmbientTemperature - aux_returnTemperature;
-    //In this case we add the manual adaption.
-    dynamicAdaption += mqttFeedAdaption;
-    // ... then we add everything up
-    linearTemp += dynamicAdaption;
-  }
-  else
-  {
-  //Add Manual Adaption
-  linearTemp += mqttFeedAdaption;
-  }
-  
-
-  //Round value to half steps
-  double halfRounded = llround(linearTemp * 2) / 2.0;
-
-  //Return max feed temperature if fast heatup is on and the ambient temperature hasn't been reached yet.
-  if (mqttFastHeatup)
-  {
-    //Target Temperature hasn't been reached
-    if (mqttAmbientTemperature < mqttTargetAmbientTemperature)
-    {
-
-      //Let's tune this so the heating hasn't to work that hard all the way
-      //  We can take the temperature difference as reference and map the max feed temperature accordingly
-      //First we calculate the difference between desired temperature (target) and actual value
-      double tempDiff = mqttTargetAmbientTemperature - mqttAmbientTemperature;
-
-      //Sanity check: max feed equals calculated
-      if (hcMaxFeed == linearTemp)
-      {
-        //Bail out.
-        return hcMaxFeed;
-      }
-
-      //This is the initial temperature difference when heatup started. referenceAmbientTemperature is set as soon as mqttFastHeatup is activated
-      double initialReferenceDifference = mqttTargetAmbientTemperature - mqttReferenceAmbientTemperature;
-
-      //Note: We don't have to check the target and current ambient temperature as this case is already handled by the initial comparison
-
-      //Now we map the difference, which is decreasing over time, to the fixed range between reference (=starting point) and target ambient
-      //  We map it according to the maximum available feed temperature and the currently calculated temperature.
-      //Previous checks will prevent any divisions by zero that would otherwise stop the MC from operating
-      double fhTemp = map_Generic(tempDiff, 0, initialReferenceDifference, linearTemp, hcMaxFeed);
-      //Expected Values:
-      //Room Temperature is 17°C
-      //Target is 21°C
-      //Difference is 4°C
-      //Calculated Feed is 50°
-      //Max is 75°C
-      //Result: ( ( 4   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 4   -   0 )   +   50 = 75
-
-      //Room Temperature is 21°C
-      //Target is 21°C
-      //Difference is 0°C
-      //Calculated Feed is 50°
-      //Max is 75°C
-      //Result: ( ( 0   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 0   -   0 )   +   50 = 50
-      //Half-Step-Round
-      double hrFhTemp = llround(fhTemp * 2) / 2.0;
-
-      if (Debug)
-      {
-        sprintf(printbuf, "DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f \r\n", mqttAmbientTemperature, mqttTargetAmbientTemperature, fhTemp);
-        String message(printbuf);
-        WriteToConsoles(message);
-      }
-
-      //Check if the calculated temperature is higher than the reported maximum feed temperature.
-      if (hrFhTemp > hcMaxFeed)
-      {
-        if (Debug)
+        if (isOnFallback)
         {
-          WriteToConsoles("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible! \r\n");
+            return fallbackMinimumFeedTemperature;
         }
-        //Something went wrong. We should play it safe and return the default value instead.
-        return linearTemp;
-      }
-
-      //Return Result.
-      return hrFhTemp;
+        else
+        {
+            return mqttMinimumFeedTemperature;
+        }
     }
-    //If we reached the goal, set it to false again so it won't trigger again when the temperature drops
+
+    //Force setpoint set via MQTT
+    if (mqttOverrideSetpoint)
+    {
+        return mqttFeedTemperatureSetpoint;
+    }
+
+    //The map() function will freeze the ESP if the values are the same.
+    //  We will return the base value instead of calculating.
+    if (mqttBasepointTemperature == mqttEndpointTemperature)
+    {
+        return mqttBasepointTemperature;
+    }
+
+    //Return max feed temperature when boost is requested.
+    if (mqttBoost)
+    {
+        return hcMaxFeed;
+    }
+
+    //Scale Feed Temperature with current "demand" based upon valve opening
+    //Fast Heatup will be ignored in this case because the open-most valve is dominant.
+    if (mqttValveScaling)
+    {
+        //This will map the current opening from the possible range (0 to mqttMaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
+        double scaledTemp = map_Generic(mqttValveOpening, 0, mqttMaxValveOpening, mqttMinimumFeedTemperature + mqttFeedAdaption, hcMaxFeed);
+        //Round value to half steps
+        double halfRoundedVScale = llround(scaledTemp * 2) / 2.0;
+        //...return value.
+        return halfRoundedVScale;
+    }
+
+    //Map Value
+    double linearTemp = map_Generic(OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed);
+
+    //Dynamic Adaption Feature. Only active when fast heatup is inactive!
+    if (mqttDynamicAdaption && !mqttFastHeatup)
+    {
+        double dynamicAdaption = mqttTargetAmbientTemperature - aux_returnTemperature;
+        //In this case we add the manual adaption.
+        dynamicAdaption += mqttFeedAdaption;
+        // ... then we add everything up
+        linearTemp += dynamicAdaption;
+    }
     else
     {
-      mqttFastHeatup = false;
+        //Add Manual Adaption
+        linearTemp += mqttFeedAdaption;
     }
-  }
 
-  if (Debug)
-  {
+    //Round value to half steps
+    double halfRounded = llround(linearTemp * 2) / 2.0;
 
-    sprintf(printbuf, "DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed, linearTemp, halfRounded);
-    String message(printbuf);
-    WriteToConsoles(message + "\r\n");
-  }
-  return halfRounded;
+    //Return max feed temperature if fast heatup is on and the ambient temperature hasn't been reached yet.
+    if (mqttFastHeatup)
+    {
+        //Target Temperature hasn't been reached
+        if (mqttAmbientTemperature < mqttTargetAmbientTemperature)
+        {
+
+            //Let's tune this so the heating hasn't to work that hard all the way
+            //  We can take the temperature difference as reference and map the max feed temperature accordingly
+            //First we calculate the difference between desired temperature (target) and actual value
+            double tempDiff = mqttTargetAmbientTemperature - mqttAmbientTemperature;
+
+            //Sanity check: max feed equals calculated
+            if (hcMaxFeed == linearTemp)
+            {
+                //Bail out.
+                return hcMaxFeed;
+            }
+
+            //This is the initial temperature difference when heatup started. referenceAmbientTemperature is set as soon as mqttFastHeatup is activated
+            double initialReferenceDifference = mqttTargetAmbientTemperature - mqttReferenceAmbientTemperature;
+
+            //Note: We don't have to check the target and current ambient temperature as this case is already handled by the initial comparison
+
+            //Now we map the difference, which is decreasing over time, to the fixed range between reference (=starting point) and target ambient
+            //  We map it according to the maximum available feed temperature and the currently calculated temperature.
+            //Previous checks will prevent any divisions by zero that would otherwise stop the MC from operating
+            double fhTemp = map_Generic(tempDiff, 0, initialReferenceDifference, linearTemp, hcMaxFeed);
+            //Expected Values:
+            //Room Temperature is 17°C
+            //Target is 21°C
+            //Difference is 4°C
+            //Calculated Feed is 50°
+            //Max is 75°C
+            //Result: ( ( 4   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 4   -   0 )   +   50 = 75
+
+            //Room Temperature is 21°C
+            //Target is 21°C
+            //Difference is 0°C
+            //Calculated Feed is 50°
+            //Max is 75°C
+            //Result: ( ( 0   -   0 )   ×   ( 75   -   50 ) )   ÷   ( 0   -   0 )   +   50 = 50
+            //Half-Step-Round
+            double hrFhTemp = llround(fhTemp * 2) / 2.0;
+
+            if (Debug)
+            {
+                sprintf(printbuf, "DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f \r\n", mqttAmbientTemperature, mqttTargetAmbientTemperature, fhTemp);
+                String message(printbuf);
+                WriteToConsoles(message);
+            }
+
+            //Check if the calculated temperature is higher than the reported maximum feed temperature.
+            if (hrFhTemp > hcMaxFeed)
+            {
+                if (Debug)
+                {
+                    WriteToConsoles("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible! \r\n");
+                }
+                //Something went wrong. We should play it safe and return the default value instead.
+                return linearTemp;
+            }
+
+            //Return Result.
+            return hrFhTemp;
+        }
+        //If we reached the goal, set it to false again so it won't trigger again when the temperature drops
+        else
+        {
+            mqttFastHeatup = false;
+        }
+    }
+
+    if (Debug)
+    {
+
+        sprintf(printbuf, "DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", OutsideTemperatureSensor, mqttEndpointTemperature, mqttBasepointTemperature, mqttMinimumFeedTemperature, hcMaxFeed, linearTemp, halfRounded);
+        String message(printbuf);
+        WriteToConsoles(message + "\r\n");
+    }
+    return halfRounded;
 }
 
 //Converts the value to its half-step representation (= value times two)
 int ConvertFeedTemperature(double temperature)
 {
-  return temperature * 2;
+    return temperature * 2;
 }
