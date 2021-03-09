@@ -132,9 +132,15 @@ double CalculateFeedTemperature()
     }
 
     //Scale Feed Temperature with current "demand" based upon valve opening
-    //Fast Heatup will be ignored in this case because the open-most valve is dominant.
+    //Fast Heatup will be ignored and disabled, if active, in this case because the most open valve is dominant.
     if (mqttValveScaling)
     {
+        //Disable Fast Heatup when this option is enabled.
+        if (mqttFastHeatup)
+        {
+            mqttFastHeatup = false;
+        }
+        
         //This will map the current opening from the possible range (0 to mqttMaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
         double scaledTemp = map_Generic(mqttValveOpening, 0, mqttMaxValveOpening, mqttMinimumFeedTemperature + mqttFeedAdaption, hcMaxFeed);
         //Round value to half steps
