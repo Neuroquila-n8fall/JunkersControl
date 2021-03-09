@@ -197,9 +197,11 @@ Example for dynamic adaption together with valve scaling:
 Map Function: `(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min`
 
 Adaption Calculation: (Outside - Basepoint) * (Feed Adaption - 0) / (Endpoint - Basepoint) + 0
+
 Example: `(5 - -15) * (20 - 0) / (31 - -15) + 0 = 8.7`
 
 Feed Calculation: (Valve Opening - Min-Valve Opening) * (Max Feed - (Min-Feed + Adapt. Calc.)) / (Max. Valve - Min. Valve) + (Min. Feed + Adapt. Calc.)
+
 Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
 
 
