@@ -22,6 +22,7 @@
     - [External Temperature Sensors](#external-temperature-sensors)
     - [Dynamic Adaption](#dynamic-adaption)
     - [Calculate yourself](#calculate-yourself)
+    - [Valve-based control](#valve-based-control)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
   - [Dedicated PCB](#dedicated-pcb)
@@ -177,6 +178,29 @@ This kind of adaption is, of course, very simple and rough. As soon as this mode
 ### Calculate yourself
 
 You can do your own calculations and just tell the control to set the temperature accordingly by sending a `1` or `0` via topic `subscription_OverrideSetpoint` to enable or disable this feature and the desired temperature to `subscription_FeedSetpoint`
+
+### Valve-based control
+
+This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `mqttMaxValveOpening`) to the `mqttMinimumFeedTemperature` plus `mqttAdaption` and `hcMaxFeed` 
+This is the most demand focused function yet because if you always report the most open valve in the circuit, you end up with a very responsive system that will react on demand immediately.
+This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `mqttDynamicAdaption` which will then add a value mapped between `mqttBasepointTemperature` and `mqttEndpointTemperature` to `0` and `mqttFeedAdaption`
+
+Example for dynamic adaption together with valve scaling:
+- Outside Temperature is 5°
+- Basepoint is -15°
+- Endpoint is 31°
+- Feed Adaption is 20
+- Valve Opening: 50%
+- Max Feed: 75°
+
+
+Map Function: `(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min`
+
+Adaption Calculation: (Outside - Basepoint) * (Feed Adaption - 0) / (Endpoint - Basepoint) + 0
+Example: `(5 - -15) * (20 - 0) / (31 - -15) + 0 = 8.7`
+
+Feed Calculation: (Valve Opening - Min-Valve Opening) * (Max Feed - (Min-Feed + Adapt. Calc.)) / (Max. Valve - Min. Valve) + (Min. Feed + Adapt. Calc.)
+Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
 
 
 ### OTA Updates and Console

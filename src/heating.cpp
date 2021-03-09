@@ -140,9 +140,36 @@ double CalculateFeedTemperature()
         {
             mqttFastHeatup = false;
         }
-        
-        //This will map the current opening from the possible range (0 to mqttMaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
-        double scaledTemp = map_Generic(mqttValveOpening, 0, mqttMaxValveOpening, mqttMinimumFeedTemperature + mqttFeedAdaption, hcMaxFeed);
+
+        double scaledTemp = 0.0;
+        //Calculate dynamic adaption if requested.
+        if (mqttDynamicAdaption)
+        {
+            //Map outside temperature beginning at basepoint to endpoint, to 0 and the adaption value
+            //This means that at mqttBasepointTemperature the adaption will equal mqttFeedAdaption and 0 when OutsideTemperature equals mqttEndpointTemperature
+            double dynamicAdaption = map_Generic(OutsideTemperatureSensor, mqttBasepointTemperature, mqttEndpointTemperature, 0, mqttFeedAdaption);
+            //This will map the current opening from the possible range (0 to mqttMaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
+            scaledTemp = map_Generic(mqttValveOpening, 0, mqttMaxValveOpening, mqttMinimumFeedTemperature + dynamicAdaption, hcMaxFeed);
+            if (Debug)
+            {
+                sprintf(printbuf, "DEBUG SET TEMP: Valve Scaled + Dyn. Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, dynamicAdaption);
+                String message(printbuf);
+                WriteToConsoles(message);
+            }
+        }
+        //Otherwise calculate the temperature based upon the fixed adaption value
+        else
+        {
+            //This will map the current opening from the possible range (0 to mqttMaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
+            scaledTemp = map_Generic(mqttValveOpening, 0, mqttMaxValveOpening, mqttMinimumFeedTemperature + mqttFeedAdaption, hcMaxFeed);
+            if (Debug)
+            {
+                sprintf(printbuf, "DEBUG SET TEMP: Valve Scaled + Static Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, mqttFeedAdaption);
+                String message(printbuf);
+                WriteToConsoles(message);
+            }
+        }
+
         //Round value to half steps
         double halfRoundedVScale = llround(scaledTemp * 2) / 2.0;
         //...return value.
