@@ -334,6 +334,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       WriteToConsoles("MQTT RCV: Boost >> " + s + "\r\n");
     }
     mqttBoost = (i == 1 ? true : false);
+    boostTimeCountdown = mqttBoostDuration;
     //Start Immediately.
     SetFeedTemperature();
   }
