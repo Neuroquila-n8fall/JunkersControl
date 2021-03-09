@@ -1,7 +1,4 @@
 - platform: mqtt
-  name: "Testsensor"
-  state_topic: "test"
-- platform: mqtt
   name: "Vorlauftemperatur Heizung"
   state_topic: "heizung/temperaturen/vorlauf"
   unit_of_measurement: "°C"
@@ -193,6 +190,29 @@
         {% endif %}
 - platform: template
   sensors:
+    heating_feed_return_diff:
+      friendly_name: "Spreizung VL-NL"
+      value_template: >-
+        {% set feed = states('sensor.vorlauftemperatur_heizung')| float %}
+        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {{ (feed - return) | round(2) }}
+      unit_of_measurement: "°C"
+    heating_setpoint_return_diff:
+      friendly_name: "Spreizung Soll-NL"
+      value_template: >-
+        {% set feed = states('sensor.soll_vorlauftemperatur_heizung')| float %}
+        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {{ (feed - return) | round(2) }}
+      unit_of_measurement: "°C"
+    heating_adaption_return_ambient:
+      friendly_name: "Adaption Zieltemperatur und Rücklauf"
+      value_template: >-
+        {% set ambient = states('input_number.heizung_zieltemperatur')| float %}
+        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {{ (ambient - return) | round(2) }}
+      unit_of_measurement: "°C"
+- platform: template
+  sensors:
     heating_parameters_preview:
       friendly_name: "Vorschau aktuelle Vorlauftemperatur"
       icon_template: mdi:thermometer
@@ -203,21 +223,22 @@
         {% set to_min =  states('input_number.heizung_minimum')|float %}
         {% set to_max =  states('sensor.maximale_vorlauftemperatur_heizung')|float %}
         {% set input_value = states('sensor.aussentemperaturfuhler_heizung')|float %}
-        {{ ((input_value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min) | round(2) }}
+        {% set adaption = states('input_number.heizung_adaption')|float %}
+        {{ (((input_value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min) + adaption) | round(2) }}
 - platform: template
   sensors:
     heating_boost_active:
       friendly_name: "Boostfunktion aktiv"
       icon_template: >-
-        {% set value = states.sensor.heizung_boost.state | upper %}
-        {% if value == "on" %}
+        {% set value = is_state('sensor.heizung_boost','1') %}
+        {% if value %}
         mdi:fire
         {% else %}
         mdi:cancel
         {% endif %}
       value_template: >-
-        {% set value = states.sensor.heizung_boost.state | upper %}
-        {% if value == "on" %}
+        {% set value = is_state('sensor.heizung_boost','1') %}
+        {% if value %}
         An
         {% else %}
         Aus
@@ -227,15 +248,15 @@
     heating_fastheatup_active:
       friendly_name: "Schnellaufheizung aktiv"
       icon_template: >-
-        {% set value = states.sensor.heizung_schnellaufheizung.state | upper %}
-        {% if value == "on" %}
+        {% set value = is_state('sensor.heizung_schnellaufheizung','1') %}
+        {% if value %}
         mdi:fast-forward
         {% else %}
         mdi:cancel
         {% endif %}
       value_template: >-
-        {% set value = states.sensor.heizung_schnellaufheizung.state | upper %}
-        {% if value == "on" %}
+        {% set value = is_state('sensor.heizung_schnellaufheizung','1') %}
+        {% if value %}
         An
         {% else %}
         Aus

@@ -8,35 +8,65 @@ input_boolean:
   heizung_fastheatup:
     name: Schnellaufheizung
     initial: false
+  heizung_dynamicadaption:
+    name: Dynamische Adaption
+    initial: false
+  heizung_ventilskalierung:
+    name: Ventilskalierung
+    initial: false
 
 input_number:
   heizung_fusspunkt:
     name: "Fußpunkt Heizung"
     min: -30
-    max: 75
+    max: 30
+    step: 0.5
     mode: slider
     unit_of_measurement: "°C"
+    icon: mdi:ray-start
   heizung_endpunkt:
     name: "Endpunkt Heizung"
     min: 0
     max: 75
+    step: 0.5
     mode: slider
     unit_of_measurement: "°C"
+    icon: mdi:ray-end
   heizung_minimum:
     name: "Minimale Vorlauftemperatur Heizung"
     min: 0
     max: 75
+    step: 0.5
     mode: slider
     unit_of_measurement: "°C"
+    icon: mdi:thermometer-low
   heizung_boostdauer:
     name: "Dauer der Boost-Funktion"
     min: 0
     max: 3600
     mode: box
     unit_of_measurement: "s"
+    icon: mdi:timer-sand
   heizung_zieltemperatur:
     name: "Ziel Raumtemperatur"
     min: 0
     max: 35
+    step: 0.5
     mode: box
     unit_of_measurement: "°C"
+    icon: mdi:thermometer-high
+  heizung_adaption:
+    name: "Vorlauf Adaption"
+    min: -30
+    max: 30
+    step: 0.1
+    mode: box
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer-lines
+  heizung_ventilskalierung_max:
+    name: "Ventilöffnung Max"
+    min: 0
+    max: 100
+    mode: box
+    unit_of_measurement: "%"
+    icon: mdi:arrow-collapse-right

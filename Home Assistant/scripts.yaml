@@ -32,6 +32,29 @@ mqtt_set_heizungsparameter:
     data:
       topic: heizung/parameters/targetambient
       payload_template: '{{ states(''input_number.heizung_zieltemperatur'') | float  }}'
+  - service: mqtt.publish
+    data:
+      topic: heizung/parameters/adaption
+      payload_template: '{{ states(''input_number.heizung_adaption'') | int  }}'
+  - service: mqtt.publish
+    data:
+      payload_template: '{% set dynadapt = states(''input_boolean.heizung_dynamicadaption'')
+        %} {% if dynadapt == ''on'' %} 1 {% else %} 0 {% endif %}'
+      topic: heizung/parameters/dynadapt
+  - service: mqtt.publish
+    data:
+      payload_template: '{% set scaling = states(''input_boolean.heizung_ventilskalierung'')
+        %} {% if scaling == ''on'' %} 1 {% else %} 0 {% endif %}'
+      topic: heizung/parameters/valvescaling
+  - service: mqtt.publish
+    data:
+      payload_template: '{{ states(''input_number.heizung_ventilskalierung_max'')
+        | int  }}'
+      topic: heizung/parameters/valvemax
+  - service: mqtt.publish
+    data:
+      payload_template: '{{ states(''sensor.ventiloffnung_minmax'') | int  }}'
+      topic: heizung/parameters/valvecurrent
   mode: single
 mqtt_set_heizungboost:
   alias: Boost
