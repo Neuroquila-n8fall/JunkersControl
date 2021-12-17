@@ -95,6 +95,7 @@ Because we are now looking at the environment temperature(s) and we know what th
 The base point now represents the outside temperature at which the heating should use the maximum possible feed temperature as dialed in by the heating circuit dial on the heating itself
 The end point is basically the temperature at which the heating should switch off.
 ![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
+
 *In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
 
 See `mqttBasepointTemperature` for base point, `mqttEndpointTemperature` for end point or "cut off" temperature. 
@@ -115,8 +116,10 @@ Boost function sets the feed temperature to the maximum reported value (`HcMaxFe
 Due to the natural lag of a heating system you should fire this function before you boost a specific radiator.
 
 ### Fast Heatup
-Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `mqtt.cpp` from `true` to `false`
+Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `mqtt.cpp` from `true` to `false`.
+This is helpful if you do have temperature sensor at home but no smart thermostats. It means that regardless of what the situation is, the current feed temperature will be kept high as long as the target temperature in the reference room hasn't been reached.
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
+
 *This is how the fast heatup function works visually*
 
 ### Fallback and Failsafe
@@ -153,7 +156,7 @@ The aforementioned values say:
 
 ### Automatic Controller Detection
 
-Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending ontrol messages. If there is no controller message on the network for 30 seconds (defined by `controllerMessageTimeout`) it will resume control and the `Override` flag returns to true.
+Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `controllerMessageTimeout`) it will resume control and the `Override` flag returns to true.
 
 You could implement this as a solution to bring in the original controller when something isn't working as expected and you don't have direct access to the ESP. You could switch back on/plug in the original TAxxx unit to run it in OEM mode.
 Maybe you switch on a relay that triggers the voltage supply for the original controller or you instruct someone to plug the TAxxx unit back in.
@@ -220,7 +223,7 @@ Debug info can be retrieved sing a very basic telnet implementation. Simply conn
 
 ## Dedicated PCB
 
-WIP
+WIP - Status update 12/17/2021: Having trouble getting it to work. Might have to try another BM1 module.
 
 ## Todo
 - [x] Find a suitable CAN module and library that is able to handle 10kbit/s using the ESP32
