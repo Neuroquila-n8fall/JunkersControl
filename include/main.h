@@ -21,10 +21,23 @@ extern const int controllerMessageTimeout;
 extern bool Debug;
 
 //——————————————————————————————————————————————————————————————————————————————
-//  Variables
+//  Pins
 //——————————————————————————————————————————————————————————————————————————————
 
+//Status LED Pin
+extern const int Status_LED;
 
+//Wifi Status LED Pin
+extern const int Wifi_LED;
+
+//MQTT Status LED Pin
+extern const int Mqtt_LED;
+
+extern const int Heating_LED;
+
+//——————————————————————————————————————————————————————————————————————————————
+//  Variables
+//——————————————————————————————————————————————————————————————————————————————
 
 //-- WiFi Status Timer Variable
 extern unsigned long wifiConnectMillis;
@@ -43,5 +56,12 @@ extern unsigned long controllerMessageTimer;
 
 //-- Step-Counter
 extern int currentStep;
+
+//LED Helper Variables
+extern bool statusLed;
+extern bool wifiLed;
+extern bool mqttLed;
+
+extern void Reboot();
 
 #endif

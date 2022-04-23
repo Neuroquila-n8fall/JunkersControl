@@ -20,7 +20,6 @@
 //NTP Timesync
 #include <timesync.h>
 
-
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
@@ -37,13 +36,29 @@ const int controllerMessageTimeout = 30000;
 bool Debug = true;
 
 //——————————————————————————————————————————————————————————————————————————————
+//  Pins
+//——————————————————————————————————————————————————————————————————————————————
+
+//Status LED Pin
+const int Status_LED = 27;
+
+//Wifi Status LED Pin
+const int Wifi_LED = 26;
+
+//MQTT Status LED Pin
+const int Mqtt_LED = 14;
+
+const int Heating_LED = 25;
+
+//——————————————————————————————————————————————————————————————————————————————
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
 
-
-
 //-- WiFi Status Timer Variable
 unsigned long wifiConnectMillis = 0L;
+
+// -- 500msec Interval Timer Variable
+unsigned long fiveHundredMsTimer = 0L;
 
 //-- One-Second Interval Timer Variable
 unsigned long oneSecondTimer = 0L;
@@ -60,9 +75,28 @@ unsigned long controllerMessageTimer = 0L;
 //-- Step-Counter
 int currentStep = 0;
 
+//LED Helper Variables
+bool statusLed = false;
+bool wifiLed = false;
+bool mqttLed = false;
 
 void setup()
 {
+  //Setup Pins
+  pinMode(Status_LED, OUTPUT);
+  pinMode(Wifi_LED, OUTPUT);
+  pinMode(Mqtt_LED, OUTPUT);
+  digitalWrite(Status_LED, HIGH);
+  statusLed = true;
+  delay(1000);
+  digitalWrite(Wifi_LED,HIGH);
+  delay(1000);
+  digitalWrite(Mqtt_LED,HIGH);
+  delay(100);
+  digitalWrite(Wifi_LED,LOW);
+  delay(100);
+  digitalWrite(Mqtt_LED,LOW);
+
   setupMqttClient();
   //Setup Serial
   Serial.begin(115200);
@@ -77,11 +111,12 @@ void setup()
   ota();
   TelnetServer.begin();
   initSensors();
-
 }
 
 void loop()
 {
+  // Run Timer Events
+  events();
   //store the current timer millis
   unsigned long currentMillis = millis();
   //Connect WiFi (if disconnected)
@@ -105,6 +140,19 @@ void loop()
   CheckForConnections();
   //Read Telnet commands
   ReadFromTelnet();
+
+  //
+  if (currentMillis - fiveHundredMsTimer >= 500)
+  {
+    fiveHundredMsTimer = currentMillis;
+
+    if (hcPump && hcActive)
+    {
+      digitalWrite(Heating_LED, !digitalRead(Heating_LED));
+    }
+  }
+  
+
   //——————————————————————————————————————————————————————————————————————————————
   //Actions performed every second
   //——————————————————————————————————————————————————————————————————————————————
@@ -114,6 +162,40 @@ void loop()
     oneSecondTimer = currentMillis;
     //Ensure that we are connected to MQTT
     reconnectMqtt();
+
+    //Blink Wifi LED
+    if (!WiFi.isConnected())
+    {
+      digitalWrite(Wifi_LED, wifiLed ? HIGH : LOW);
+      wifiLed = !wifiLed;
+    }
+    else
+    {
+      digitalWrite(Wifi_LED, HIGH);
+      wifiLed = true;
+    }
+
+    //Blink MQTT LED
+    if (!client.connected())
+    {
+      digitalWrite(Mqtt_LED, mqttLed ? HIGH : LOW);
+      mqttLed = !mqttLed;
+    }
+    else
+    {
+      digitalWrite(Mqtt_LED, HIGH);
+      mqttLed = true;
+    }
+
+    if (hcPump && !hcActive)
+    {
+      digitalWrite(Heating_LED, !digitalRead(Heating_LED));
+    }
+
+    if (!hcPump && !hcActive)
+    {
+      digitalWrite(Heating_LED, 0);
+    }    
 
     //Boost Function
     if (mqttBoost)
@@ -317,7 +399,8 @@ void loop()
 
     //Request remperatures and report them back to the MQTT broker
     //  Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    ReadAndSendTemperatures();
+    //ReadAndSendTemperatures();
+    
   }
 
   //——————————————————————————————————————————————————————————————————————————————
@@ -375,15 +458,17 @@ void loop()
       WriteToConsoles("Connection established. Switching over to SCADA!\r\n");
     }
   }
+
+  if (TimeIsSynced() && !AlarmIsSet)
+  {
+    // Set Reboot time next day
+    setEvent(Reboot, now() + 24 * 3600);
+    AlarmIsSet = true;
+  }
+  
 }
 
-
-
-
-
-
-
-
-
-
-
+void Reboot()
+{
+  ESP.restart();
+}

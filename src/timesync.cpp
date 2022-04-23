@@ -7,6 +7,8 @@
 //——————————————————————————————————————————————————————————————————————————————
 Timezone myTZ;
 
+bool AlarmIsSet = false;
+
 //Sync using NTP, if clock is off
 void SyncTimeIfRequired()
 {
@@ -23,4 +25,3 @@ bool TimeIsSynced()
 {
   return timeStatus() == timeSet;
 }
-

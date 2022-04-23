@@ -28,7 +28,7 @@ extern const int calcHeatingBasepoint;
 //Endpoint for linear temperature calculation
 extern const int calcHeatingEndpoint;
 
-//Minimum Feed Temperature. This is the base value for calculations. Setting this as the setpoint will trigger the economy mode.
+//Minimum Feed Temperature. This is the base value for calculations. Defaults to 10° on most devices.
 extern const int calcTriggerAntiFreeze;
 
 //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available

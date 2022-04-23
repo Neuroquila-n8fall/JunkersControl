@@ -1,22 +1,18 @@
-#ifndef _TIMESYNC_H
-#define _TIMESYNC_H
-
-#include <ezTime.h>
-
 //——————————————————————————————————————————————————————————————————————————————
-//  NTP Time Object
+//  Variables
 //——————————————————————————————————————————————————————————————————————————————
-extern Timezone myTZ;
 
-extern bool AlarmIsSet;
+extern Preferences preferences;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
 //——————————————————————————————————————————————————————————————————————————————
 
-extern void SyncTimeIfRequired();
-extern bool TimeIsSynced();
-
-
-
-#endif
+/**
+ * @brief Initializes the preferences storage
+ **/
+extern void initSettings();
+/**
+ * @brief Loads stored settings. Uses default values if this is the first time the ESP starts
+ **/
+extern void loadSettings();

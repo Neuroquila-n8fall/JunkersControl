@@ -34,7 +34,7 @@ void CheckForConnections()
 
 //Write messages to both Serial and Telnet Clients
 void WriteToConsoles(String message)
-{
+{  
   Serial.print(message);
   //Print Message only if a client is connected and there is no data in the receive buffer.
   if (TelnetRemoteClient.connected() && TelnetRemoteClient.available() == 0)

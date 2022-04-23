@@ -215,6 +215,11 @@ void processCan()
       //Concat bytes 0 and 1 and divide the resulting INT by 100
       rawTemp = (Message.data[0] << 8) + Message.data[1];
       temp = rawTemp / 100.0;
+      //Temperatures above 200 are considered invalid.
+      if(temp > 200.0) {
+        WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
+        break;
+      };
       OutsideTemperatureSensor = temp;
       client.publish(pub_OutsideTemperature, String(temp).c_str());
       break;
