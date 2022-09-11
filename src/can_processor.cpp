@@ -17,14 +17,7 @@ ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 //Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
 {
-  CANMessage msg;
-  //This was the culprit of messages not arriving as they should.
-  //We have to set up the length of the message first. The heating doesn't care about that much but the library does!
-  msg.len = 8;
-  //These are here for reference only and are the default values of the ctr
-  msg.ext = false;
-  msg.rtr = false;
-  msg.idx = 0;
+  CANMessage msg = PrepareMessage(0x252);  
 
   char printbuf[255];
   double feedTemperature = 0.0F;
