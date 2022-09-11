@@ -20,6 +20,10 @@ const char *mqttPassword = mqttPASSWORD;
 
 //-- Subscriptions
 
+const char subscription_Parameters[] = "heating/set/parameters";
+
+const char pub_Parameters[] = "heating/get/parameters";
+
 //Example Topic
 const char subTopic_Example[] = "heizung/control/something";
 
