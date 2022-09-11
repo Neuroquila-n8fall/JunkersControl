@@ -17,7 +17,7 @@ void loadSettings() {
 
     hcMaxFeed = preferences.getDouble("hcMaxFeed", 75.0F);
 
-    HkSollVorlauf = preferences.getDouble("HkSollVorlauf", 10.0F);
+    hcFeedSetpoint = preferences.getDouble("HkSollVorlauf", 10.0F);
 
     fallbackBasepointTemperature = preferences.getDouble("fallbackBasepointTemperature", -10.0F);
 

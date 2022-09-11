@@ -20,26 +20,24 @@ void SetFeedTemperature()
   CANMessage msg = PrepareMessage(0x252);  
 
   char printbuf[255];
-  double feedTemperature = 0.0F;
   int feedSetpoint = 0;
 
   //Get raw Setpoint
-  feedTemperature = CalculateFeedTemperature();
+  mqttCommandedFeedTemperature = CalculateFeedTemperature();
   //Transform it into the int representation
-  feedSetpoint = ConvertFeedTemperature(feedTemperature);
+  feedSetpoint = ConvertFeedTemperature(mqttCommandedFeedTemperature);
 
-  msg.id = 0x252;
   msg.data[0] = feedSetpoint;
   if (Debug)
   {
-    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", feedTemperature, feedSetpoint);
+    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", mqttCommandedFeedTemperature, feedSetpoint);
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
   }
   //Report Feed Temperature back
   if (Override)
   {
-    client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
+    client.publish(pub_SetpointFeedTemperature, String(mqttCommandedFeedTemperature).c_str());
   }
 }
 
@@ -169,6 +167,7 @@ void processCan()
     //Value: Data / 2.0
     case 0x201:
       temp = Message.data[0] / 2.0;
+      hcCurrentFeed = temp;
       client.publish(pub_CurFeedTemperature, String(temp).c_str());
       break;
 
@@ -177,6 +176,7 @@ void processCan()
     //Value: Data / 2.0
     case 0x202:
       temp = Message.data[0] / 2.0;
+      hcMaxWaterTemperature = temp;
       break;
 
     //[DHW] - [Controller] - Current water temperature
@@ -184,6 +184,7 @@ void processCan()
     //Value: Data / 2.0
     case 0x203:
       temp = Message.data[0] / 2.0;
+      hcCurrentWaterTemperature = temp;
       break;
 
     //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
@@ -208,6 +209,7 @@ void processCan()
       status = Message.data[0];
       String(status).toCharArray(errorCode, 2);
       client.publish(pub_Error, errorCode);
+      mqttErrorCode = status;
       break;
 
     //[Controller] - Current outside temperature

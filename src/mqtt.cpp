@@ -135,6 +135,8 @@ const char pub_SensorAmbient[] = "heizung/temperaturen/umgebung";
 
 // Feed Temperature
 double mqttFeedTemperatureSetpoint = 50.0F;
+// Calculated Feed Temperature, Commanded
+double mqttCommandedFeedTemperature = 50.0F;
 // Basepoint Temperature
 double mqttBasepointTemperature = -10.0F;
 // Endpoint Temperature
@@ -171,6 +173,17 @@ bool mqttValveScaling = false;
 int mqttMaxValveOpening = 80;
 // The value of the valve that is most open (%)
 int mqttValveOpening = 50;
+// Error Code
+int mqttErrorCode = 0x000;
+
+// Auxilary Sensor Feed
+double mqttAuxFeed = 0.0F;
+// Auxilary Sensor Return
+double mqttAuxReturn = 0.0F;
+// Auxilary Sensor Exhaust
+double mqttAuxExhaust = 0.0F;
+// Auxilary Sensor Ambient
+double mqttAuxAmbient = 0.0F;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
@@ -319,8 +332,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     if (Debug)
     {
       serializeJsonPretty(doc, prettyDoc);
-      WriteToConsoles(prettyDoc);
-      WriteToConsoles("\r\n");
+      WriteToConsoles(prettyDoc + "\r\n");
     }
   }
 }
@@ -332,28 +344,34 @@ void SendParameters()
   JsonObject HeatingInformation = doc["HeatingInformation"];
 
   JsonObject HeatingInformation_Temperatures = HeatingInformation["Temperatures"];
-  float HeatingInformation_Temperatures_FeedMaximum = HeatingInformation_Temperatures["FeedMaximum"];
-  float HeatingInformation_Temperatures_FeedCurrent = HeatingInformation_Temperatures["FeedCurrent"];
-  float HeatingInformation_Temperatures_FeedSetpoint = HeatingInformation_Temperatures["FeedSetpoint"];
-  float HeatingInformation_Temperatures_Outside = HeatingInformation_Temperatures["Outside"]; // 15.1
+  HeatingInformation_Temperatures["FeedMaximum"] = hcMaxFeed;
+  HeatingInformation_Temperatures["FeedCurrent"] = hcCurrentFeed;
+  HeatingInformation_Temperatures["FeedSetpoint"] = mqttCommandedFeedTemperature;
+  HeatingInformation_Temperatures["Outside"] = OutsideTemperatureSensor;
 
   JsonObject HeatingInformation_AuxilaryTemperatures = HeatingInformation["AuxilaryTemperatures"];
-  float HeatingInformation_AuxilaryTemperatures_Feed = HeatingInformation_AuxilaryTemperatures["Feed"];
-  float HeatingInformation_AuxilaryTemperatures_Return = HeatingInformation_AuxilaryTemperatures["Return"];
-  float HeatingInformation_AuxilaryTemperatures_Exhaust = HeatingInformation_AuxilaryTemperatures["Exhaust"];
-  float HeatingInformation_AuxilaryTemperatures_Ambient = HeatingInformation_AuxilaryTemperatures["Ambient"];
+  HeatingInformation_AuxilaryTemperatures["Feed"] = mqttAuxFeed;
+  HeatingInformation_AuxilaryTemperatures["Return"] = mqttAuxReturn;
+  HeatingInformation_AuxilaryTemperatures["Exhaust"] = mqttAuxExhaust;
+  HeatingInformation_AuxilaryTemperatures["Ambient"] = mqttAuxAmbient;
 
   JsonObject HeatingInformation_Status = HeatingInformation["Status"];
-  bool HeatingInformation_Status_GasBurner = HeatingInformation_Status["GasBurner"];   // true
-  bool HeatingInformation_Status_Pump = HeatingInformation_Status["Pump"];             // true
-  const char *HeatingInformation_Status_Error = HeatingInformation_Status["Error"];    // "0x255"
-  bool HeatingInformation_Status_Season = HeatingInformation_Status["Season"];         // true
-  bool HeatingInformation_Status_Working = HeatingInformation_Status["Working"];       // true
-  bool HeatingInformation_Status_Boost = HeatingInformation_Status["Boost"];           // true
-  bool HeatingInformation_Status_FastHeatup = HeatingInformation_Status["FastHeatup"]; // true
+  HeatingInformation_Status["GasBurner"] = flame;
+  HeatingInformation_Status["Pump"] = hcPump;
+  HeatingInformation_Status["Error"] = mqttErrorCode;
+  HeatingInformation_Status["Season"] = hcSeason;
+  HeatingInformation_Status["Working"] = hcActive;
+  HeatingInformation_Status["Boost"] = mqttBoost;
+  HeatingInformation_Status["FastHeatup"] = mqttFastHeatup;
 
   String result;
   serializeJson(doc, result);
 
   client.publish(pub_Parameters, result.c_str());
+  if (Debug)
+  {
+    String prettyResult;
+    serializeJsonPretty(doc, prettyResult);
+    WriteToConsoles(prettyResult + "\r\n");
+  }
 }

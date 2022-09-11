@@ -172,6 +172,19 @@ extern bool mqttValveScaling;
 extern int mqttMaxValveOpening;
 //The value of the valve that is most open
 extern int mqttValveOpening;
+// Calculated Feed Temperature, Commanded
+extern double mqttCommandedFeedTemperature;
+// Error Code
+extern int mqttErrorCode;
+
+// Auxilary Sensor Feed
+extern double mqttAuxFeed;
+// Auxilary Sensor Return
+extern double mqttAuxReturn;
+// Auxilary Sensor Exhaust
+extern double mqttAuxExhaust;
+// Auxilary Sensor Ambient
+extern double mqttAuxAmbient;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions

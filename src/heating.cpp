@@ -29,10 +29,10 @@ double temp = 0.00F;
 double hcMaxFeed = 75.00F;
 
 //-- Heating Circuit: Current Feed Temperature (From Controller)
-double HkAktVorlauf = 0.00F;
+double hcCurrentFeed = 0.00F;
 
 //-- Heating Circuit: Feed Temperature Setpoint (Control Value)
-double HkSollVorlauf = 40.00F;
+double hcFeedSetpoint = 40.00F;
 
 //-- Heating Controller: Current Temperature on the Outside (From Controller)
 double OutsideTemperatureSensor = 0.00F;
@@ -75,6 +75,12 @@ int hcHeatingPower = 0;
 
 //-- Hot Water "now" setting.
 bool hwNow = false;
+
+//-- Max. possible water temperature -or- target temperature when running in heating battery mode
+double hcMaxWaterTemperature = 0.0F;
+
+//-- Current Water Temperature
+double hcCurrentWaterTemperature = 0.0F;
 
 //-- Fallback Values
 

@@ -42,10 +42,10 @@ extern double temp;
 extern double hcMaxFeed;
 
 //-- Heating Circuit: Current Feed Temperature (From Controller)
-extern double HkAktVorlauf;
+extern double hcCurrentFeed;
 
 //-- Heating Circuit: Feed Temperature Setpoint (Control Value)
-extern double HkSollVorlauf;
+extern double hcFeedSetpoint;
 
 //-- Heating Controller: Current Temperature on the Outside (From Controller)
 extern double OutsideTemperatureSensor;
@@ -88,6 +88,12 @@ extern int hcHeatingPower;
 
 //-- Hot Water "now" setting.
 extern bool hwNow;
+
+//-- Max. possible water temperature -or- target temperature when running in heating battery mode
+extern double hcMaxWaterTemperature;
+
+//-- Current Water Temperature
+extern double hcCurrentWaterTemperature;
 
 //-- Fallback Values
 
