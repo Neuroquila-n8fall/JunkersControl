@@ -2,8 +2,11 @@
 #define _MAIN_H
 
 #include <Arduino.h>
+#include <ACAN2515.h>
 
-
+extern void SendMessage(CANMessage msg);
+extern void SetDateTime();
+extern void Reboot();
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -57,11 +60,28 @@ extern unsigned long controllerMessageTimer;
 //-- Step-Counter
 extern int currentStep;
 
+//-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
+extern int dateTimeSendDelay;
+
 //LED Helper Variables
 extern bool statusLed;
 extern bool wifiLed;
 extern bool mqttLed;
 
-extern void Reboot();
+//——————————————————————————————————————————————————————————————————————————————
+//  Macros / Extensions
+//——————————————————————————————————————————————————————————————————————————————
+
+//-- runEvery Macro to get rid of timer/counter variables
+//-- -- Source: https://forum.arduino.cc/t/runevery-the-next-blink-without-delay/122405
+#define runEveryMilliseconds(t) for (static uint32_t _lasttime;\
+    (uint32_t)((uint32_t)millis() - _lasttime) >= (t);\
+    _lasttime += (t))
+
+#define runEverySeconds(t) for (static uint32_t _lasttime;\
+    (uint32_t)((uint32_t)millis() - _lasttime) >= (t) * 1000;\
+    _lasttime += (t))
+
+
 
 #endif
