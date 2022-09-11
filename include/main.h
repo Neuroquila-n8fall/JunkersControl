@@ -7,6 +7,7 @@
 extern void SendMessage(CANMessage msg);
 extern void SetDateTime();
 extern void Reboot();
+extern CANMessage PrepareMessage(uint32_t id);
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -63,10 +64,16 @@ extern int currentStep;
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 extern int dateTimeSendDelay;
 
-//LED Helper Variables
+//-- LED Helper Variables
 extern bool statusLed;
 extern bool wifiLed;
 extern bool mqttLed;
+
+//-- Timestamp of last received message from the heating controller
+extern unsigned long lastHeatingMessageTime;
+
+//-- Timestamp of the last message sent by us
+extern unsigned long lastSentMessageTime;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Macros / Extensions
@@ -80,7 +87,7 @@ extern bool mqttLed;
 
 #define runEverySeconds(t) for (static uint32_t _lasttime;\
     (uint32_t)((uint32_t)millis() - _lasttime) >= (t) * 1000;\
-    _lasttime += (t))
+    _lasttime += (t) * 1000)
 
 
 

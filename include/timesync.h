@@ -16,7 +16,7 @@ extern bool AlarmIsSet;
 
 extern void SyncTimeIfRequired();
 extern bool TimeIsSynced();
-
+extern void printWifiStatus();
 
 
 #endif

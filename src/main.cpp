@@ -39,13 +39,13 @@ bool Debug = true;
 //  Pins
 //——————————————————————————————————————————————————————————————————————————————
 
-//Status LED Pin
+// Status LED Pin
 const int Status_LED = 27;
 
-//Wifi Status LED Pin
+// Wifi Status LED Pin
 const int Wifi_LED = 26;
 
-//MQTT Status LED Pin
+// MQTT Status LED Pin
 const int Mqtt_LED = 14;
 
 const int Heating_LED = 25;
@@ -72,32 +72,38 @@ unsigned long thirtySecondTimer = 0L;
 //-- Last Controller Message timer
 unsigned long controllerMessageTimer = 0L;
 
+//-- Timestamp of last received message from the heating controller
+unsigned long lastHeatingMessageTime = 0L;
+
+//-- Timestamp of the last message sent by us
+unsigned long lastSentMessageTime = 0L;
+
 //-- Step-Counter
 int currentStep = 0;
 
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 int dateTimeSendDelay = 30;
-//LED Helper Variables
+// LED Helper Variables
 bool statusLed = false;
 bool wifiLed = false;
 bool mqttLed = false;
 
 void setup()
 {
-  //Setup Pins
+  // Setup Pins
   pinMode(Status_LED, OUTPUT);
   pinMode(Wifi_LED, OUTPUT);
   pinMode(Mqtt_LED, OUTPUT);
   digitalWrite(Status_LED, HIGH);
   statusLed = true;
   delay(1000);
-  digitalWrite(Wifi_LED,HIGH);
+  digitalWrite(Wifi_LED, HIGH);
   delay(1000);
-  digitalWrite(Mqtt_LED,HIGH);
+  digitalWrite(Mqtt_LED, HIGH);
   delay(100);
-  digitalWrite(Wifi_LED,LOW);
+  digitalWrite(Wifi_LED, LOW);
   delay(100);
-  digitalWrite(Mqtt_LED,LOW);
+  digitalWrite(Mqtt_LED, LOW);
 
   setupMqttClient();
   // Setup Serial
@@ -113,6 +119,8 @@ void setup()
   ota();
   TelnetServer.begin();
   initSensors();
+  lastHeatingMessageTime = millis();
+  lastSentMessageTime = millis();
 }
 
 void loop()
@@ -145,18 +153,14 @@ void loop()
   // Set Date & Time
   SetDateTime();
 
-
   //
-  if (currentMillis - fiveHundredMsTimer >= 500)
+  runEveryMilliseconds(500)
   {
-    fiveHundredMsTimer = currentMillis;
-
     if (hcPump && hcActive)
     {
       digitalWrite(Heating_LED, !digitalRead(Heating_LED));
     }
   }
-  
 
   //——————————————————————————————————————————————————————————————————————————————
   // Actions performed every second
@@ -164,11 +168,10 @@ void loop()
   runEverySeconds(1)
   {
     char printbuf[255];
-    oneSecondTimer = currentMillis;
     // Ensure that we are connected to MQTT
     reconnectMqtt();
 
-    //Blink Wifi LED
+    // Blink Wifi LED
     if (!WiFi.isConnected())
     {
       digitalWrite(Wifi_LED, wifiLed ? HIGH : LOW);
@@ -180,7 +183,7 @@ void loop()
       wifiLed = true;
     }
 
-    //Blink MQTT LED
+    // Blink MQTT LED
     if (!client.connected())
     {
       digitalWrite(Mqtt_LED, mqttLed ? HIGH : LOW);
@@ -200,7 +203,7 @@ void loop()
     if (!hcPump && !hcActive)
     {
       digitalWrite(Heating_LED, 0);
-    }    
+    }
 
     // Boost Function
     if (mqttBoost)
@@ -233,133 +236,129 @@ void loop()
         WriteToConsoles("No other controller on the network. Enabling Override.\r\n");
       }
     }
+  }
 
-    // Send desired Values to the heating controller
-    // Note that it cannot perform unrealistic actions.
-    // The built-in controller of the heating will always take care of staying well within the specs
-    // We can only "suggest" to set to a certain temperature or switching off the pump(s)
-
-    // I have "borrowed" the concept of a step-chain from PLC programming since it appears
-    //   to have been incoorporated into the controller as well because values arrive in
-    //   intervals of approximately 1 second.
-
-    CANMessage msg;
-    // This was the culprit of messages not arriving as they should.
-    // We have to set up the length of the message first. The heating doesn't care about that much but the library does!
-    msg.len = 8;
-    // These are here for reference only and are the default values of the ctr
-    msg.ext = false;
-    msg.rtr = false;
-    msg.idx = 0;
-
-    double feedTemperature = 0.0F;
-    int feedSetpoint = 0;
-
-    switch (currentStep)
+  //——————————————————————————————————————————————————————————————————————————————
+  // Control Actions
+  //——————————————————————————————————————————————————————————————————————————————
+  runEverySeconds(3)
+  {
+    // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
+    if (lastHeatingMessageTime - currentMillis >= 2000 && lastSentMessageTime - currentMillis >= 1000)
     {
-    case 0:
-      break;
 
-    case 1:
-      break;
+      char printbuf[255];
 
-    case 2:
-      // Switch economy mode. This is always the opposite of the desired operational state
-      msg.id = 0x253;
-      msg.data[0] = !mqttHeatingSwitch;
-      if (Debug)
+      // Send desired Values to the heating controller
+      // Note that it cannot perform unrealistic actions.
+      // The built-in controller of the heating will always take care of staying well within the specs
+      // We can only "suggest" to set to a certain temperature or switching off the pump(s)
+
+      // I have "borrowed" the concept of a step-chain from PLC programming since it appears
+      //   to have been incoorporated into the controller as well because values arrive in
+      //   intervals of approximately 1 second.
+
+      CANMessage msg = PrepareMessage(0x0);
+
+      double feedTemperature = 0.0F;
+      int feedSetpoint = 0;
+
+      switch (currentStep)
       {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !mqttHeatingSwitch);
-        String message(printbuf);
-        WriteToConsoles(message + "\r\n");
+      case 0:
+        // Switch economy mode. This is always the opposite of the desired operational state
+        msg.id = 0x253;
+        msg.data[0] = !mqttHeatingSwitch;
+        if (Debug)
+        {
+          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !mqttHeatingSwitch);
+          String message(printbuf);
+          WriteToConsoles(message + "\r\n");
+        }
+        break;
+
+      // Temperature regulation mode
+      //  1 = Weather guided | 0 = Room Temperature Guided
+      case 1:
+        msg.id = 0x258;
+        msg.data[0] = 1;
+        break;
+
+      case 2:
+
+        // Get raw Setpoint
+        feedTemperature = CalculateFeedTemperature();
+        // Transform it into the int representation
+        feedSetpoint = ConvertFeedTemperature(feedTemperature);
+
+        msg.id = 0x252;
+        msg.data[0] = feedSetpoint;
+        if (Debug)
+        {
+          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
+          String message(printbuf);
+          WriteToConsoles(message + "\r\n");
+        }
+        // Report Values back to the Broker if on Override.
+        if (Override)
+        {
+          // Report back Operational State
+          client.publish(pub_HcOperation, hcActive ? "1" : "0");
+          // Report back feed setpoint
+          client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
+          // Report back Boost status
+          client.publish(pub_Boost, mqttBoost ? "1" : "0");
+          // Report back Fastheatup status
+          client.publish(pub_Fastheatup, mqttFastHeatup ? "1" : "0");
+        }
+
+        break;
+
+      // DHW "Now"
+      case 3:
+        msg.id = 0x254;
+        msg.data[0] = 0x01;
+        break;
+
+      // DHW Temperature Setpoint
+      case 4:
+        msg.id = 0x255;
+        msg.data[0] = 20;
+        break;
+
+      case 5:
+        // Request? Data
+        msg.id = 0xF9;
+        break;
+
+      default:
+        // If we reach any undefined number inside the chain, reset to zero
+        currentStep = 0;
+        return; // important!
       }
-      break;
 
-    // Temperature regulation mode
-    //  1 = Weather guided | 0 = Room Temperature Guided
-    case 3:
-      msg.id = 0x258;
-      msg.data[0] = 1;
-      break;
+      // Increase counter
+      currentStep++;
 
-    case 4:
-
-      // Get raw Setpoint
-      feedTemperature = CalculateFeedTemperature();
-      // Transform it into the int representation
-      feedSetpoint = ConvertFeedTemperature(feedTemperature);
-
-      msg.id = 0x252;
-      msg.data[0] = feedSetpoint;
-      if (Debug)
-      {
-        sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
-        String message(printbuf);
-        WriteToConsoles(message + "\r\n");
-      }
-      // Report Values back to the Broker if on Override.
-      if (Override)
-      {
-        // Report back Operational State
-        client.publish(pub_HcOperation, hcActive ? "1" : "0");
-        // Report back feed setpoint
-        client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
-        // Report back Boost status
-        client.publish(pub_Boost, mqttBoost ? "1" : "0");
-        // Report back Fastheatup status
-        client.publish(pub_Fastheatup, mqttFastHeatup ? "1" : "0");
-      }
-
-      break;
-
-    // DHW "Now"
-    case 5:
-      msg.id = 0x254;
-      msg.data[0] = 0x01;
-      break;
-
-    // DHW Temperature Setpoint
-    case 6:
-      msg.id = 0x255;
-      msg.data[0] = 20;
-      break;
-
-    case 7:
-      // Request? Data
-      msg.id = 0xF9;
-      break;
-
-    default:
-      // If we reach any undefined number inside the chain, reset to zero
-      currentStep = 0;
-      return; // important!
+      SendMessage(msg);
     }
-
-    SendMessage(msg);
-
-    // Increase counter
-    currentStep++;
   }
 
   //——————————————————————————————————————————————————————————————————————————————
   // Actions performed every five seconds
   //——————————————————————————————————————————————————————————————————————————————
-  if (currentMillis - fiveSecondTimer >= 5000)
+  runEverySeconds(5)
   {
-    fiveSecondTimer = currentMillis;
-
     // Request remperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    ReadAndSendTemperatures();
+    // ReadAndSendTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————
   // Actions performed every thirty seconds
   //——————————————————————————————————————————————————————————————————————————————
-  if (currentMillis - thirtySecondTimer >= 30000)
+  runEverySeconds(30)
   {
-    thirtySecondTimer = currentMillis;
-
     // Run on fallback values when the connection to the server has been lost.
     if (TimeIsSynced() && !client.connected())
     {
@@ -408,12 +407,18 @@ void loop()
       WriteToConsoles("Connection established. Switching over to SCADA!\r\n");
     }
 
-      if (TimeIsSynced() && !AlarmIsSet)
-  {
-    // Set Reboot time next day
-    setEvent(Reboot, now() + 24 * 3600);
-    AlarmIsSet = true;
+    if (TimeIsSynced() && !AlarmIsSet)
+    {
+      // Set Reboot time next day
+      setEvent(Reboot, now() + 24 * 3600);
+      AlarmIsSet = true;
+    }
   }
+
+  runEverySeconds(60)
+  {
+    // Set Date & Time
+    SetDateTime();
   }
 }
 
@@ -435,6 +440,7 @@ void SendMessage(CANMessage msg)
       WriteToConsoles(message + "\r\n");
     }
     can.tryToSend(msg);
+    lastSentMessageTime = millis();
 
     // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
     char dataBuf[9];
@@ -472,33 +478,40 @@ void SetDateTime()
   char printbuf[255];
   runEverySeconds(dateTimeSendDelay)
   {
-
-    CANMessage msg;
-    // This was the culprit of messages not arriving as they should.
-    // We have to set up the length of the message first. The heating doesn't care about that much but the library does!
-    msg.len = 8;
-    // These are here for reference only and are the default values of the ctr
-    msg.ext = false;
-    msg.rtr = false;
-    msg.idx = 0;
-
-    // Send Date
-    msg.id = 0x256;
-    // Get day of week:
-    //  --> N = ISO-8601 numeric representation of the day of the week. (1 = Monday, 7 = Sunday)
-    msg.data[0] = myTZ.dateTime("N").toInt();
-    // Hours and minutes
-    msg.data[1] = myTZ.hour();
-    msg.data[2] = myTZ.minute();
-    // As of now we don't know what this value is for but it seems mandatory.
-    msg.data[3] = 4;
-    if (Debug)
+    if (lastSentMessageTime - millis() >= 1000)
     {
-      sprintf(printbuf, "DEBUG: Date and Time DOW:%i H:%i M:%i", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
-      String message(printbuf);
-      WriteToConsoles(message + "\r\n");
-    }
+      CANMessage msg = PrepareMessage(0x256);
 
-    SendMessage(msg);
-  }  
+      // Get day of week:
+      //  --> N = ISO-8601 numeric representation of the day of the week. (1 = Monday, 7 = Sunday)
+      msg.data[0] = myTZ.dateTime("N").toInt();
+      // Hours and minutes
+      msg.data[1] = myTZ.hour();
+      msg.data[2] = myTZ.minute();
+      // As of now we don't know what this value is for but it seems mandatory.
+      msg.data[3] = 4;
+      if (Debug)
+      {
+        sprintf(printbuf, "DEBUG: Date and Time DOW:%i H:%i M:%i", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
+        String message(printbuf);
+        WriteToConsoles(message + "\r\n");
+      }
+
+      SendMessage(msg);
+    }
+  }
+}
+
+CANMessage PrepareMessage(uint32_t id)
+{
+  CANMessage msg;
+  // This was the culprit of messages not arriving as they should.
+  // We have to set up the length of the message first. The heating doesn't care about that much but the library does!
+  msg.len = 8;
+  // These are here for reference only and are the default values of the ctr
+  msg.ext = false;
+  msg.rtr = false;
+  msg.idx = 0;
+  msg.id = id;
+  return msg;
 }

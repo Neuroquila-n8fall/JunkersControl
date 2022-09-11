@@ -150,6 +150,15 @@ void processCan()
 
     unsigned int rawTemp = 0;
     char errorCode[2];
+
+
+    //Take note of the last time we received a message from the boiler
+    if (Message.id < 0x250)
+    {
+      lastHeatingMessageTime = millis();
+    }
+    
+
     switch (Message.id)
     {
 
