@@ -21,8 +21,10 @@ void connectWifi()
   //(re)connect WiFi
   if (!WiFi.isConnected())
   {
+    WiFi.disconnect();
     WiFi.mode(WIFI_STA);
-    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
+    //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
+    //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
     WiFi.setHostname(hostName);
     Serial.println("WiFi not connected. Reconnecting...");
     WiFi.begin(ssid, pass);
@@ -32,6 +34,7 @@ void connectWifi()
       delay(5000);
       ESP.restart();
     }
+    printWifiStatus();
   }
 
   //Sync time
@@ -42,7 +45,13 @@ void connectWifi()
   if (currentMillis - wifiConnectMillis >= wifiRetryInterval)
   {
     wifiConnectMillis = currentMillis;
-    if (WiFi.isConnected())
+    printWifiStatus();
+  }
+}
+
+void printWifiStatus()
+{
+  if (WiFi.isConnected())
     {
       Serial.println("-------------------------------");
       Serial.println("Wifi Connected");
@@ -60,5 +69,4 @@ void connectWifi()
       myTZ.setLocation(F("Europe/Berlin"));
       Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
     }
-  }
 }

@@ -48,6 +48,7 @@ void ota()
         else if (error == OTA_END_ERROR)
           Serial.println("End Failed");
       });
-
+      
+  ArduinoOTA.setHostname(hostName);
   ArduinoOTA.begin();
 }
