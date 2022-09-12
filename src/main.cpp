@@ -352,6 +352,7 @@ void loop()
     // Request remperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
     // ReadAndSendTemperatures();
+    SendParameters();
   }
 
   //——————————————————————————————————————————————————————————————————————————————

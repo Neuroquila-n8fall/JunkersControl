@@ -194,5 +194,6 @@ extern void reconnectMqtt();
 extern String generateClientId();
 extern void setupMqttClient();
 extern void callback(char *topic, byte *payload, unsigned int length);
+extern void SendParameters();
 
 #endif

@@ -207,24 +207,8 @@ void reconnectMqtt()
       Serial.println("connected");
 
       // ... and resubscribe to topics
-      client.subscribe(subTopic_Example);
-      client.subscribe(subscription_AuxTemperature);
-      client.subscribe(subscription_AmbientTemperature);
-      client.subscribe(subscription_TargetAmbientTemperature);
-      client.subscribe(subscription_Adaption);
-      client.subscribe(subscription_FeedBaseSetpoint);
-      client.subscribe(subscription_FeedCutOff);
-      client.subscribe(subscription_FeedSetpoint);
-      client.subscribe(subscription_FeedMinimum);
-      client.subscribe(subscription_OnOff);
-      client.subscribe(subscription_OnDemandBoost);
-      client.subscribe(subscription_OnDemandBoostDuration);
-      client.subscribe(subscription_FastHeatup);
-      client.subscribe(subscription_DynamicAdaption);
-      client.subscribe(subscription_OverrideSetpoint);
-      client.subscribe(subscription_ValveScaling);
-      client.subscribe(subscription_ValveScalingMaxOpening);
-      client.subscribe(subscription_ValveScalingOpening);
+      client.subscribe(subscription_Parameters);
+      client.subscribe(pub_Parameters);
     }
     else
     {
@@ -278,10 +262,10 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Example for performing an action on topic receive.
   if (strcmp(topic, subscription_Parameters) == 0)
   {
-    const int docSize = 384;
+    const int docSize = 768;
     StaticJsonDocument<docSize> doc;
     bool setFeedImmediately = false;
-    DeserializationError error = deserializeJson(doc, (char *)payload);
+    DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
     {
@@ -327,35 +311,28 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (setFeedImmediately)
       SetFeedTemperature();
-    String prettyDoc;
-
-    if (Debug)
-    {
-      serializeJsonPretty(doc, prettyDoc);
-      WriteToConsoles(prettyDoc + "\r\n");
-    }
   }
 }
 
 void SendParameters()
 {
-  //TODO: Fill in values
   StaticJsonDocument<384> doc;
-  JsonObject HeatingInformation = doc["HeatingInformation"];
+  JsonObject object = doc.to<JsonObject>();
+  JsonObject HeatingInformation = object.createNestedObject("HeatingInformation");
 
-  JsonObject HeatingInformation_Temperatures = HeatingInformation["Temperatures"];
+  JsonObject HeatingInformation_Temperatures = HeatingInformation.createNestedObject("Temperatures");
   HeatingInformation_Temperatures["FeedMaximum"] = hcMaxFeed;
   HeatingInformation_Temperatures["FeedCurrent"] = hcCurrentFeed;
   HeatingInformation_Temperatures["FeedSetpoint"] = mqttCommandedFeedTemperature;
   HeatingInformation_Temperatures["Outside"] = OutsideTemperatureSensor;
 
-  JsonObject HeatingInformation_AuxilaryTemperatures = HeatingInformation["AuxilaryTemperatures"];
+  JsonObject HeatingInformation_AuxilaryTemperatures = HeatingInformation.createNestedObject("AuxilaryTemperatures");
   HeatingInformation_AuxilaryTemperatures["Feed"] = mqttAuxFeed;
   HeatingInformation_AuxilaryTemperatures["Return"] = mqttAuxReturn;
   HeatingInformation_AuxilaryTemperatures["Exhaust"] = mqttAuxExhaust;
   HeatingInformation_AuxilaryTemperatures["Ambient"] = mqttAuxAmbient;
 
-  JsonObject HeatingInformation_Status = HeatingInformation["Status"];
+  JsonObject HeatingInformation_Status = HeatingInformation.createNestedObject("Status");
   HeatingInformation_Status["GasBurner"] = flame;
   HeatingInformation_Status["Pump"] = hcPump;
   HeatingInformation_Status["Error"] = mqttErrorCode;
@@ -364,14 +341,17 @@ void SendParameters()
   HeatingInformation_Status["Boost"] = mqttBoost;
   HeatingInformation_Status["FastHeatup"] = mqttFastHeatup;
 
-  String result;
-  serializeJson(doc, result);
+char buffer[768];
+size_t n = serializeJson(doc, buffer);
+char printbuf[255];
+sprintf(printbuf, "Document Size: %i \r\n", n);
+WriteToConsoles(printbuf);
 
-  client.publish(pub_Parameters, result.c_str());
+  client.publish(pub_Parameters, buffer, n);
   if (Debug)
   {
-    String prettyResult;
-    serializeJsonPretty(doc, prettyResult);
-    WriteToConsoles(prettyResult + "\r\n");
+    serializeJsonPretty(doc, buffer);
+    WriteToConsoles(buffer);
+    WriteToConsoles("\r\n");
   }
 }
