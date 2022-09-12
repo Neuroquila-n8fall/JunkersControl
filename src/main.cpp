@@ -19,6 +19,8 @@
 #include <t_sensors.h>
 // NTP Timesync
 #include <timesync.h>
+//General Configuration
+#include <config/configuration.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -349,10 +351,21 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(5)
   {
+    // Publish Status
+    PublishStatus();
+
     // Request remperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    // ReadAndSendTemperatures();
-    SendParameters();
+    if (AuxSensorsEnabled)
+      ReadAndSendTemperatures();
+
+    // Publish Heating Temperatures
+    if (HeatingTemperaturesEnabled)
+      PublishHeatingTemperatures();
+    
+    // Publish Water Temperatures
+    if (WaterTemperaturesEnabled)
+      PublishWaterTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————

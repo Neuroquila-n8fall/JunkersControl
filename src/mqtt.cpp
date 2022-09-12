@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <mqtt.h>
+#include <config/configuration.h>
 #include <main.h>
 #include <telnet.h>
 #include <heating.h>
@@ -14,122 +15,6 @@ PubSubClient client(espClient);
 const char *mqttServer = mqttSERVER;
 const char *mqttUsername = mqttUSERNAME;
 const char *mqttPassword = mqttPASSWORD;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  MQTT Topics
-//——————————————————————————————————————————————————————————————————————————————
-
-//-- Subscriptions
-
-const char subscription_Parameters[] = "heating/set/parameters";
-
-const char pub_Parameters[] = "heating/get/parameters";
-
-// Example Topic
-const char subTopic_Example[] = "heizung/control/something";
-
-// Heating ON|OFF Control
-const char subscription_OnOff[] = "heizung/control/operation";
-
-// Heating Setpoint Feed
-const char subscription_FeedSetpoint[] = "heizung/control/sollvorlauf";
-
-// Heating Adaption: The Outside temperature at which hcMaxFeed should be reached
-const char subscription_FeedBaseSetpoint[] = "heizung/parameters/fusspunkt";
-
-// Heating Adaption: The Outside temperature at which the minimum temperature should be set
-const char subscription_FeedCutOff[] = "heizung/parameters/endpunkt";
-
-// Heating Adaption: Minimum Temperature of Feed (Anti-Freeze)
-const char subscription_FeedMinimum[] = "heizung/parameters/minimum";
-
-// Secondary Outside Temperature Source
-const char subscription_AuxTemperature[] = "umwelt/temperaturen/aussen";
-
-// Ambient Temperature Source
-const char subscription_AmbientTemperature[] = "heizung/parameters/ambient";
-
-// Ambient Temperature Target
-const char subscription_TargetAmbientTemperature[] = "heizung/parameters/targetambient";
-
-// On-Demand Boost.
-const char subscription_OnDemandBoost[] = "heizung/control/boost";
-
-// On-Demand Boost: Time in seconds
-const char subscription_OnDemandBoostDuration[] = "heizung/parameters/boostduration";
-
-// Fast-Heatup
-const char subscription_FastHeatup[] = "heizung/control/fastheatup";
-
-// Adaption
-const char subscription_Adaption[] = "heizung/parameters/adaption";
-
-// Dynamic Adaption based on return temperature sensor and desired target room temperature
-//   This enables a mode in which the feed temperature will be decreased when the return temperature is much higher than required
-//   This is useful when the heating is much more capable than required.
-//   Example: The return Temperature is 40°, the desired room temperature is 21°: The Adaption is -19° --> Feed setpoint is decreased by 19°
-//   Another one: The Return temperature is 20°, the desired room temperature is 21°: The Adaption is +1° --> Feed setpoint increased by 1°
-const char subscription_DynamicAdaption[] = "heizung/parameters/dynadapt";
-
-const char subscription_OverrideSetpoint[] = "heizung/parameters/overridesetpoint";
-
-//-- Published Topics
-
-// Maximum Feed Temperature
-const char pub_HcMaxFeedTemperature[] = "heizung/temperaturen/maxvorlauf";
-
-// Current Feed Temperature
-const char pub_CurFeedTemperature[] = "heizung/temperaturen/aktvorlauf";
-
-// Setpoint of feed Temperature
-const char pub_SetpointFeedTemperature[] = "heizung/temperaturen/sollvorlauf";
-
-// The Temperature on the Outside
-const char pub_OutsideTemperature[] = "heizung/temperaturen/aussen";
-
-// Flame status
-const char pub_GasBurner[] = "heizung/status/brenner";
-
-// Heating Circuit Pump Status
-const char pub_HcPump[] = "heizung/status/pumpe";
-
-// General Error Flag
-const char pub_Error[] = "heizung/status/fehler";
-
-// Seasonal Operation Flag
-const char pub_Season[] = "heizung/status/betriebsmodus";
-
-// Heating Operating
-const char pub_HcOperation[] = "heizung/status/heizbetrieb";
-
-// Boost
-const char pub_Boost[] = "heizung/status/boost";
-
-// Fast Heatup
-const char pub_Fastheatup[] = "heizung/status/schnellaufheizung";
-
-// Valve Scaling
-const char subscription_ValveScaling[] = "heizung/parameters/valvescaling";
-
-// Valve Scaling Max Opening
-const char subscription_ValveScalingMaxOpening[] = "heizung/parameters/valvemax";
-
-// Valve Scaling Current Top Opening Value
-const char subscription_ValveScalingOpening[] = "heizung/parameters/valvecurrent";
-
-//-- Topics for Temperature Sensor Readings
-
-// Feed Temperature Topic
-const char pub_SensorFeed[] = "heizung/temperaturen/vorlauf";
-
-// Return Temperature Topic
-const char pub_SensorReturn[] = "heizung/temperaturen/nachlauf";
-
-// Exhaust Temperature Topic
-const char pub_SensorExhaust[] = "heizung/temperaturen/abgas";
-
-// Ambient Temperature Topic
-const char pub_SensorAmbient[] = "heizung/temperaturen/umgebung";
 
 //-- Variables set by MQTT subscriptions with factory defaults at startup
 
@@ -161,7 +46,7 @@ int mqttBoostDuration = 300;
 int boostTimeCountdown = mqttBoostDuration;
 // Fast Heatup. This will max out the feed temperature for a prolongued time until mqttTargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
 bool mqttFastHeatup = false;
-// Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
+// Stored Ambient Temperature as reference. Reset everytime the Fastheatup flag is set
 double mqttReferenceAmbientTemperature = 17.0F;
 // Dynamic Adaption Flag
 bool mqttDynamicAdaption = false;
@@ -206,9 +91,8 @@ void reconnectMqtt()
     {
       Serial.println("connected");
 
-      // ... and resubscribe to topics
-      client.subscribe(subscription_Parameters);
-      client.subscribe(pub_Parameters);
+      // Subscribe to parameters.
+      client.subscribe(ParametersTopic);
     }
     else
     {
@@ -260,7 +144,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // Example for performing an action on topic receive.
-  if (strcmp(topic, subscription_Parameters) == 0)
+  if (strcmp(topic, ParametersTopic) == 0)
   {
     const int docSize = 768;
     StaticJsonDocument<docSize> doc;
@@ -314,34 +198,112 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 }
 
-void SendParameters()
+void PublishStatus()
 {
+  /* Example JSON
+  {
+		"Status":
+		{
+			"GasBurner": true,
+			"Pump": true,
+			"Error": 0..255,
+			"Season": true,
+			"Working": true,
+			"Boost": true,
+			"FastHeatup": true			
+		}
+  }
+  */
   StaticJsonDocument<384> doc;
-  JsonObject object = doc.to<JsonObject>();
-  JsonObject HeatingInformation = object.createNestedObject("HeatingInformation");
+  JsonObject jsonObj = doc.to<JsonObject>();
+  jsonObj["GasBurner"] = flame;
+  jsonObj["Pump"] = hcPump;
+  jsonObj["Error"] = mqttErrorCode;
+  jsonObj["Season"] = hcSeason;
+  jsonObj["Working"] = hcActive;
+  jsonObj["Boost"] = mqttBoost;
+  jsonObj["FastHeatup"] = mqttFastHeatup;
 
-  JsonObject HeatingInformation_Temperatures = HeatingInformation.createNestedObject("Temperatures");
-  HeatingInformation_Temperatures["FeedMaximum"] = hcMaxFeed;
-  HeatingInformation_Temperatures["FeedCurrent"] = hcCurrentFeed;
-  HeatingInformation_Temperatures["FeedSetpoint"] = mqttCommandedFeedTemperature;
-  HeatingInformation_Temperatures["Outside"] = OutsideTemperatureSensor;
-
-  JsonObject HeatingInformation_AuxilaryTemperatures = HeatingInformation.createNestedObject("AuxilaryTemperatures");
-  HeatingInformation_AuxilaryTemperatures["Feed"] = mqttAuxFeed;
-  HeatingInformation_AuxilaryTemperatures["Return"] = mqttAuxReturn;
-  HeatingInformation_AuxilaryTemperatures["Exhaust"] = mqttAuxExhaust;
-  HeatingInformation_AuxilaryTemperatures["Ambient"] = mqttAuxAmbient;
-
-  JsonObject HeatingInformation_Status = HeatingInformation.createNestedObject("Status");
-  HeatingInformation_Status["GasBurner"] = flame;
-  HeatingInformation_Status["Pump"] = hcPump;
-  HeatingInformation_Status["Error"] = mqttErrorCode;
-  HeatingInformation_Status["Season"] = hcSeason;
-  HeatingInformation_Status["Working"] = hcActive;
-  HeatingInformation_Status["Boost"] = mqttBoost;
-  HeatingInformation_Status["FastHeatup"] = mqttFastHeatup;
-
+  // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(pub_Parameters, buffer, n);
+  client.publish(StatusTopic, buffer, n);
+}
+
+void PublishHeatingTemperatures()
+{
+  /* Example JSON
+  {
+    "Temperatures":
+		{
+			"FeedMaximum": 75.10,
+			"FeedCurrent": 30.10,
+			"FeedSetpoint": 10.10,
+			"Outside": 15.10
+		}
+  }
+  */
+
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
+  jsonObj["FeedMaximum"] = hcMaxFeed;
+  jsonObj["FeedCurrent"] = hcCurrentFeed;
+  jsonObj["FeedSetpoint"] = mqttCommandedFeedTemperature;
+  jsonObj["Outside"] = OutsideTemperatureSensor;
+
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
+  client.publish(HeatingTemperaturesTopic, buffer, n);
+}
+
+void PublishWaterTemperatures()
+{
+  //TODO: Gather HW temperatures
+  /* Example JSON
+  "Temperatures":
+		{
+			"FeedMaximum": 75.10,
+			"FeedCurrent": 30.10,
+			"FeedSetpoint": 10.10,
+		}
+  */
+
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
+  jsonObj["FeedMaximum"] = 0;
+  jsonObj["FeedCurrent"] = 0;
+  jsonObj["FeedSetpoint"] = 0;
+
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
+  client.publish(WaterTemperaturesTopic, buffer, n);
+}
+
+void PublishAuxilaryTemperatures()
+{
+  /*
+  {
+  "AuxilaryTemperatures":
+		{
+			"Feed": 30.10,
+			"Return": 30.10,
+			"Exhaust": 50.10,
+			"Ambient": 17.10
+		}
+  }
+  */
+
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
+  jsonObj["Feed"] = mqttAuxFeed;
+  jsonObj["Return"] = mqttAuxReturn;
+  jsonObj["Exhaust"] = mqttAuxExhaust;
+  jsonObj["Ambient"] = mqttAuxAmbient;
+
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
+  client.publish(AuxilaryTemperaturesTopic, buffer, n);
 }

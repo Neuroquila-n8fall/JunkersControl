@@ -194,6 +194,9 @@ extern void reconnectMqtt();
 extern String generateClientId();
 extern void setupMqttClient();
 extern void callback(char *topic, byte *payload, unsigned int length);
-extern void SendParameters();
+extern void PublishStatus();
+extern void PublishHeatingTemperatures();
+extern void PublishWaterTemperatures();
+extern void PublishAuxilaryTemperatures();
 
 #endif
