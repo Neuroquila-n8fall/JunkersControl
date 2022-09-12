@@ -301,18 +301,6 @@ void loop()
           String message(printbuf);
           WriteToConsoles(message + "\r\n");
         }
-        // Report Values back to the Broker if on Override.
-        if (Override)
-        {
-          // Report back Operational State
-          client.publish(pub_HcOperation, hcActive ? "1" : "0");
-          // Report back feed setpoint
-          client.publish(pub_SetpointFeedTemperature, String(feedTemperature).c_str());
-          // Report back Boost status
-          client.publish(pub_Boost, mqttBoost ? "1" : "0");
-          // Report back Fastheatup status
-          client.publish(pub_Fastheatup, mqttFastHeatup ? "1" : "0");
-        }
 
         break;
 

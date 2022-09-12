@@ -34,11 +34,6 @@ void SetFeedTemperature()
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
   }
-  //Report Feed Temperature back
-  if (Override)
-  {
-    client.publish(pub_SetpointFeedTemperature, String(mqttCommandedFeedTemperature).c_str());
-  }
 }
 
 void setupCan()
@@ -159,7 +154,6 @@ void processCan()
     case 0x200:
       temp = Message.data[0] / 2.0;
       hcMaxFeed = temp;
-      client.publish(pub_HcMaxFeedTemperature, String(temp).c_str());
       break;
 
     //[HC] - [Controller] - Current feed temperature
@@ -168,7 +162,6 @@ void processCan()
     case 0x201:
       temp = Message.data[0] / 2.0;
       hcCurrentFeed = temp;
-      client.publish(pub_CurFeedTemperature, String(temp).c_str());
       break;
 
     //[DHW] - [Controller] - Max. possible water temperature -or- target temperature when running in heating battery mode
@@ -208,7 +201,6 @@ void processCan()
     case 0x206:
       status = Message.data[0];
       String(status).toCharArray(errorCode, 2);
-      client.publish(pub_Error, errorCode);
       mqttErrorCode = status;
       break;
 
@@ -225,7 +217,6 @@ void processCan()
         break;
       };
       OutsideTemperatureSensor = temp;
-      client.publish(pub_OutsideTemperature, String(temp).c_str());
       break;
 
     //Unknown
@@ -237,7 +228,6 @@ void processCan()
     //Value: 1 = On | 0 = Off
     case 0x209:
       flame = Message.data[0];
-      client.publish(pub_GasBurner, String(flame).c_str());
       break;
 
     //[HC] - [Controller] - HC Pump Operation
@@ -245,7 +235,6 @@ void processCan()
     //Value: 1 = On | 0 = Off
     case 0x20A:
       hcPump = Message.data[0];
-      client.publish(pub_HcPump, String(hcPump).c_str());
       break;
 
     //[DHW] - [Controller] - Hot Water Battery Operation
@@ -260,7 +249,6 @@ void processCan()
     //Value: 1 = Winter | 0 = Summer
     case 0x20C:
       hcSeason = Message.data[0];
-      client.publish(pub_Season, String(hcSeason).c_str());
       break;
 
     //[HC] - [RC] - Heating Operating
@@ -268,7 +256,6 @@ void processCan()
     //Value: 1 = On | 0 = Off
     case 0x250:
       hcActive = Message.data[0];
-      client.publish(pub_HcOperation, String(hcActive).c_str());
       break;
 
     //[HC] - [RC] - Heating Power
@@ -284,7 +271,6 @@ void processCan()
     //Set: Value as half-centigrade steps i.e. 35.5
     case 0x252:
       temp = Message.data[0] / 2.0;
-      client.publish(pub_SetpointFeedTemperature, String(temp).c_str());
       break;
 
     //[DHW] - [RC] - Setpoint water temperature

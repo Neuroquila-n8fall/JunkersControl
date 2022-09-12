@@ -136,14 +136,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // Example for performing an action on topic receive.
-  if (strcmp(topic, subTopic_Example) == 0)
-  {
-    // Transform payload into an integer
-    int i = s.toInt();
-    // Do something with 'i'
-  }
-
-  // Example for performing an action on topic receive.
   if (strcmp(topic, ParametersTopic) == 0)
   {
     const int docSize = 768;

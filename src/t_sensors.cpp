@@ -49,7 +49,6 @@ void ReadAndSendTemperatures()
     {
         aux_feedTemperature = value;
         mqttAuxFeed = value;
-        client.publish(pub_SensorFeed, String(value).c_str());
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Feed Sensor: %.2f °C\r\n", value);
@@ -70,7 +69,6 @@ void ReadAndSendTemperatures()
     {
         aux_returnTemperature = value;
         mqttAuxReturn = value;
-        client.publish(pub_SensorReturn, String(value).c_str());
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Return Sensor: %.2f °C\r\n", value);
@@ -91,7 +89,6 @@ void ReadAndSendTemperatures()
     {
         aux_exhaustEmperature = value;
         mqttAuxExhaust = value;
-        client.publish(pub_SensorExhaust, String(value).c_str());
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Exhaust Sensor: %.2f °C\r\n", value);
@@ -112,7 +109,6 @@ void ReadAndSendTemperatures()
     {
         aux_ambientTemperature = value;
         mqttAuxAmbient = value;
-        client.publish(pub_SensorAmbient, String(value).c_str());
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Ambient Sensor: %.2f °C\r\n", value);
