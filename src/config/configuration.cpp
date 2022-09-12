@@ -16,8 +16,8 @@ char StatusTopic[] = "cerasmarter/status";
 //  Feature Configuration
 //——————————————————————————————————————————————————————————————————————————————
 
-bool AuxSensorsEnabled;
+bool AuxSensorsEnabled = false;
 
-bool HeatingTemperaturesEnabled;
+bool HeatingTemperaturesEnabled = true;
 
-bool WaterTemperaturesEnabled;
+bool WaterTemperaturesEnabled = false;
