@@ -341,17 +341,7 @@ void SendParameters()
   HeatingInformation_Status["Boost"] = mqttBoost;
   HeatingInformation_Status["FastHeatup"] = mqttFastHeatup;
 
-char buffer[768];
-size_t n = serializeJson(doc, buffer);
-char printbuf[255];
-sprintf(printbuf, "Document Size: %i \r\n", n);
-WriteToConsoles(printbuf);
-
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
   client.publish(pub_Parameters, buffer, n);
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles(buffer);
-    WriteToConsoles("\r\n");
-  }
 }
