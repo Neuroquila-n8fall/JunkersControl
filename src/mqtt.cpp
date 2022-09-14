@@ -12,9 +12,9 @@
 PubSubClient client(espClient);
 
 //-- MQTT Endpoint
-const char *mqttServer = mqttSERVER;
-const char *mqttUsername = mqttUSERNAME;
-const char *mqttPassword = mqttPASSWORD;
+//const char *mqttServer = mqttSERVER;
+//const char *mqttUsername = mqttUSERNAME;
+//const char *mqttPassword = mqttPASSWORD;
 
 //-- Variables set by MQTT subscriptions with factory defaults at startup
 

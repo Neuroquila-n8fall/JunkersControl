@@ -1,15 +1,15 @@
 #include <Arduino.h>
 #include "wifi_config.h"
 #include "main.h"
-#include "arduino_secrets.h"
+//#include "arduino_secrets.h"
 #include "timesync.h"
 #include <configuration.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  WiFi Settings
 //——————————————————————————————————————————————————————————————————————————————
-const char *ssid = SECRET_SSID;
-const char *pass = SECRET_PASS;
+//const char *ssid = SECRET_SSID;
+//const char *pass = SECRET_PASS;
 const char hostName[] = "FXHEATCTRL01";
 //-- WiFi Check interval for status output
 const int wifiRetryInterval = 30000;

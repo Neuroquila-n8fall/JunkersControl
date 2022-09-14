@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
-#include <arduino_secrets.h>
+//#include <arduino_secrets.h>
 #include <wifi_config.h>
 
 //——————————————————————————————————————————————————————————————————————————————
@@ -12,9 +12,9 @@
 extern PubSubClient client;
 
 //-- MQTT Endpoint
-extern const char *mqttServer;
-extern const char *mqttUsername;
-extern const char *mqttPassword;
+//extern const char *mqttServer;
+//extern const char *mqttUsername;
+//extern const char *mqttPassword;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
