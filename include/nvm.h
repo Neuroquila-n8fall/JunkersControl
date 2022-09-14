@@ -1,3 +1,6 @@
+#ifndef NVM_H
+#define NVM_H
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
@@ -16,3 +19,5 @@ extern void initSettings();
  * @brief Loads stored settings. Uses default values if this is the first time the ESP starts
  **/
 extern void loadSettings();
+
+#endif

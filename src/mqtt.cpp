@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <mqtt.h>
-#include <config/configuration.h>
+#include <configuration.h>
 #include <main.h>
 #include <telnet.h>
 #include <heating.h>
@@ -82,17 +82,20 @@ void reconnectMqtt()
   // Loop until we're reconnected
   while (!client.connected())
   {
-
+    
     Serial.print("Attempting MQTT connection...");
 
     String clientId = generateClientId();
     // Attempt to connect
-    if (client.connect(clientId.c_str(), mqttUsername, mqttPassword))
+    if (client.connect(clientId.c_str(), configuration.MQTT_User, configuration.MQTT_Password))
     {
       Serial.println("connected");
 
       // Subscribe to parameters.
-      client.subscribe(ParametersTopic);
+      client.subscribe(configuration.MQTT_Topics_HeatingParameters);
+      client.subscribe(configuration.MQTT_Topics_WaterParameters);
+      client.subscribe(configuration.MQTT_Topics_Status);
+      client.subscribe(configuration.MQTT_Topics_AuxilaryParameters);
     }
     else
     {
@@ -120,12 +123,12 @@ String generateClientId()
 void setupMqttClient()
 {
   // Setup MQTT client
-  client.setServer(mqttServer, 1883);
+  client.setServer(configuration.MQTT_Server, configuration.MQTT_Port);
   client.setCallback(callback);
   client.setKeepAlive(10);
 }
 
-// \brief Callback for MQTT subscribed topics
+// Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
   payload[length] = '\0';
@@ -135,17 +138,47 @@ void callback(char *topic, byte *payload, unsigned int length)
     return;
   }
 
-  // Example for performing an action on topic receive.
-  if (strcmp(topic, ParametersTopic) == 0)
+  // Status Requested
+  if (strcmp(topic, configuration.MQTT_Topics_Status) == 0)
   {
-    const int docSize = 768;
+    StaticJsonDocument<256> doc;
+
+    DeserializationError error = deserializeJson(doc, (char *)payload, length);
+
+    if (error)
+    {
+      WriteToConsoles("[Status Request] Error Processing JSON: ");
+      WriteToConsoles(error.c_str());
+      WriteToConsoles("\r\n");
+      return;
+    }
+
+    bool HeatingTemperatures = doc["HeatingTemperatures"];   // false
+    bool WaterTemperatures = doc["WaterTemperatures"];       // false
+    bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
+    bool Status = doc["Status"];                             // false
+
+    if (HeatingTemperatures) PublishHeatingTemperatures();    
+
+    if (WaterTemperatures) PublishWaterTemperatures();
+
+    if (AuxilaryTemperatures) PublishAuxilaryTemperatures();
+
+    if (Status) PublishStatus();
+
+  }
+
+  // Receiving Heating Parameters
+  if (strcmp(topic, configuration.MQTT_Topics_HeatingParameters) == 0)
+  {
+    const int docSize = 384;
     StaticJsonDocument<docSize> doc;
     bool setFeedImmediately = false;
     DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
     {
-      WriteToConsoles("Error Processing JSON: ");
+      WriteToConsoles("[Heating Parameters] Error Processing JSON: ");
       WriteToConsoles(error.c_str());
       WriteToConsoles("\r\n");
       return;
@@ -187,6 +220,25 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (setFeedImmediately)
       SetFeedTemperature();
+
+    // Receiving Water Parameters
+    if (strcmp(topic, configuration.MQTT_Topics_WaterParameters) == 0)
+    {
+      const int docSize = 16;
+      StaticJsonDocument<docSize> doc;
+      DeserializationError error = deserializeJson(doc, (char *)payload, length);
+
+      if (error)
+      {
+        WriteToConsoles("[Water Parameters] Error Processing JSON: ");
+        WriteToConsoles(error.c_str());
+        WriteToConsoles("\r\n");
+        return;
+      }
+
+      // TODO: Water Temperature Setpoint variable to be populated here...
+      float Setpoint = doc["Setpoint"]; // 22.1
+    }
   }
 }
 

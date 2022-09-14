@@ -1,9 +1,4 @@
-#include <Arduino.h>
 #include <ota.h>
-#include <ArduinoOTA.h>
-#include <telnet.h>
-#include <can_processor.h>
-#include <mqtt.h>
 
 //-- OTA Flag
 bool otaRunning = false;
@@ -21,9 +16,14 @@ void ota()
 
         String type;
         if (ArduinoOTA.getCommand() == U_FLASH)
+        {
           type = "sketch";
+        }
         else // U_SPIFFS
+        {
           type = "filesystem";
+          SPIFFS.end();
+        }
 
         // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
         Serial.println("Start updating " + type);

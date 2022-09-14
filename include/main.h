@@ -19,25 +19,10 @@ extern bool Override;
 
 //Controller Message Timeout
 //  After this timeout this controller will take over control.
-extern const int controllerMessageTimeout;
+extern int controllerMessageTimeout;
 
 //Set this to true to view debug info
 extern bool Debug;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Pins
-//——————————————————————————————————————————————————————————————————————————————
-
-//Status LED Pin
-extern const int Status_LED;
-
-//Wifi Status LED Pin
-extern const int Wifi_LED;
-
-//MQTT Status LED Pin
-extern const int Mqtt_LED;
-
-extern const int Heating_LED;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables

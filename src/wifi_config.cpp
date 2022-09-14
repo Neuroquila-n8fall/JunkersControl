@@ -3,6 +3,7 @@
 #include "main.h"
 #include "arduino_secrets.h"
 #include "timesync.h"
+#include <configuration.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  WiFi Settings
@@ -25,9 +26,10 @@ void connectWifi()
     WiFi.mode(WIFI_STA);
     //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
     //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
-    WiFi.setHostname(hostName);
+    WiFi.setHostname(configuration.Wifi_Hostname);
     Serial.println("WiFi not connected. Reconnecting...");
-    WiFi.begin(ssid, pass);
+    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi_SSID, configuration.Wifi_Password, configuration.Wifi_Hostname);
+    WiFi.begin(configuration.Wifi_SSID, configuration.Wifi_Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       Serial.println("Connection Failed! Rebooting...");

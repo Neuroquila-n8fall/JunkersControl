@@ -1,0 +1,37 @@
+{
+    "Wifi": {
+        "SSID": "ssid",
+        "Password": "pass",
+        "Hostname": "CERASMARTER"
+    },
+    "MQTT": {
+        "Server": "1.2.3.4",
+        "Port": 1883,
+        "User": "mqtt",
+        "Password": "mqtt",
+        "Topics": {
+            "HeatingParameters": "cerasmarter/heating/parameters",
+            "WaterParameters": "cerasmarter/water/parameters",
+            "AuxilaryParameters": "cerasmarter/auxilary/parameters",
+            "Status": "cerasmarter/status"
+        }
+    },
+    "Features": {
+        "HeatingParameters": true,
+        "WaterParameters": false,
+        "AuxilaryParameters": false
+    },
+    "Time": {
+        "Timezone": "Europe/Berlin"
+    },
+    "General": {
+        "BusMessageTimeout": 30,
+        "Debug": false
+    },
+    "LEDs": {
+        "Wifi": 26,
+        "Status": 27,
+        "Mqtt": 14,
+        "Heating": 25
+    }
+}

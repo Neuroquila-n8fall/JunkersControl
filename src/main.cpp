@@ -19,8 +19,8 @@
 #include <t_sensors.h>
 // NTP Timesync
 #include <timesync.h>
-//General Configuration
-#include <config/configuration.h>
+// General Configuration
+#include <configuration.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -32,25 +32,10 @@ bool Override = true;
 
 // Controller Message Timeout
 //   After this timeout this controller will take over control.
-const int controllerMessageTimeout = 30000;
+int controllerMessageTimeout = 30000;
 
 // Set this to true to view debug info
 bool Debug = true;
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Pins
-//——————————————————————————————————————————————————————————————————————————————
-
-// Status LED Pin
-const int Status_LED = 27;
-
-// Wifi Status LED Pin
-const int Wifi_LED = 26;
-
-// MQTT Status LED Pin
-const int Mqtt_LED = 14;
-
-const int Heating_LED = 25;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
@@ -92,24 +77,37 @@ bool mqttLed = false;
 
 void setup()
 {
-  // Setup Pins
-  pinMode(Status_LED, OUTPUT);
-  pinMode(Wifi_LED, OUTPUT);
-  pinMode(Mqtt_LED, OUTPUT);
-  digitalWrite(Status_LED, HIGH);
-  statusLed = true;
-  delay(1000);
-  digitalWrite(Wifi_LED, HIGH);
-  delay(1000);
-  digitalWrite(Mqtt_LED, HIGH);
-  delay(100);
-  digitalWrite(Wifi_LED, LOW);
-  delay(100);
-  digitalWrite(Mqtt_LED, LOW);
-
-  setupMqttClient();
   // Setup Serial
   Serial.begin(115200);
+
+  // Read configuration
+  bool result = ReadConfiguration();
+
+  if (!result)
+  {
+    WriteToConsoles("Unable to read configuration.");
+    return;
+  }
+
+  Debug = configuration.Debug;
+  controllerMessageTimeout = configuration.BusMessageTimeout;
+
+  // Setup Pins
+  pinMode(configuration.StatusLed, OUTPUT);
+  pinMode(configuration.WifiLed, OUTPUT);
+  pinMode(configuration.MqttLed, OUTPUT);
+  digitalWrite(configuration.StatusLed, HIGH);
+  statusLed = true;
+  delay(1000);
+  digitalWrite(configuration.WifiLed, HIGH);
+  delay(1000);
+  digitalWrite(configuration.MqttLed, HIGH);
+  delay(100);
+  digitalWrite(configuration.WifiLed, LOW);
+  delay(100);
+  digitalWrite(configuration.MqttLed, LOW);
+
+  setupMqttClient();
 
   // Setup can module
   setupCan();
@@ -160,7 +158,7 @@ void loop()
   {
     if (hcPump && hcActive)
     {
-      digitalWrite(Heating_LED, !digitalRead(Heating_LED));
+      digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
     }
   }
 
@@ -176,35 +174,35 @@ void loop()
     // Blink Wifi LED
     if (!WiFi.isConnected())
     {
-      digitalWrite(Wifi_LED, wifiLed ? HIGH : LOW);
+      digitalWrite(configuration.WifiLed, wifiLed ? HIGH : LOW);
       wifiLed = !wifiLed;
     }
     else
     {
-      digitalWrite(Wifi_LED, HIGH);
+      digitalWrite(configuration.WifiLed, HIGH);
       wifiLed = true;
     }
 
     // Blink MQTT LED
     if (!client.connected())
     {
-      digitalWrite(Mqtt_LED, mqttLed ? HIGH : LOW);
+      digitalWrite(configuration.MqttLed, mqttLed ? HIGH : LOW);
       mqttLed = !mqttLed;
     }
     else
     {
-      digitalWrite(Mqtt_LED, HIGH);
+      digitalWrite(configuration.MqttLed, HIGH);
       mqttLed = true;
     }
 
     if (hcPump && !hcActive)
     {
-      digitalWrite(Heating_LED, !digitalRead(Heating_LED));
+      digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
     }
 
     if (!hcPump && !hcActive)
     {
-      digitalWrite(Heating_LED, 0);
+      digitalWrite(configuration.HeatingLed, 0);
     }
 
     // Boost Function
@@ -350,7 +348,7 @@ void loop()
     // Publish Heating Temperatures
     if (HeatingTemperaturesEnabled)
       PublishHeatingTemperatures();
-    
+
     // Publish Water Temperatures
     if (WaterTemperaturesEnabled)
       PublishWaterTemperatures();
