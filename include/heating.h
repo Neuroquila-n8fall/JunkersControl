@@ -62,12 +62,14 @@ struct CeraValues
     int SetPoint = 40.0F;
     //-- The currently reported temperature of the DHW circuit
     double TemperatureCurrent = 0.00F;
-    //-- Wether this installation utilizes a buffer(or battery)
+    //-- Whether this installation utilizes a buffer(or battery)
     bool BufferMode = false;
     //-- Hot Water "now" setting (means: Instant heatup but is referred to as "now" on TAxxx and the manual).
     bool Now = false;
     //-- Continous Flow Setpoint
     double ContinousFlowSetpoint = 0.00F;
+    //-- Maximum Temperature
+    double MaximumTemperature =0.00F;
   } Hotwater;
   //-- Values for mixed circuit installations
   struct MixedCircuit_

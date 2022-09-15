@@ -199,14 +199,14 @@ void processCan()
     //Value: Data / 2.0
     case 0x205:
       temp = Message.data[0] / 2.0;
+      ceraValues.Hotwater.TemperatureCurrent = temp;
       break;
 
     //[Controller] - Error Byte
     //Data Type: Byte
     //Value: 0x00 = Operational
     //       Error codes and their meaning vary between models. See your manual for details.
-    case 0x206:
-    
+    case 0x206:    
       ceraValues.General.Error = Message.data[0];
       String(ceraValues.General.Error).toCharArray(errorCode, 2);
       break;

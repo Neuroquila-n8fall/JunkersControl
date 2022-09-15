@@ -95,7 +95,14 @@ void callback(char *topic, byte *payload, unsigned int length)
       WriteToConsoles("\r\n");
       return;
     }
-
+    /* Example JSON:
+        {
+            "HeatingTemperatures": true,
+            "WaterTemperatures": true,
+            "AuxilaryTemperatures": true,
+            "Status": true
+        }
+    */
     bool HeatingTemperatures = doc["HeatingTemperatures"];   // false
     bool WaterTemperatures = doc["WaterTemperatures"];       // false
     bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
@@ -224,13 +231,10 @@ void PublishHeatingTemperatures()
 {
   /* Example JSON
   {
-    "Temperatures":
-		{
 			"FeedMaximum": 75.10,
 			"FeedCurrent": 30.10,
 			"FeedSetpoint": 10.10,
 			"Outside": 15.10
-		}
   }
   */
 
@@ -251,19 +255,22 @@ void PublishWaterTemperatures()
 {
   //TODO: Gather HW temperatures
   /* Example JSON
-  "Temperatures":
 		{
-			"FeedMaximum": 75.10,
-			"FeedCurrent": 30.10,
-			"FeedSetpoint": 10.10,
+			"Maximum": 75.10,
+			"Current": 30.10,
+			"Setpoint": 10.10,
+      ""
 		}
   */
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
-  jsonObj["FeedMaximum"] = 0;
-  jsonObj["FeedCurrent"] = 0;
-  jsonObj["FeedSetpoint"] = 0;
+  jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
+  jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
+  jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
+  jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+  jsonObj["Now"] = ceraValues.Hotwater.Now;
+  jsonObj["Buffer"] = ceraValues.Hotwater.BufferMode;
 
   // Publish Data on MQTT
   char buffer[768];
