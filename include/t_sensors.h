@@ -81,7 +81,7 @@ extern DeviceAddress ambient_sens;
 //——————————————————————————————————————————————————————————————————————————————
 
 //Read Temperatures and send the results using MQTT
-extern void ReadAndSendTemperatures();
+extern void ReadTemperatures();
 
 //Initialize Sensors
 extern void initSensors();

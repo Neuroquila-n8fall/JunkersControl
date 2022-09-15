@@ -35,7 +35,7 @@ void initSensors()
 }
 
 //Reads the attached temperature sensors and publishes the values to MQTT
-void ReadAndSendTemperatures()
+void ReadTemperatures()
 {
     sensors.requestTemperatures();
     char printBuf[255];
