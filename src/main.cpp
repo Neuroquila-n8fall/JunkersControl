@@ -328,7 +328,7 @@ void loop()
     // Publish Status
     PublishStatus();
 
-    // Request remperatures and report them back to the MQTT broker
+    // Request Temperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
     if (AuxSensorsEnabled)
     {
