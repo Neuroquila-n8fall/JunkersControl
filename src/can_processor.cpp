@@ -6,13 +6,11 @@
 #include <mqtt.h>
 #include <telnet.h>
 #include <timesync.h>
+#include <configuration.h>
 
-//——————————————————————————————————————————————————————————————————————————————
-//  MCP2515 Driver object
-//——————————————————————————————————————————————————————————————————————————————
+ACAN2515 can(configuration.CAN_CS, SPI, configuration.CAN_INT);
 
-ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
-
+double temp = 0.00F;
 
 //Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
@@ -23,28 +21,29 @@ void SetFeedTemperature()
   int feedSetpoint = 0;
 
   //Get raw Setpoint
-  mqttCommandedFeedTemperature = CalculateFeedTemperature();
+  
+  commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
   //Transform it into the int representation
-  feedSetpoint = ConvertFeedTemperature(mqttCommandedFeedTemperature);
+  feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
   msg.data[0] = feedSetpoint;
   if (Debug)
   {
-    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", mqttCommandedFeedTemperature, feedSetpoint);
+    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
   }
 }
 
 void setupCan()
-{
-
+{  
   //Setup CAN Module
-  SPI.begin(MCP2515_SCK, MCP2515_MISO, MCP2515_MOSI);
+  SPI.begin(configuration.CAN_CS, configuration.CAN_MISO, configuration.CAN_MOSI);
+  uint32_t QUARTZ_FREQUENCY = (uint32_t) configuration.CAN_Quartz * 1000UL * 1000UL;
   ACAN2515Settings settings(QUARTZ_FREQUENCY, 10UL * 1000UL); // CAN bit rate 10 kb/s
 
   const uint16_t errorCode = can.begin(settings, [] { can.isr(); });
-  if (errorCode == 0)
+  if (errorCode == 0 && Debug)
   {
     Serial.print("Bit Rate prescaler: ");
     Serial.println(settings.mBitRatePrescaler);
@@ -119,13 +118,16 @@ void processCan()
       WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
     }
 
-    //Print string
-    sprintf(printBuf, "CAN: [%04X] Data:\t", Message.id);
-    String consoleMessage(printBuf);
-    consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
-    consoleMessage += data;
-    WriteToConsoles(consoleMessage);
-    WriteToConsoles("\r\n");
+    if (Debug)
+    {
+      // Print string
+      sprintf(printBuf, "CAN: [%04X] Data:\t", Message.id);
+      String consoleMessage(printBuf);
+      consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
+      consoleMessage += data;
+      WriteToConsoles(consoleMessage);
+      WriteToConsoles("\r\n");
+    }
 
     /*************************************
      * Terms
@@ -158,31 +160,31 @@ void processCan()
     //Value: Data / 2.0
     case 0x200:
       temp = Message.data[0] / 2.0;
-      hcMaxFeed = temp;
+      ceraValues.Heating.FeedMaximum = temp;
       break;
 
     //[HC] - [Controller] - Current feed temperature
     //Data Type: INT
     //Value: Data / 2.0
     case 0x201:
-      temp = Message.data[0] / 2.0;
-      hcCurrentFeed = temp;
+      temp = Message.data[0] / 2.0;      
+      ceraValues.Heating.FeedCurrent = temp;
       break;
 
     //[DHW] - [Controller] - Max. possible water temperature -or- target temperature when running in heating battery mode
     //Data Type: INT
     //Value: Data / 2.0
     case 0x202:
-      temp = Message.data[0] / 2.0;
-      hcMaxWaterTemperature = temp;
+      temp = Message.data[0] / 2.0;      
+      ceraValues.Heating.BufferWaterTemperatureMaximum = temp;
       break;
 
     //[DHW] - [Controller] - Current water temperature
     //Data Type: INT
     //Value: Data / 2.0
     case 0x203:
-      temp = Message.data[0] / 2.0;
-      hcCurrentWaterTemperature = temp;
+      temp = Message.data[0] / 2.0;      
+      ceraValues.Heating.BufferWaterTemperatureCurrent = temp;
       break;
 
     //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
@@ -204,9 +206,9 @@ void processCan()
     //Value: 0x00 = Operational
     //       Error codes and their meaning vary between models. See your manual for details.
     case 0x206:
-      status = Message.data[0];
-      String(status).toCharArray(errorCode, 2);
-      mqttErrorCode = status;
+    
+      ceraValues.General.Error = Message.data[0];
+      String(ceraValues.General.Error).toCharArray(errorCode, 2);
       break;
 
     //[Controller] - Current outside temperature
@@ -221,53 +223,53 @@ void processCan()
         WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         break;
       };
-      OutsideTemperatureSensor = temp;
+      ceraValues.General.OutsideTemperature = temp;
       break;
 
     //Unknown
     case 0x208:
       break;
 
-    //[Controller] - Gas Burner Flame Status
+    //[Controller] - Gas Burner Flame ceraValues.General.Error
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x209:
-      flame = Message.data[0];
+      ceraValues.General.FlameLit = Message.data[0];
       break;
 
     //[HC] - [Controller] - HC Pump Operation
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x20A:
-      hcPump = Message.data[0];
+      ceraValues.Heating.PumpActive = Message.data[0];
       break;
 
     //[DHW] - [Controller] - Hot Water Battery Operation
     //Data Type: Bit
     //Value: 1 = Enabled | 0 = Disabled
-    case 0x20B:
-      hwBatteryMode = Message.data[0];
+    case 0x20B:    
+      ceraValues.Hotwater.BufferMode = Message.data[0];
       break;
 
     //[HC] - [Controller] - Current Seasonal Operation Mode (Set by Dial on the boiler panel)
     //Data Type: Bit
     //Value: 1 = Winter | 0 = Summer
     case 0x20C:
-      hcSeason = Message.data[0];
+      ceraValues.Heating.Season = Message.data[0];
       break;
 
     //[HC] - [RC] - Heating Operating
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x250:
-      hcActive = Message.data[0];
+      ceraValues.Heating.Active = Message.data[0];
       break;
 
     //[HC] - [RC] - Heating Power
     //Data Type: INT
     //Value: 0-255 = 0-100%
     case 0x251:
-      hcHeatingPower = Message.data[0];
+      ceraValues.Heating.HeatingPower = Message.data[0];
       break;
 
     //[HC] - [RC] - Setpoint Feed Temperature
@@ -281,16 +283,17 @@ void processCan()
     //[DHW] - [RC] - Setpoint water temperature
     //Data Type: INT
     //Value: Data / 2.0
-    //Set: //Set: Value as half-centigrade steps i.e. 45.5
+    //Set: Value as half-centigrade steps i.e. 45.5
     case 0x253:
       temp = Message.data[0] / 2.0;
+      ceraValues.Hotwater.SetPoint = temp;
       break;
 
     //[DHW] - [RC] - "Hot Water Now" (Warmwasser SOFORT in German)
     //Data Type: Bit
     //Value: 1 = Enabled | 0 = Disabled
     case 0x254:
-      hwNow = Message.data[0];
+      ceraValues.Hotwater.Now = Message.data[0];
       break;
 
     //[RC] - Date and Time
@@ -300,9 +303,9 @@ void processCan()
     //       Data[2] = Minutes (0-59)
     //       Data[3] = Always '4' - Unknown meaning.
     case 0x256:
-      curDayOfWeek = Message.data[0];
-      curHours = Message.data[1];
-      curMinutes = Message.data[2];
+      ceraValues.Time.DayOfWeek = Message.data[0];
+      ceraValues.Time.Hours = Message.data[1];
+      ceraValues.Time.Minutes = Message.data[2];
       break;
 
     //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)
@@ -310,13 +313,14 @@ void processCan()
     //Value: Data / 2.0
     case 0x255:
       temp = Message.data[0] / 2.0;
+      ceraValues.Hotwater.ContinousFlowSetpoint = temp;
       break;
 
     //[MC] - [Controller] - Mixed-Circuit Pump Operation
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x404:
-      mcPump = Message.data[0];
+      ceraValues.MixedCircuit.PumpActive = Message.data[0];
       break;
 
     //[MC] - [RC] - Setpoint Mixed-Circuit Feed Temperature
@@ -324,13 +328,14 @@ void processCan()
     //Value: Data / 2.0
     case 0x405:
       temp = Message.data[0] / 2.0;
+      ceraValues.MixedCircuit.FeedSetpoint = temp;
       break;
 
     //[MC] - [RC] - Mixed-Circuit Economy Setting
     //Data Type: Bit
     //Value: 1 = On | 0 = Off
     case 0x407:
-      mcEconomy = Message.data[0];
+      ceraValues.MixedCircuit.Economy = Message.data[0];
       break;
 
     //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature
@@ -338,6 +343,7 @@ void processCan()
     //Value: Data / 2.0
     case 0x440:
       temp = Message.data[0] / 2.0;
+      ceraValues.MixedCircuit.FeedCurrent = temp;
       break;
     }
   }

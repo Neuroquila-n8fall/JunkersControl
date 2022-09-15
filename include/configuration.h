@@ -44,6 +44,13 @@ struct Configuration
     int WifiLed;    // Wifi Status LED GPIO, ex. 26
     int MqttLed;    // Mqtt Led GPIO, ex. 14
     int HeatingLed; // Heating Active LED GPIO, ex. 25
+
+    byte CAN_SCK;
+    byte CAN_MISO;
+    byte CAN_MOSI;
+    byte CAN_CS;
+    byte CAN_INT;
+    int CAN_Quartz;
 };
 
 extern const char *configFileName;

@@ -2,6 +2,7 @@
 #include <telnet.h>
 #include <WiFi.h>
 #include <wifi_config.h>
+#include <configuration.h>
 
 const uint TelnetServerPort = 23;
 WiFiServer TelnetServer(TelnetServerPort);
@@ -26,7 +27,7 @@ void CheckForConnections()
       //Accept
       TelnetRemoteClient = TelnetServer.available();
       TelnetRemoteClient.println("——————————————————————————");
-      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", hostName, WiFi.localIP().toString().c_str());
+      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi_Hostname, WiFi.localIP().toString().c_str());
       TelnetRemoteClient.println("——————————————————————————");
     }
   }

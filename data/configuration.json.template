@@ -28,6 +28,14 @@
         "BusMessageTimeout": 30,
         "Debug": false
     },
+    "CAN": {
+        "SCK": 18,
+        "MOSI": 23,
+        "MISO": 19,
+        "CS": 5,
+        "INT": 17,
+        "Quartz": 16
+    },
     "LEDs": {
         "Wifi": 26,
         "Status": 27,

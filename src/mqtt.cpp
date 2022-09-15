@@ -11,64 +11,7 @@
 //——————————————————————————————————————————————————————————————————————————————
 PubSubClient client(espClient);
 
-//-- MQTT Endpoint
-const char *mqttServer = mqttSERVER;
-const char *mqttUsername = mqttUSERNAME;
-const char *mqttPassword = mqttPASSWORD;
-
-//-- Variables set by MQTT subscriptions with factory defaults at startup
-
-// Feed Temperature
-double mqttFeedTemperatureSetpoint = 50.0F;
-// Calculated Feed Temperature, Commanded
-double mqttCommandedFeedTemperature = 50.0F;
-// Basepoint Temperature
-double mqttBasepointTemperature = -10.0F;
-// Endpoint Temperature
-double mqttEndpointTemperature = 31.0F;
-// Ambient Temperature
-double mqttAmbientTemperature = 17.0F;
-// Target Ambient Temperature to reach
-double mqttTargetAmbientTemperature = 21.5F;
-// Feed Temperature Adaption Value. Increases or decreases the target feed temperature
-double mqttFeedAdaption = 0.00F;
-// Minimum ("Anti Freeze") Temperature.
-double mqttMinimumFeedTemperature = 10.0F;
-// Whether the heating should be off or not
-bool mqttHeatingSwitch = true;
-// Auxilary Temperature
-double mqttAuxilaryTemperature = 0.0F;
-// Boost will max the feed temperature for mqttBoostTime seconds
-bool mqttBoost = false;
-// Boost Duration (Seconds)
-int mqttBoostDuration = 300;
-// Countdown variable for boost control.
-int boostTimeCountdown = mqttBoostDuration;
-// Fast Heatup. This will max out the feed temperature for a prolongued time until mqttTargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
-bool mqttFastHeatup = false;
-// Stored Ambient Temperature as reference. Reset everytime the Fastheatup flag is set
-double mqttReferenceAmbientTemperature = 17.0F;
-// Dynamic Adaption Flag
-bool mqttDynamicAdaption = false;
-// Take the value from mqttFeedTemperatureSetpoint instead of doing built-in calculations.
-bool mqttOverrideSetpoint = false;
-// Enable scaling based upon valve opening
-bool mqttValveScaling = false;
-// Maximum valve opening. 80% for Homematic eTRV-2 (%)
-int mqttMaxValveOpening = 80;
-// The value of the valve that is most open (%)
-int mqttValveOpening = 50;
-// Error Code
-int mqttErrorCode = 0x000;
-
-// Auxilary Sensor Feed
-double mqttAuxFeed = 0.0F;
-// Auxilary Sensor Return
-double mqttAuxReturn = 0.0F;
-// Auxilary Sensor Exhaust
-double mqttAuxExhaust = 0.0F;
-// Auxilary Sensor Ambient
-double mqttAuxAmbient = 0.0F;
+CommandedValues commandedValues;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
@@ -185,38 +128,41 @@ void callback(char *topic, byte *payload, unsigned int length)
     }
 
     JsonObject Cerasmarter = doc["Cerasmarter"];
-    mqttHeatingSwitch = Cerasmarter["Enabled"];
-    hcActive = mqttHeatingSwitch;
-    mqttFeedTemperatureSetpoint = Cerasmarter["FeedSetpoint"];
-    mqttBasepointTemperature = Cerasmarter["FeedBaseSetpoint"];
-    mqttEndpointTemperature = Cerasmarter["FeedCutOff"];
-    mqttMinimumFeedTemperature = Cerasmarter["FeedMinimum"];
-    mqttAuxilaryTemperature = Cerasmarter["AuxilaryTemperature"];
-    mqttAmbientTemperature = Cerasmarter["AmbientTemperature"];
-    mqttTargetAmbientTemperature = Cerasmarter["TargetAmbientTemperature"];
+    //Request Enable/Disable Heating and set the status of the heating accordlingly
+    commandedValues.Heating.Active = Cerasmarter["Enabled"];
+    ceraValues.Heating.Active = commandedValues.Heating.Active;
 
-    if (Cerasmarter["OnDemandBoost"] != mqttBoost)
+    commandedValues.Heating.FeedSetpoint = Cerasmarter["FeedSetpoint"];
+    commandedValues.Heating.BasepointTemperature = Cerasmarter["FeedBaseSetpoint"];
+    commandedValues.Heating.EndpointTemperature = Cerasmarter["FeedCutOff"];    
+    commandedValues.Heating.MinimumFeedTemperature = Cerasmarter["FeedMinimum"];    
+    commandedValues.Heating.AuxilaryTemperature = Cerasmarter["AuxilaryTemperature"];
+    commandedValues.Heating.AmbientTemperature = Cerasmarter["AmbientTemperature"];
+    commandedValues.Heating.TargetAmbientTemperature = Cerasmarter["TargetAmbientTemperature"];
+
+    
+    if (Cerasmarter["OnDemandBoost"] != commandedValues.Heating.Boost)
     {
-      mqttBoost = Cerasmarter["OnDemandBoost"];
-      boostTimeCountdown = mqttBoostDuration;
+      commandedValues.Heating.Boost = Cerasmarter["OnDemandBoost"];
+      commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
       setFeedImmediately = true;
     }
 
-    mqttBoostDuration = Cerasmarter["OnDemandBoostDuration"];
-    if (Cerasmarter["FastHeatup"] != mqttFastHeatup)
+    commandedValues.Heating.BoostDuration = Cerasmarter["OnDemandBoostDuration"];
+    if (Cerasmarter["FastHeatup"] != commandedValues.Heating.FastHeatup)
     {
       setFeedImmediately = true;
       // Set reference Temperature
-      mqttReferenceAmbientTemperature = mqttAmbientTemperature;
+      commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     }
 
-    mqttFastHeatup = Cerasmarter["FastHeatup"];
-    mqttFeedAdaption = Cerasmarter["Adaption"];
-    mqttValveScaling = Cerasmarter["ValveScaling"];
-    mqttMaxValveOpening = Cerasmarter["ValveScalingMaxOpening"];
-    mqttValveOpening = Cerasmarter["ValveScalingOpening"];
-    mqttDynamicAdaption = Cerasmarter["DynamicAdaption"];
-    mqttOverrideSetpoint = Cerasmarter["OverrideSetpoint"];
+    commandedValues.Heating.FastHeatup = Cerasmarter["FastHeatup"];    
+    commandedValues.Heating.FeedAdaption = Cerasmarter["Adaption"];    
+    commandedValues.Heating.ValveScaling = Cerasmarter["ValveScaling"];    
+    commandedValues.Heating.MaxValveOpening = Cerasmarter["ValveScalingMaxOpening"];    
+    commandedValues.Heating.ValveOpening = Cerasmarter["ValveScalingOpening"];    
+    commandedValues.Heating.DynamicAdaption = Cerasmarter["DynamicAdaption"];    
+    commandedValues.Heating.OverrideSetpoint = Cerasmarter["OverrideSetpoint"];
 
     if (setFeedImmediately)
       SetFeedTemperature();
@@ -260,13 +206,13 @@ void PublishStatus()
   */
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
-  jsonObj["GasBurner"] = flame;
-  jsonObj["Pump"] = hcPump;
-  jsonObj["Error"] = mqttErrorCode;
-  jsonObj["Season"] = hcSeason;
-  jsonObj["Working"] = hcActive;
-  jsonObj["Boost"] = mqttBoost;
-  jsonObj["FastHeatup"] = mqttFastHeatup;
+  jsonObj["GasBurner"] = ceraValues.General.FlameLit;
+  jsonObj["Pump"] = ceraValues.Heating.PumpActive;
+  jsonObj["Error"] = ceraValues.General.Error;
+  jsonObj["Season"] = ceraValues.Heating.Season;
+  jsonObj["Working"] = ceraValues.Heating.Active;
+  jsonObj["Boost"] = commandedValues.Heating.Boost;
+  jsonObj["FastHeatup"] = commandedValues.Heating.FastHeatup;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -290,10 +236,10 @@ void PublishHeatingTemperatures()
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
-  jsonObj["FeedMaximum"] = hcMaxFeed;
-  jsonObj["FeedCurrent"] = hcCurrentFeed;
-  jsonObj["FeedSetpoint"] = mqttCommandedFeedTemperature;
-  jsonObj["Outside"] = OutsideTemperatureSensor;
+  jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+  jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
+  jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
+  jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -341,10 +287,10 @@ void PublishAuxilaryTemperatures()
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
-  jsonObj["Feed"] = mqttAuxFeed;
-  jsonObj["Return"] = mqttAuxReturn;
-  jsonObj["Exhaust"] = mqttAuxExhaust;
-  jsonObj["Ambient"] = mqttAuxAmbient;
+  jsonObj["Feed"] = ceraValues.Auxilary.FeedTemperature;
+  jsonObj["Return"] = ceraValues.Auxilary.ReturnTemperature;
+  jsonObj["Exhaust"] = ceraValues.Auxilary.ExhaustTemperature;
+  jsonObj["Ambient"] = ceraValues.Auxilary.AmbientTemperature;
 
   // Publish Data on MQTT
   char buffer[768];

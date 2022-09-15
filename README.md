@@ -25,11 +25,14 @@
     - [Valve-based control](#valve-based-control)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
+  - [Configuration / Setup](#configuration--setup)
   - [Dedicated PCB](#dedicated-pcb)
   - [Todo](#todo)
   - [Special Thanks](#special-thanks)
 
 ![Alt_Text](/assets/example_ha_dashboard.jpg)
+
+#NOTE: Documentation is being updated for recent changes.
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -97,12 +100,12 @@ The end point is basically the temperature at which the heating should switch of
 ![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
 *In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
 
-See `mqttBasepointTemperature` for base point, `mqttEndpointTemperature` for end point or "cut off" temperature. 
+See `commandedValues.Heating.BasepointTemperature` for base point, `commandedValues.Heating.EndpointTemperature` for end point or "cut off" temperature. 
 
 ### Night/Economy Mode
 There are two ways to switch the economy mode.
-1) Send `0` or `1` to the topic described inside `mqtt.cpp` named `subscription_OnOff`. It will then select the feed temperature according to `mqttMinimumFeedTemperature` inside `mqtt.cpp` and enable economy mode.
-2) Set `hcActive` to `false` or `true` depending on if you want to switch economy on or off.
+1) Send `0` or `1` to the topic described inside `mqtt.cpp` named `subscription_OnOff`. It will then select the feed temperature according to `commandedValues.Heating.MinimumFeedTemperature` inside `mqtt.cpp` and enable economy mode.
+2) Set `ceraValues.Heating.Active` to `false` or `true` depending on if you want to switch economy on or off.
 
 ### Switch Off/On
 
@@ -111,11 +114,11 @@ See [Night/Economy Mode](#nighteconomy-mode)
 Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
 
 ### Boost
-Boost function sets the feed temperature to the maximum reported value (`HcMaxFeed`) for a selected period of time (default: 300 seconds). Change `mqttBoostDuration` inside `mqtt.cpp` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
+Boost function sets the feed temperature to the maximum reported value (`ceraValues.Heating.FeedMaximum`) for a selected period of time (default: 300 seconds). Change `commandedValues.Heating.BoostDuration` inside `mqtt.cpp` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
 Due to the natural lag of a heating system you should fire this function before you boost a specific radiator.
 
 ### Fast Heatup
-Fast Heatup function compares a temperature (`mqttAmbientTemperature`) to a given target value (`mqttTargetAmbientTemperature`) and sets the feed temperature to maximum (`HcMaxFeed`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `mqttFastHeatup` default value inside `mqtt.cpp` from `true` to `false`
+Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTemperature`) to a given target value (`commandedValues.Heating.TargetAmbientTemperature`) and sets the feed temperature to maximum (`ceraValues.Heating.FeedMaximum`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `commandedValues.Heating.FastHeatup` default value inside `mqtt.cpp` from `true` to `false`
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
 *This is how the fast heatup function works visually*
 
@@ -181,9 +184,9 @@ You can do your own calculations and just tell the control to set the temperatur
 
 ### Valve-based control
 
-This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `mqttMaxValveOpening`) to the `mqttMinimumFeedTemperature` plus `mqttAdaption` and `hcMaxFeed` 
+This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `commandedValues.Heating.MaxValveOpening`) to the `commandedValues.Heating.MinimumFeedTemperature` plus `mqttAdaption` and `ceraValues.Heating.FeedMaximum` 
 This is the most demand focused function yet because if you always report the most open valve in the circuit, you end up with a very responsive system that will react on demand immediately.
-This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `mqttDynamicAdaption` which will then add a value mapped between `mqttBasepointTemperature` and `mqttEndpointTemperature` to `0` and `mqttFeedAdaption`
+This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `commandedValues.Heating.DynamicAdaption` which will then add a value mapped between `commandedValues.Heating.BasepointTemperature` and `commandedValues.Heating.EndpointTemperature` to `0` and `commandedValues.Heating.FeedAdaption`
 
 Example for dynamic adaption together with valve scaling:
 - Outside Temperature is 5°
@@ -217,6 +220,15 @@ Debug info can be retrieved sing a very basic telnet implementation. Simply conn
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
+
+## Configuration / Setup
+1) See `configuration.json` inside the `data` folder to configure the project to your requirements.
+2) Upload the project
+3) Now It will format the SPIFFS filesystem.
+4) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
+5) It will now read this config and will reach operational status
+
+You should be able to perform OTA updates now for both application and configuration.
 
 ## Dedicated PCB
 

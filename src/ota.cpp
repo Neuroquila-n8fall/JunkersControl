@@ -49,6 +49,6 @@ void ota()
           Serial.println("End Failed");
       });
       
-  ArduinoOTA.setHostname(hostName);
+  ArduinoOTA.setHostname(configuration.Wifi_Hostname);
   ArduinoOTA.begin();
 }

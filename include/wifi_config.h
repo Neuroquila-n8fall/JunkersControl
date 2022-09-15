@@ -7,9 +7,7 @@
 //——————————————————————————————————————————————————————————————————————————————
 //  WiFi Settings
 //——————————————————————————————————————————————————————————————————————————————
-extern const char *ssid;
-extern const char *pass;
-extern const char hostName[];
+
 //-- WiFi Check interval for status output
 extern const int wifiRetryInterval;
 //-- Wifi Client object

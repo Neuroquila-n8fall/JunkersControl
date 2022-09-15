@@ -44,18 +44,6 @@ bool Debug = true;
 //-- WiFi Status Timer Variable
 unsigned long wifiConnectMillis = 0L;
 
-// -- 500msec Interval Timer Variable
-unsigned long fiveHundredMsTimer = 0L;
-
-//-- One-Second Interval Timer Variable
-unsigned long oneSecondTimer = 0L;
-
-//-- Five-Second Interval Timer Variable
-unsigned long fiveSecondTimer = 0L;
-
-//-- Thirty-Second Interval Timer Variable
-unsigned long thirtySecondTimer = 0L;
-
 //-- Last Controller Message timer
 unsigned long controllerMessageTimer = 0L;
 
@@ -156,7 +144,7 @@ void loop()
   //
   runEveryMilliseconds(500)
   {
-    if (hcPump && hcActive)
+    if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
     {
       digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
     }
@@ -195,33 +183,33 @@ void loop()
       mqttLed = true;
     }
 
-    if (hcPump && !hcActive)
+    if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
       digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
     }
 
-    if (!hcPump && !hcActive)
+    if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
       digitalWrite(configuration.HeatingLed, 0);
     }
 
     // Boost Function
-    if (mqttBoost)
+    if (commandedValues.Heating.Boost)
     {
       // Countdown to zero and switch off boost if 0
-      if (boostTimeCountdown > 0)
+      if (commandedValues.Heating.BoostTimeCountdown > 0)
       {
-        boostTimeCountdown--;
+        commandedValues.Heating.BoostTimeCountdown--;
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG BOOST: Time: %i Left: %i \r\n", mqttBoostDuration, boostTimeCountdown);
+          sprintf(printbuf, "DEBUG BOOST: Time: %i Left: %i \r\n", commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
           String message(printbuf);
           WriteToConsoles(message);
         }
       }
       else
       {
-        mqttBoost = false;
+        commandedValues.Heating.Boost = false;
       }
     }
 
@@ -268,10 +256,10 @@ void loop()
       case 0:
         // Switch economy mode. This is always the opposite of the desired operational state
         msg.id = 0x253;
-        msg.data[0] = !mqttHeatingSwitch;
+        msg.data[0] = !commandedValues.Heating.Active;
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !mqttHeatingSwitch);
+          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !commandedValues.Heating.Active);
           String message(printbuf);
           WriteToConsoles(message + "\r\n");
         }
@@ -295,7 +283,7 @@ void loop()
         msg.data[0] = feedSetpoint;
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, hcActive ? "ON" : "OFF", isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
+          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
           String message(printbuf);
           WriteToConsoles(message + "\r\n");
         }
@@ -366,44 +354,44 @@ void loop()
       // Note: negate this statement to try out the fallback mode.
       if (!Debug)
       {
-        // Activate fallback
-        isOnFallback = true;
+        // Activate fallback        
+        ceraValues.Fallback.isOnFallback = true;
         WriteToConsoles("Connection lost. Switching over to fallback mode!\r\n");
       }
 
       // Check if the profile has to be changed depending on the time schedule.
       //   Check if the current hour is in between the start of both "Start" and "End" marks
-      if (myTZ.hour() >= fallbackStartEntry.StartHour && myTZ.hour() < fallbackEndEntry.StartHour)
+      if (myTZ.hour() >= ceraValues.Fallback.fallbackStartEntry.StartHour && myTZ.hour() < ceraValues.Fallback.fallbackEndEntry.StartHour)
       {
         // Check if the minute mark has been passed.
-        if (myTZ.minute() >= fallbackStartEntry.StartMinute)
+        if (myTZ.minute() >= ceraValues.Fallback.fallbackStartEntry.StartMinute)
         {
           // Activate Heating Profile by overwriting the fields with fallback values
-          mqttBasepointTemperature = fallbackBasepointTemperature;
-          mqttEndpointTemperature = fallbackEndpointTemperature;
-          hcActive = true;
+          commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.BasepointTemperature;
+          commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.EndpointTemperature;
+          ceraValues.Heating.Active = true;
           return; // important!
         }
       }
 
       // Check if we have passed the hour mark.
-      if (myTZ.hour() > fallbackEndEntry.StartHour)
+      if (myTZ.hour() > ceraValues.Fallback.fallbackEndEntry.StartHour)
       {
         // Check if the minute mark has been passed
-        if (myTZ.minute() >= fallbackStartEntry.StartMinute)
+        if (myTZ.minute() >= ceraValues.Fallback.fallbackStartEntry.StartMinute)
         {
           // Set both Base and Endpoint to the anti-freeze setting.
-          mqttBasepointTemperature = fallbackMinimumFeedTemperature;
-          mqttEndpointTemperature = fallbackMinimumFeedTemperature;
-          hcActive = false;
+          commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
+          commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
+          ceraValues.Heating.Active = false;
         }
       }
     }
 
     // Disable fallback mode when connected.
-    if (client.connected() && isOnFallback)
+    if (client.connected() && ceraValues.Fallback.isOnFallback)
     {
-      isOnFallback = false;
+      ceraValues.Fallback.isOnFallback = false;
       WriteToConsoles("Connection established. Switching over to SCADA!\r\n");
     }
 

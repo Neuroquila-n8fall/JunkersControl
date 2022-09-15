@@ -31,15 +31,6 @@ extern bool Debug;
 //-- WiFi Status Timer Variable
 extern unsigned long wifiConnectMillis;
 
-//-- One-Second Interval Timer Variable
-extern unsigned long oneSecondTimer;
-
-//-- Five-Second Interval Timer Variable
-extern unsigned long fiveSecondTimer;
-
-//-- Thirty-Second Interval Timer Variable
-extern unsigned long thirtySecondTimer;
-
 //-- Last Controller Message timer
 extern unsigned long controllerMessageTimer;
 

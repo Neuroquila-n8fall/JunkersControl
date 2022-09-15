@@ -3,6 +3,7 @@
 #include <mqtt.h>
 #include <main.h>
 #include <telnet.h>
+#include <heating.h>
 
 //-- Temperature Sensor Setup
 // OneWire Pin
@@ -21,12 +22,6 @@ DeviceAddress feed_sens = {0x28, 0x76, 0x51, 0x91, 0x42, 0x20, 0x01, 0xE3};
 DeviceAddress return_sens = {0x28, 0x6F, 0x9C, 0xF6, 0x42, 0x20, 0x01, 0xF6};
 DeviceAddress exhaust_sens = {0x28, 0x6D, 0x98, 0xF5, 0x42, 0x20, 0x01, 0x0F};
 DeviceAddress ambient_sens = {0x28, 0xBF, 0x39, 0x10, 0x42, 0x20, 0x01, 0x93};
-
-//-- Auxilary Sensor Values (OneWire Sensors)
-double aux_feedTemperature = 0.0F;
-double aux_returnTemperature = 0.0F;
-double aux_ambientTemperature = 0.0F;
-double aux_exhaustEmperature = 0.0F;
 
 void initSensors()
 {
@@ -47,8 +42,7 @@ void ReadAndSendTemperatures()
     float value = sensors.getTempC(feed_sens);
     if (value != DEVICE_DISCONNECTED_C)
     {
-        aux_feedTemperature = value;
-        mqttAuxFeed = value;
+        ceraValues.Auxilary.FeedTemperature = value;
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Feed Sensor: %.2f °C\r\n", value);
@@ -67,8 +61,7 @@ void ReadAndSendTemperatures()
     value = sensors.getTempC(return_sens);
     if (value != DEVICE_DISCONNECTED_C)
     {
-        aux_returnTemperature = value;
-        mqttAuxReturn = value;
+        ceraValues.Auxilary.ReturnTemperature = value;
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Return Sensor: %.2f °C\r\n", value);
@@ -87,8 +80,7 @@ void ReadAndSendTemperatures()
     value = sensors.getTempC(exhaust_sens);
     if (value != DEVICE_DISCONNECTED_C)
     {
-        aux_exhaustEmperature = value;
-        mqttAuxExhaust = value;
+        ceraValues.Auxilary.ExhaustTemperature = value;
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Exhaust Sensor: %.2f °C\r\n", value);
@@ -107,8 +99,7 @@ void ReadAndSendTemperatures()
     value = sensors.getTempC(ambient_sens);
     if (value != DEVICE_DISCONNECTED_C)
     {
-        aux_ambientTemperature = value;
-        mqttAuxAmbient = value;
+        ceraValues.Auxilary.AmbientTemperature = value;
         if (Debug)
         {
             sprintf(printBuf, "DEBUG TEMP READING: Ambient Sensor: %.2f °C\r\n", value);

@@ -101,6 +101,15 @@ bool ReadConfiguration()
     configuration.MqttLed = Leds["Mqtt"];       // 14
     configuration.HeatingLed = Leds["Heating"]; // 25
 
+    JsonObject CAN = doc["CAN"];
+    configuration.CAN_SCK = CAN["SCK"];
+    configuration.CAN_MISO = CAN["MISO"];
+    configuration.CAN_MOSI = CAN["MOSI"];
+    configuration.CAN_CS = CAN["CS"];
+    configuration.CAN_INT = CAN["INT"];
+    configuration.CAN_Quartz = CAN["Quartz"];
+
+
     // We don't need to keep it open at this point.
     SPIFFS.end();
 
