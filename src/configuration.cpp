@@ -92,12 +92,7 @@ bool ReadConfiguration()
     configuration.LEDs.MqttLed = Leds["Mqtt"];       // 14
     configuration.LEDs.HeatingLed = Leds["Heating"]; // 25
 
-    JsonObject CAN = doc["CAN"];
-    configuration.CanModuleConfig.CAN_SCK = CAN["SCK"];
-    configuration.CanModuleConfig.CAN_MISO = CAN["MISO"];
-    configuration.CanModuleConfig.CAN_MOSI = CAN["MOSI"];
-    configuration.CanModuleConfig.CAN_CS = CAN["CS"];
-    configuration.CanModuleConfig.CAN_INT = CAN["INT"];
+    JsonObject CAN = doc["CAN"];    
     configuration.CanModuleConfig.CAN_Quartz = CAN["Quartz"];
 
     JsonObject CAN_Addresses = CAN["Addresses"];

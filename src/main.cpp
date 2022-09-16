@@ -3,6 +3,8 @@
 
 // Main Header
 #include <main.h>
+// General Configuration
+#include <configuration.h>
 // Include MQTT Topics
 #include <mqtt.h>
 // CAN Module Settings
@@ -19,8 +21,7 @@
 #include <t_sensors.h>
 // NTP Timesync
 #include <timesync.h>
-// General Configuration
-#include <configuration.h>
+
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation

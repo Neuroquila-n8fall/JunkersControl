@@ -8,7 +8,24 @@
 #include <timesync.h>
 #include <configuration.h>
 
-ACAN2515 can(configuration.CanModuleConfig.CAN_CS, SPI, configuration.CanModuleConfig.CAN_INT);
+//-- Preprocessor 
+#define ST(A) #A
+#define STR(A) ST(A)
+//-- Set CS Pin via Build Flag
+#ifndef MCP2515_CS
+#define MCP2515_CS 5
+#endif
+//-- Set INT Pin via Build Flag
+#ifndef MCP2515_INT
+#define MCP2515_INT 17
+#endif
+
+
+static const byte MCP2515_SCK = 18;  // SCK input of MCP2515
+static const byte MCP2515_MOSI = 23; // SDI input of MCP2515
+static const byte MCP2515_MISO = 19; // SDO output of MCP2515
+
+ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 
 double temp = 0.00F;
 
@@ -37,10 +54,9 @@ void SetFeedTemperature()
 
 void setupCan()
 {
-  // Setup CAN Module
-  SPI.begin(configuration.CanModuleConfig.CAN_CS, configuration.CanModuleConfig.CAN_MISO, configuration.CanModuleConfig.CAN_MOSI);
-  uint32_t QUARTZ_FREQUENCY = (uint32_t)configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL;
-  ACAN2515Settings settings(QUARTZ_FREQUENCY, 10UL * 1000UL); // CAN bit rate 10 kb/s
+  SPI.begin(MCP2515_SCK, MCP2515_MISO, MCP2515_MOSI);
+  uint32_t frequency = configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL; // 16 MHz
+  ACAN2515Settings settings(frequency, 10UL * 1000UL); // CAN bit rate 10 kb/s
 
   const uint16_t errorCode = can.begin(settings, []
                                        { can.isr(); });

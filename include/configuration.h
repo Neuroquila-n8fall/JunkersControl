@@ -79,11 +79,6 @@ struct Configuration
 
     struct CanModuleConfig_
     {
-        byte CAN_SCK;
-        byte CAN_MISO;
-        byte CAN_MOSI;
-        byte CAN_CS;
-        byte CAN_INT;
         int CAN_Quartz;
     } CanModuleConfig;
 

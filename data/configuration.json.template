@@ -30,11 +30,6 @@
         "Sniffing": false
     },
     "CAN": {
-        "SCK": 18,
-        "MOSI": 23,
-        "MISO": 19,
-        "CS": 5,
-        "INT": 17,
         "Quartz": 16,
         "Addresses": {
             "Controller": {
