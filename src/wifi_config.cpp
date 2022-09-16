@@ -19,17 +19,23 @@ void connectWifi()
     WiFi.mode(WIFI_STA);
     //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
     //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
-    WiFi.setHostname(configuration.Wifi_Hostname);
+    WiFi.setHostname(configuration.Wifi.Hostname);
     Serial.println("WiFi not connected. Reconnecting...");
-    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi_SSID, configuration.Wifi_Password, configuration.Wifi_Hostname);
-    WiFi.begin(configuration.Wifi_SSID, configuration.Wifi_Password);
+
+    if(Debug)
+    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
+
+    WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       Serial.println("Connection Failed! Rebooting...");
       delay(5000);
       ESP.restart();
     }
+
+    if(Debug)
     printWifiStatus();
+
   }
 
   //Sync time

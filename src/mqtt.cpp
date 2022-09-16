@@ -30,15 +30,15 @@ void reconnectMqtt()
 
     String clientId = generateClientId();
     // Attempt to connect
-    if (client.connect(clientId.c_str(), configuration.MQTT_User, configuration.MQTT_Password))
+    if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
     {
       Serial.println("connected");
 
       // Subscribe to parameters.
-      client.subscribe(configuration.MQTT_Topics_HeatingParameters);
-      client.subscribe(configuration.MQTT_Topics_WaterParameters);
-      client.subscribe(configuration.MQTT_Topics_Status);
-      client.subscribe(configuration.MQTT_Topics_AuxilaryParameters);
+      client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
+      client.subscribe(configuration.Mqtt.Topics.WaterParameters);
+      client.subscribe(configuration.Mqtt.Topics.Status);
+      client.subscribe(configuration.Mqtt.Topics.AuxilaryParameters);
     }
     else
     {
@@ -66,7 +66,7 @@ String generateClientId()
 void setupMqttClient()
 {
   // Setup MQTT client
-  client.setServer(configuration.MQTT_Server, configuration.MQTT_Port);
+  client.setServer(configuration.Mqtt.Server, configuration.Mqtt.Port);
   client.setCallback(callback);
   client.setKeepAlive(10);
 }
@@ -82,7 +82,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // Status Requested
-  if (strcmp(topic, configuration.MQTT_Topics_Status) == 0)
+  if (strcmp(topic, configuration.Mqtt.Topics.Status) == 0)
   {
     StaticJsonDocument<256> doc;
 
@@ -119,7 +119,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // Receiving Heating Parameters
-  if (strcmp(topic, configuration.MQTT_Topics_HeatingParameters) == 0)
+  if (strcmp(topic, configuration.Mqtt.Topics.HeatingParameters) == 0)
   {
     const int docSize = 384;
     StaticJsonDocument<docSize> doc;
@@ -175,7 +175,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       SetFeedTemperature();
 
     // Receiving Water Parameters
-    if (strcmp(topic, configuration.MQTT_Topics_WaterParameters) == 0)
+    if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
     {
       const int docSize = 16;
       StaticJsonDocument<docSize> doc;
@@ -224,7 +224,7 @@ void PublishStatus()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(StatusTopic, buffer, n);
+  client.publish(configuration.Mqtt.Topics.Status, buffer, n);
 }
 
 void PublishHeatingTemperatures()
@@ -248,7 +248,7 @@ void PublishHeatingTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(HeatingTemperaturesTopic, buffer, n);
+  client.publish(configuration.Mqtt.Topics.HeatingParameters, buffer, n);
 }
 
 void PublishWaterTemperatures()
@@ -275,32 +275,32 @@ void PublishWaterTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(WaterTemperaturesTopic, buffer, n);
+  client.publish(configuration.Mqtt.Topics.WaterParameters, buffer, n);
 }
 
 void PublishAuxilaryTemperatures()
 {
   /*
   {
-  "AuxilaryTemperatures":
-		{
+
 			"Feed": 30.10,
 			"Return": 30.10,
 			"Exhaust": 50.10,
 			"Ambient": 17.10
-		}
+
   }
   */
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
-  jsonObj["Feed"] = ceraValues.Auxilary.FeedTemperature;
-  jsonObj["Return"] = ceraValues.Auxilary.ReturnTemperature;
-  jsonObj["Exhaust"] = ceraValues.Auxilary.ExhaustTemperature;
-  jsonObj["Ambient"] = ceraValues.Auxilary.AmbientTemperature;
+  for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+  {
+    Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
+    jsonObj[curSensor.Label] = ceraValues.Auxilary.Temperatures[i];
+  }
 
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(AuxilaryTemperaturesTopic, buffer, n);
+  client.publish(configuration.Mqtt.Topics.AuxilaryParameters, buffer, n);
 }

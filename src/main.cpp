@@ -77,23 +77,26 @@ void setup()
     return;
   }
 
-  Debug = configuration.Debug;
-  controllerMessageTimeout = configuration.BusMessageTimeout;
+  Debug = configuration.General.Debug;
+  controllerMessageTimeout = configuration.General.BusMessageTimeout;
+
+  // Resize the Temperature array
+  ceraValues.Auxilary.Temperatures = (double *)malloc(configuration.TemperatureSensors.SensorCount * sizeof(double));
 
   // Setup Pins
-  pinMode(configuration.StatusLed, OUTPUT);
-  pinMode(configuration.WifiLed, OUTPUT);
-  pinMode(configuration.MqttLed, OUTPUT);
-  digitalWrite(configuration.StatusLed, HIGH);
+  pinMode(configuration.LEDs.StatusLed, OUTPUT);
+  pinMode(configuration.LEDs.WifiLed, OUTPUT);
+  pinMode(configuration.LEDs.MqttLed, OUTPUT);
+  digitalWrite(configuration.LEDs.StatusLed, HIGH);
   statusLed = true;
   delay(1000);
-  digitalWrite(configuration.WifiLed, HIGH);
+  digitalWrite(configuration.LEDs.WifiLed, HIGH);
   delay(1000);
-  digitalWrite(configuration.MqttLed, HIGH);
+  digitalWrite(configuration.LEDs.MqttLed, HIGH);
   delay(100);
-  digitalWrite(configuration.WifiLed, LOW);
+  digitalWrite(configuration.LEDs.WifiLed, LOW);
   delay(100);
-  digitalWrite(configuration.MqttLed, LOW);
+  digitalWrite(configuration.LEDs.MqttLed, LOW);
 
   setupMqttClient();
 
@@ -146,7 +149,7 @@ void loop()
   {
     if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
     {
-      digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
+      digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
     }
   }
 
@@ -162,35 +165,35 @@ void loop()
     // Blink Wifi LED
     if (!WiFi.isConnected())
     {
-      digitalWrite(configuration.WifiLed, wifiLed ? HIGH : LOW);
+      digitalWrite(configuration.LEDs.WifiLed, wifiLed ? HIGH : LOW);
       wifiLed = !wifiLed;
     }
     else
     {
-      digitalWrite(configuration.WifiLed, HIGH);
+      digitalWrite(configuration.LEDs.WifiLed, HIGH);
       wifiLed = true;
     }
 
     // Blink MQTT LED
     if (!client.connected())
     {
-      digitalWrite(configuration.MqttLed, mqttLed ? HIGH : LOW);
+      digitalWrite(configuration.LEDs.MqttLed, mqttLed ? HIGH : LOW);
       mqttLed = !mqttLed;
     }
     else
     {
-      digitalWrite(configuration.MqttLed, HIGH);
+      digitalWrite(configuration.LEDs.MqttLed, HIGH);
       mqttLed = true;
     }
 
     if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
-      digitalWrite(configuration.HeatingLed, !digitalRead(configuration.HeatingLed));
+      digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
     }
 
     if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
-      digitalWrite(configuration.HeatingLed, 0);
+      digitalWrite(configuration.LEDs.HeatingLed, 0);
     }
 
     // Boost Function
@@ -330,18 +333,18 @@ void loop()
 
     // Request Temperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    if (AuxSensorsEnabled)
+    if (configuration.Features.Features_AuxilaryParameters)
     {
       ReadTemperatures();
       PublishAuxilaryTemperatures();
     }
 
     // Publish Heating Temperatures
-    if (HeatingTemperaturesEnabled)
+    if (configuration.Features.Features_HeatingParameters)
       PublishHeatingTemperatures();
 
     // Publish Water Temperatures
-    if (WaterTemperaturesEnabled)
+    if (configuration.Features.Features_WaterParameters)
       PublishWaterTemperatures();
   }
 
@@ -357,7 +360,7 @@ void loop()
       // Note: negate this statement to try out the fallback mode.
       if (!Debug)
       {
-        // Activate fallback        
+        // Activate fallback
         ceraValues.Fallback.isOnFallback = true;
         WriteToConsoles("Connection lost. Switching over to fallback mode!\r\n");
       }
@@ -429,39 +432,47 @@ void SendMessage(CANMessage msg)
       sprintf(printbuf, "DEBUG STEP CHAIN #%i: Sending CAN Message", currentStep);
       String message(printbuf);
       WriteToConsoles(message + "\r\n");
+
+      WriteMessage(msg);
     }
     can.tryToSend(msg);
     lastSentMessageTime = millis();
 
-    // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
-    char dataBuf[9];
-    String data;
 
-    for (int x = 0; x < msg.len; x++)
-    {
-      // A little bit of trickery to assemble the data bytes into a nicely formatted string
-      sprintf(dataBuf, "%02X (%i)", msg.data[x], msg.data[x]);
-      // Convert char array to string
-      String temp(dataBuf);
-      // Get rid of trailing spaces
-      temp.trim();
-      // Concat
-      data += temp;
-      // Add tab between data
-      if (x < msg.len - 1)
-      {
-        data += "\t";
-      }
-    }
-
-    // Print string
-    sprintf(printbuf, "CAN: [%04X] Data:\t", msg.id);
-    String consoleMessage(printbuf);
-    consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
-    consoleMessage += data;
-    WriteToConsoles(consoleMessage);
-    WriteToConsoles("\r\n");
   }
+}
+
+void WriteMessage(CANMessage msg)
+{
+  char printbuf[255];
+  // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
+  char dataBuf[12];
+  String data;
+
+  for (int x = 0; x < msg.len; x++)
+  {
+    // A little bit of trickery to assemble the data bytes into a nicely formatted string
+    sprintf(dataBuf, "0x%.2X (%i)", msg.data[x], msg.data[x]);
+    // Convert char array to string
+    String temp(dataBuf);
+    // Get rid of trailing spaces
+    temp.trim();
+    // Concat
+    data += temp;
+    // Add tab between data
+    if (x < msg.len - 1)
+    {
+      data += "\t";
+    }
+  }
+
+  // Print string
+  sprintf(printbuf, "CAN: [0x%.3X] Data:\t", msg.id);
+  String consoleMessage(printbuf);
+  consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
+  consoleMessage += data;
+  WriteToConsoles(consoleMessage);
+  WriteToConsoles("\r\n");
 }
 
 void SetDateTime()

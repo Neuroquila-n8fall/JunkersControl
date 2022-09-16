@@ -27,7 +27,7 @@ void CheckForConnections()
       //Accept
       TelnetRemoteClient = TelnetServer.available();
       TelnetRemoteClient.println("——————————————————————————");
-      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi_Hostname, WiFi.localIP().toString().c_str());
+      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi.Hostname, WiFi.localIP().toString().c_str());
       TelnetRemoteClient.println("——————————————————————————");
     }
   }

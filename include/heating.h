@@ -129,14 +129,8 @@ struct CeraValues
 
   struct Auxilary_
   {
-    // Auxilary Sensor Feed
-    double FeedTemperature = 0.00F;
-    // Auxilary Sensor Return
-    double ReturnTemperature = 0.00F;
-    // Auxilary Sensor Exhaust
-    double ExhaustTemperature = 0.00F;
-    // Auxilary Sensor Ambient
-    double AmbientTemperature = 0.00F;
+    double *Temperatures;
+    double FeedReturnTemperatureReference;
   } Auxilary;
 };
 

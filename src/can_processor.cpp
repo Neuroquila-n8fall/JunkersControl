@@ -8,22 +8,22 @@
 #include <timesync.h>
 #include <configuration.h>
 
-ACAN2515 can(configuration.CAN_CS, SPI, configuration.CAN_INT);
+ACAN2515 can(configuration.CanModuleConfig.CAN_CS, SPI, configuration.CanModuleConfig.CAN_INT);
 
 double temp = 0.00F;
 
-//Simply takes all current states into account and dispatches the setpoint message immediately.
+// Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
 {
-  CANMessage msg = PrepareMessage(0x252);  
+  CANMessage msg = PrepareMessage(0x252);
 
   char printbuf[255];
   int feedSetpoint = 0;
 
-  //Get raw Setpoint
-  
+  // Get raw Setpoint
+
   commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
-  //Transform it into the int representation
+  // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
   msg.data[0] = feedSetpoint;
@@ -36,13 +36,14 @@ void SetFeedTemperature()
 }
 
 void setupCan()
-{  
-  //Setup CAN Module
-  SPI.begin(configuration.CAN_CS, configuration.CAN_MISO, configuration.CAN_MOSI);
-  uint32_t QUARTZ_FREQUENCY = (uint32_t) configuration.CAN_Quartz * 1000UL * 1000UL;
+{
+  // Setup CAN Module
+  SPI.begin(configuration.CanModuleConfig.CAN_CS, configuration.CanModuleConfig.CAN_MISO, configuration.CanModuleConfig.CAN_MOSI);
+  uint32_t QUARTZ_FREQUENCY = (uint32_t)configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL;
   ACAN2515Settings settings(QUARTZ_FREQUENCY, 10UL * 1000UL); // CAN bit rate 10 kb/s
 
-  const uint16_t errorCode = can.begin(settings, [] { can.isr(); });
+  const uint16_t errorCode = can.begin(settings, []
+                                       { can.isr(); });
   if (errorCode == 0 && Debug)
   {
     Serial.print("Bit Rate prescaler: ");
@@ -73,60 +74,35 @@ void setupCan()
   }
 }
 
-//Process incoming CAN messages
+// Process incoming CAN messages
 void processCan()
 {
   CANMessage Message;
   if (can.receive(Message))
   {
     unsigned long curMillis = millis();
-    //Buffer for sending console output. 100 chars should be enough for now:
+    // Buffer for sending console output. 100 chars should be enough for now:
     //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
     char printBuf[100];
-    //Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
-    char dataBuf[9];
-    String data;
 
-    for (int x = 0; x < Message.len; x++)
-    {
-      //A little bit of trickery to assemble the data bytes into a nicely formatted string
-      sprintf(dataBuf, "%02X (%i)", Message.data[x], Message.data[x]);
-      //Convert char array to string
-      String temp(dataBuf);
-      //Get rid of trailing spaces
-      temp.trim();
-      //Concat
-      data += temp;
-      //Add tab between data
-      if (x < Message.len - 1)
-      {
-        data += "\t";
-      }
-    }
-
-    //Check for other controllers on the network by watching out for messages that are greater than 0x250
+    // Check for other controllers on the network by watching out for messages that are greater than 0x250
     if (Message.id > 0x250)
     {
       controllerMessageTimer = curMillis;
-      
-      //Bail out if we're already disabled.
-      if(!Override) return;
-      
-      //Switch off override if another controller sends messages on the network.
+
+      // Bail out if we're already disabled.
+      if (!Override)
+        return;
+
+      // Switch off override if another controller sends messages on the network.
       Override = false;
-      
+
       WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
     }
 
-    if (Debug)
+    if (Debug || configuration.General.Sniffing)
     {
-      // Print string
-      sprintf(printBuf, "CAN: [%04X] Data:\t", Message.id);
-      String consoleMessage(printBuf);
-      consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
-      consoleMessage += data;
-      WriteToConsoles(consoleMessage);
-      WriteToConsoles("\r\n");
+      WriteMessage(Message);
     }
 
     /*************************************
@@ -139,212 +115,230 @@ void processCan()
      * FT = Feed Temperature
      * Basepoint = Outside temperature at which the heating should deliver the highest possible feed temperature.
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
-    **************************************/
+     **************************************/
 
     unsigned int rawTemp = 0;
     char errorCode[2];
 
-
-    //Take note of the last time we received a message from the boiler
+    // Take note of the last time we received a message from the boiler
     if (Message.id < 0x250)
     {
       lastHeatingMessageTime = millis();
     }
-    
-
-    switch (Message.id)
-    {
 
     //[HC] - [Controller] - Max. possible feed temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x200:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.Heating.FeedMax)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedMaximum = temp;
-      break;
+    }
 
     //[HC] - [Controller] - Current feed temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x201:
-      temp = Message.data[0] / 2.0;      
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.Heating.FeedCurrent)
+    {
+      temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedCurrent = temp;
-      break;
+    }
 
     //[DHW] - [Controller] - Max. possible water temperature -or- target temperature when running in heating battery mode
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x202:
-      temp = Message.data[0] / 2.0;      
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
+    {
+      temp = Message.data[0] / 2.0;
       ceraValues.Heating.BufferWaterTemperatureMaximum = temp;
-      break;
+    }
 
     //[DHW] - [Controller] - Current water temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x203:
-      temp = Message.data[0] / 2.0;      
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
+    {
+      temp = Message.data[0] / 2.0;
       ceraValues.Heating.BufferWaterTemperatureCurrent = temp;
-      break;
+    }
 
     //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x204:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
+    {
       temp = Message.data[0] / 2.0;
-      break;
+      ceraValues.Hotwater.MaximumTemperature = temp;
+    }
 
     //[DHW] - [Controller] - Current water feed or battery temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x205:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.TemperatureCurrent = temp;
-      break;
+    }
 
     //[Controller] - Error Byte
-    //Data Type: Byte
-    //Value: 0x00 = Operational
+    // Data Type: Byte
+    // Value: 0x00 = Operational
     //       Error codes and their meaning vary between models. See your manual for details.
-    case 0x206:    
+    if (Message.id == configuration.CanAddresses.General.Error)
+    {
       ceraValues.General.Error = Message.data[0];
-      String(ceraValues.General.Error).toCharArray(errorCode, 2);
-      break;
+    }
 
     //[Controller] - Current outside temperature
-    //Data Type: Byte Concat
-    //Value: (Data[0] & Data[1]) / 100.0
-    case 0x207:
-      //Concat bytes 0 and 1 and divide the resulting INT by 100
+    // Data Type: Byte Concat
+    // Value: (Data[0] & Data[1]) / 100.0
+    if (Message.id == configuration.CanAddresses.Heating.OutsideTemperature)
+    {
+      // Concat bytes 0 and 1 and divide the resulting INT by 100
       rawTemp = (Message.data[0] << 8) + Message.data[1];
       temp = rawTemp / 100.0;
-      //Temperatures above 200 are considered invalid.
-      if(temp > 200.0) {
+      // Temperatures above 200 are considered invalid.
+      if (temp > 200.0)
+      {
         WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
-        break;
+        return;
       };
       ceraValues.General.OutsideTemperature = temp;
-      break;
+    }
 
-    //Unknown
-    case 0x208:
-      break;
-
-    //[Controller] - Gas Burner Flame ceraValues.General.Error
-    //Data Type: Bit
-    //Value: 1 = On | 0 = Off
-    case 0x209:
+    //[Controller] - Gas Burner Flame Status
+    // Data Type: Bit
+    // Value: 1 = On | 0 = Off
+    if (Message.id == configuration.CanAddresses.General.FlameLit)
+    {
       ceraValues.General.FlameLit = Message.data[0];
-      break;
+    }
 
     //[HC] - [Controller] - HC Pump Operation
-    //Data Type: Bit
-    //Value: 1 = On | 0 = Off
-    case 0x20A:
+    // Data Type: Bit
+    // Value: 1 = On | 0 = Off
+    if (Message.id == configuration.CanAddresses.Heating.Pump)
+    {
       ceraValues.Heating.PumpActive = Message.data[0];
-      break;
+    }
 
-    //[DHW] - [Controller] - Hot Water Battery Operation
-    //Data Type: Bit
-    //Value: 1 = Enabled | 0 = Disabled
-    case 0x20B:    
+    //[DHW] - [Controller] - Hot Water Buffer Operation
+    // Data Type: Bit
+    // Value: 1 = Enabled | 0 = Disabled
+    if (Message.id == configuration.CanAddresses.HotWater.BufferOperation)
+    {
       ceraValues.Hotwater.BufferMode = Message.data[0];
-      break;
+    }
 
     //[HC] - [Controller] - Current Seasonal Operation Mode (Set by Dial on the boiler panel)
-    //Data Type: Bit
-    //Value: 1 = Winter | 0 = Summer
-    case 0x20C:
+    // Data Type: Bit
+    // Value: 1 = Winter | 0 = Summer
+    if (Message.id == configuration.CanAddresses.Heating.Season)
+    {
       ceraValues.Heating.Season = Message.data[0];
-      break;
+    }
 
     //[HC] - [RC] - Heating Operating
-    //Data Type: Bit
-    //Value: 1 = On | 0 = Off
-    case 0x250:
+    // Data Type: Bit
+    // Value: 1 = On | 0 = Off
+    if (Message.id == configuration.CanAddresses.Heating.Operation)
+    {
       ceraValues.Heating.Active = Message.data[0];
-      break;
+    }
 
     //[HC] - [RC] - Heating Power
-    //Data Type: INT
-    //Value: 0-255 = 0-100%
-    case 0x251:
+    // Data Type: INT
+    // Value: 0-255 = 0-100%
+    if (Message.id == configuration.CanAddresses.Heating.Power)
+    {
       ceraValues.Heating.HeatingPower = Message.data[0];
-      break;
+    }
 
     //[HC] - [RC] - Setpoint Feed Temperature
-    //Data Type: INT
-    //Value: Value / 2.0
-    //Set: Value as half-centigrade steps i.e. 35.5
-    case 0x252:
+    // Data Type: INT
+    // Value: Value / 2.0
+    // Set: Value as half-centigrade steps i.e. 35.5
+    if (Message.id == configuration.CanAddresses.Heating.FeedSetpoint)
+    {
       temp = Message.data[0] / 2.0;
-      break;
+      ceraValues.Heating.FeedSetpoint = temp;
+    }
 
     //[DHW] - [RC] - Setpoint water temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    //Set: Value as half-centigrade steps i.e. 45.5
-    case 0x253:
+    // Data Type: INT
+    // Value: Data / 2.0
+    // Set: Value as half-centigrade steps i.e. 45.5
+    if (Message.id == configuration.CanAddresses.HotWater.SetpointTemperature)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.SetPoint = temp;
-      break;
+    }
 
     //[DHW] - [RC] - "Hot Water Now" (Warmwasser SOFORT in German)
-    //Data Type: Bit
-    //Value: 1 = Enabled | 0 = Disabled
-    case 0x254:
+    // Data Type: Bit
+    // Value: 1 = Enabled | 0 = Disabled
+    if (Message.id == configuration.CanAddresses.HotWater.Now)
+    {
       ceraValues.Hotwater.Now = Message.data[0];
-      break;
+    }
 
     //[RC] - Date and Time
-    //Data Type: Multibyte
-    //Value: Data[0] = Day Of Week Number ( 1 = Monday)
+    // Data Type: Multibyte
+    // Value: Data[0] = Day Of Week Number ( 1 = Monday)
     //       Data[1] = Hours (0-23)
     //       Data[2] = Minutes (0-59)
     //       Data[3] = Always '4' - Unknown meaning.
-    case 0x256:
+    if (Message.id == configuration.CanAddresses.General.DateTime)
+    {
       ceraValues.Time.DayOfWeek = Message.data[0];
       ceraValues.Time.Hours = Message.data[1];
       ceraValues.Time.Minutes = Message.data[2];
-      break;
+    }
 
     //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x255:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration
+                          .CanAddresses
+                          .HotWater
+                          .ContinousFlowSetpointTemperature)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.ContinousFlowSetpoint = temp;
-      break;
+    }
 
     //[MC] - [Controller] - Mixed-Circuit Pump Operation
-    //Data Type: Bit
-    //Value: 1 = On | 0 = Off
-    case 0x404:
+    // Data Type: Bit
+    // Value: 1 = On | 0 = Off
+    if (Message.id == configuration.CanAddresses.MixedCircuit.Pump)
+    {
       ceraValues.MixedCircuit.PumpActive = Message.data[0];
-      break;
+    }
 
     //[MC] - [RC] - Setpoint Mixed-Circuit Feed Temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x405:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.MixedCircuit.FeedSetpoint)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.MixedCircuit.FeedSetpoint = temp;
-      break;
+    }
 
     //[MC] - [RC] - Mixed-Circuit Economy Setting
-    //Data Type: Bit
-    //Value: 1 = On | 0 = Off
-    case 0x407:
+    // Data Type: Bit
+    // Value: 1 = On | 0 = Off
+    if (Message.id == configuration.CanAddresses.MixedCircuit.Economy)
+    {
       ceraValues.MixedCircuit.Economy = Message.data[0];
-      break;
+    }
 
     //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature
-    //Data Type: INT
-    //Value: Data / 2.0
-    case 0x440:
+    // Data Type: INT
+    // Value: Data / 2.0
+    if (Message.id == configuration.CanAddresses.MixedCircuit.FeedCurrent)
+    {
       temp = Message.data[0] / 2.0;
       ceraValues.MixedCircuit.FeedCurrent = temp;
-      break;
     }
   }
 }
