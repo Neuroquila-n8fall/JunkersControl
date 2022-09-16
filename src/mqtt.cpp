@@ -37,8 +37,7 @@ void reconnectMqtt()
       // Subscribe to parameters.
       client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
       client.subscribe(configuration.Mqtt.Topics.WaterParameters);
-      client.subscribe(configuration.Mqtt.Topics.Status);
-      client.subscribe(configuration.Mqtt.Topics.AuxilaryParameters);
+      client.subscribe(configuration.Mqtt.Topics.StatusRequest);
     }
     else
     {
@@ -82,7 +81,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
   // Status Requested
-  if (strcmp(topic, configuration.Mqtt.Topics.Status) == 0)
+  if (strcmp(topic, configuration.Mqtt.Topics.StatusRequest) == 0)
   {
     StaticJsonDocument<256> doc;
 
@@ -134,42 +133,41 @@ void callback(char *topic, byte *payload, unsigned int length)
       return;
     }
 
-    JsonObject Cerasmarter = doc["Cerasmarter"];
     //Request Enable/Disable Heating and set the status of the heating accordlingly
-    commandedValues.Heating.Active = Cerasmarter["Enabled"];
+    commandedValues.Heating.Active = doc["Enabled"];
     ceraValues.Heating.Active = commandedValues.Heating.Active;
 
-    commandedValues.Heating.FeedSetpoint = Cerasmarter["FeedSetpoint"];
-    commandedValues.Heating.BasepointTemperature = Cerasmarter["FeedBaseSetpoint"];
-    commandedValues.Heating.EndpointTemperature = Cerasmarter["FeedCutOff"];    
-    commandedValues.Heating.MinimumFeedTemperature = Cerasmarter["FeedMinimum"];    
-    commandedValues.Heating.AuxilaryTemperature = Cerasmarter["AuxilaryTemperature"];
-    commandedValues.Heating.AmbientTemperature = Cerasmarter["AmbientTemperature"];
-    commandedValues.Heating.TargetAmbientTemperature = Cerasmarter["TargetAmbientTemperature"];
+    commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
+    commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
+    commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];    
+    commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];    
+    commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
+    commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
+    commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
 
     
-    if (Cerasmarter["OnDemandBoost"] != commandedValues.Heating.Boost)
+    if (doc["OnDemandBoost"] != commandedValues.Heating.Boost)
     {
-      commandedValues.Heating.Boost = Cerasmarter["OnDemandBoost"];
+      commandedValues.Heating.Boost = doc["OnDemandBoost"];
       commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
       setFeedImmediately = true;
     }
 
-    commandedValues.Heating.BoostDuration = Cerasmarter["OnDemandBoostDuration"];
-    if (Cerasmarter["FastHeatup"] != commandedValues.Heating.FastHeatup)
+    commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
+    if (doc["FastHeatup"] != commandedValues.Heating.FastHeatup)
     {
       setFeedImmediately = true;
       // Set reference Temperature
       commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     }
 
-    commandedValues.Heating.FastHeatup = Cerasmarter["FastHeatup"];    
-    commandedValues.Heating.FeedAdaption = Cerasmarter["Adaption"];    
-    commandedValues.Heating.ValveScaling = Cerasmarter["ValveScaling"];    
-    commandedValues.Heating.MaxValveOpening = Cerasmarter["ValveScalingMaxOpening"];    
-    commandedValues.Heating.ValveOpening = Cerasmarter["ValveScalingOpening"];    
-    commandedValues.Heating.DynamicAdaption = Cerasmarter["DynamicAdaption"];    
-    commandedValues.Heating.OverrideSetpoint = Cerasmarter["OverrideSetpoint"];
+    commandedValues.Heating.FastHeatup = doc["FastHeatup"];    
+    commandedValues.Heating.FeedAdaption = doc["Adaption"];    
+    commandedValues.Heating.ValveScaling = doc["ValveScaling"];    
+    commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];    
+    commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];    
+    commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];    
+    commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
 
     if (setFeedImmediately)
       SetFeedTemperature();
@@ -190,7 +188,8 @@ void callback(char *topic, byte *payload, unsigned int length)
       }
 
       // TODO: Water Temperature Setpoint variable to be populated here...
-      float Setpoint = doc["Setpoint"]; // 22.1
+      commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
+
     }
   }
 }
@@ -199,8 +198,6 @@ void PublishStatus()
 {
   /* Example JSON
   {
-		"Status":
-		{
 			"GasBurner": true,
 			"Pump": true,
 			"Error": 0..255,
@@ -208,7 +205,6 @@ void PublishStatus()
 			"Working": true,
 			"Boost": true,
 			"FastHeatup": true			
-		}
   }
   */
   StaticJsonDocument<384> doc;
@@ -248,7 +244,7 @@ void PublishHeatingTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.HeatingParameters, buffer, n);
+  client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
 }
 
 void PublishWaterTemperatures()
@@ -275,7 +271,7 @@ void PublishWaterTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.WaterParameters, buffer, n);
+  client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
 }
 
 void PublishAuxilaryTemperatures()
@@ -302,5 +298,5 @@ void PublishAuxilaryTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.AuxilaryParameters, buffer, n);
+  client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
 }

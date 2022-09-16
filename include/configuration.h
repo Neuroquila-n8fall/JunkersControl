@@ -42,10 +42,13 @@ struct Configuration
 
         struct Topics_
         {
+            char HeatingValues[255];
             char HeatingParameters[255];
+            char WaterValues[255];
             char WaterParameters[255];
-            char AuxilaryParameters[255];
+            char AuxilaryValues[255];
             char Status[255]; // "cerasmarter/status"
+            char StatusRequest[255];
         } Topics;
 
     } Mqtt;

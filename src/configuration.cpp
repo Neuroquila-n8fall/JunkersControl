@@ -65,10 +65,13 @@ bool ReadConfiguration()
     strlcpy(configuration.Mqtt.Password, MQTT["Password"], sizeof(configuration.Mqtt.Password)); // "pass"
 
     JsonObject MQTT_Topics = MQTT["Topics"];
+    strlcpy(configuration.Mqtt.Topics.HeatingValues, MQTT_Topics["HeatingValues"], sizeof(configuration.Mqtt.Topics.HeatingValues));    //"cerasmarter/heating/values"
+    strlcpy(configuration.Mqtt.Topics.WaterValues, MQTT_Topics["WaterValues"], sizeof(configuration.Mqtt.Topics.WaterValues));          //"cerasmarter/water/values"
     strlcpy(configuration.Mqtt.Topics.HeatingParameters, MQTT_Topics["HeatingParameters"], sizeof(configuration.Mqtt.Topics.HeatingParameters));    //"cerasmarter/heating/parameters"
     strlcpy(configuration.Mqtt.Topics.WaterParameters, MQTT_Topics["WaterParameters"], sizeof(configuration.Mqtt.Topics.WaterParameters));          //"cerasmarter/water/parameters"
-    strlcpy(configuration.Mqtt.Topics.AuxilaryParameters, MQTT_Topics["AuxilaryParameters"], sizeof(configuration.Mqtt.Topics.AuxilaryParameters)); //"cerasmarter/auxilary/parameters"
+    strlcpy(configuration.Mqtt.Topics.AuxilaryValues, MQTT_Topics["AuxilaryParameters"], sizeof(configuration.Mqtt.Topics.AuxilaryValues)); //"cerasmarter/auxilary/parameters"
     strlcpy(configuration.Mqtt.Topics.Status, MQTT_Topics["Status"], sizeof(configuration.Mqtt.Topics.Status));                                     // "cerasmarter/status"
+    strlcpy(configuration.Mqtt.Topics.StatusRequest, MQTT_Topics["StatusRequest"], sizeof(configuration.Mqtt.Topics.StatusRequest));                                     // "cerasmarter/status/get"
 
     JsonObject Features = doc["Features"];
     configuration.Features.Features_HeatingParameters = Features["HeatingParameters"];   // true
