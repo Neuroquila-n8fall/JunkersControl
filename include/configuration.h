@@ -86,39 +86,39 @@ struct Configuration
     {
         struct Heating_
         {
-            byte FeedCurrent;
-            byte FeedMax;
-            byte FeedSetpoint;
-            byte OutsideTemperature;
-            byte Pump;
-            byte Season;
-            byte Operation;
-            byte Power;
+            uint16_t FeedCurrent;
+            uint16_t FeedMax;
+            uint16_t FeedSetpoint;
+            uint16_t OutsideTemperature;
+            uint16_t Pump;
+            uint16_t Season;
+            uint16_t Operation;
+            uint16_t Power;
         } Heating;
 
         struct General_
         {
-            byte FlameLit;
-            byte DateTime;
-            byte Error;
+            uint16_t FlameLit;
+            uint16_t DateTime;
+            uint16_t Error;
         } General;
 
         struct HotWater_
         {
-            byte SetpointTemperature;
-            byte MaxTemperature;
-            byte CurrentTemperature;
-            byte Now;
-            byte BufferOperation;
-            byte ContinousFlowSetpointTemperature;
+            uint16_t SetpointTemperature;
+            uint16_t MaxTemperature;
+            uint16_t CurrentTemperature;
+            uint16_t Now;
+            uint16_t BufferOperation;
+            uint16_t ContinousFlowSetpointTemperature;
         } HotWater;
 
         struct MixedCircuit_
         {
-            byte Pump;
-            byte FeedSetpoint;
-            byte FeedCurrent;
-            byte Economy;
+            uint16_t Pump;
+            uint16_t FeedSetpoint;
+            uint16_t FeedCurrent;
+            uint16_t Economy;
         } MixedCircuit;
 
     } CanAddresses;

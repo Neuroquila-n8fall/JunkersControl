@@ -10,9 +10,15 @@ Configuration configuration;
 
 // Converters
 
-void convertFromJson(JsonVariantConst src, byte &dst)
-{
+void convertFromJson(JsonVariantConst src, byte& dst)
+{    
     dst = strtoul(src.as<const char *>(), NULL, 16);
+}
+
+unsigned long convertHexString(const char *src)
+{
+    byte addr = strtoul(src, NULL, 16);
+    return strtoul(src, NULL, 16);
 }
 
 bool ReadConfiguration()
@@ -98,37 +104,37 @@ bool ReadConfiguration()
     JsonObject CAN_Addresses = CAN["Addresses"];
 
     JsonObject CAN_Addresses_Controller = CAN_Addresses["Controller"];
-    configuration.CanAddresses.General.FlameLit = CAN_Addresses_Controller["FlameStatus"].as<byte>(); // "0x209"
-    configuration.CanAddresses.General.Error = CAN_Addresses_Controller["Error"].as<byte>();          // "0x206"
-    configuration.CanAddresses.General.DateTime = CAN_Addresses_Controller["DateTime"].as<byte>();    // "0x256"
+    configuration.CanAddresses.General.FlameLit = convertHexString(CAN_Addresses_Controller["FlameStatus"].as<const char*>()); // "0x209"
+    configuration.CanAddresses.General.Error = convertHexString(CAN_Addresses_Controller["Error"].as<const char*>());         // "0x206"
+    configuration.CanAddresses.General.DateTime = convertHexString(CAN_Addresses_Controller["DateTime"].as<const char*>());    // "0x256"
 
     JsonObject CAN_Addresses_Heating = CAN_Addresses["Heating"];
-    configuration.CanAddresses.Heating.FeedCurrent = CAN_Addresses_Heating["FeedCurrent"].as<byte>();               // "0x201"
-    configuration.CanAddresses.Heating.FeedMax = CAN_Addresses_Heating["FeedMax"].as<byte>();                       // "0x200"
-    configuration.CanAddresses.Heating.FeedSetpoint = CAN_Addresses_Heating["FeedSetpoint"].as<byte>();             // "0x252"
-    configuration.CanAddresses.Heating.OutsideTemperature = CAN_Addresses_Heating["OutsideTemperature"].as<byte>(); // "0x207"
-    configuration.CanAddresses.Heating.Pump = CAN_Addresses_Heating["Pump"].as<byte>();                             // "0x20A"
-    configuration.CanAddresses.Heating.Season = CAN_Addresses_Heating["Season"].as<byte>();                         // "0x20C"
-    configuration.CanAddresses.Heating.Operation = CAN_Addresses_Heating["Operation"].as<byte>();                   // "0x250"
-    configuration.CanAddresses.Heating.Power = CAN_Addresses_Heating["Power"].as<byte>();                           // "0x251"
+    configuration.CanAddresses.Heating.FeedCurrent = convertHexString(CAN_Addresses_Heating["FeedCurrent"].as<const char*>());               // "0x201"
+    configuration.CanAddresses.Heating.FeedMax = convertHexString(CAN_Addresses_Heating["FeedMax"].as<const char*>());                       // "0x200"
+    configuration.CanAddresses.Heating.FeedSetpoint = convertHexString(CAN_Addresses_Heating["FeedSetpoint"].as<const char*>());             // "0x252"
+    configuration.CanAddresses.Heating.OutsideTemperature = convertHexString(CAN_Addresses_Heating["OutsideTemperature"].as<const char*>()); // "0x207"
+    configuration.CanAddresses.Heating.Pump = convertHexString(CAN_Addresses_Heating["Pump"].as<const char*>());                             // "0x20A"
+    configuration.CanAddresses.Heating.Season = convertHexString(CAN_Addresses_Heating["Season"].as<const char*>());                         // "0x20C"
+    configuration.CanAddresses.Heating.Operation = convertHexString(CAN_Addresses_Heating["Operation"].as<const char*>());                   // "0x250"
+    configuration.CanAddresses.Heating.Power = convertHexString(CAN_Addresses_Heating["Power"].as<const char*>());                           // "0x251"
 
     JsonObject CAN_Addresses_HotWater = CAN_Addresses["HotWater"];
-    configuration.CanAddresses.HotWater.SetpointTemperature = CAN_Addresses_HotWater["SetpointTemperature"].as<byte>(); // "0x203"
-    configuration.CanAddresses.HotWater.MaxTemperature = CAN_Addresses_HotWater["MaxTemperature"].as<byte>();           // "0x204"
-    configuration.CanAddresses.HotWater.CurrentTemperature = CAN_Addresses_HotWater["CurrentTemperature"].as<byte>();   // "0x205"
-    configuration.CanAddresses.HotWater.Now = CAN_Addresses_HotWater["Now"].as<byte>();                                 // "0x254"
-    configuration.CanAddresses.HotWater.BufferOperation = CAN_Addresses_HotWater["BufferOperation"].as<byte>();         // "0x20B"
+    configuration.CanAddresses.HotWater.SetpointTemperature = convertHexString(CAN_Addresses_HotWater["SetpointTemperature"].as<const char*>()); // "0x203"
+    configuration.CanAddresses.HotWater.MaxTemperature = convertHexString(CAN_Addresses_HotWater["MaxTemperature"].as<const char*>());           // "0x204"
+    configuration.CanAddresses.HotWater.CurrentTemperature = convertHexString(CAN_Addresses_HotWater["CurrentTemperature"].as<const char*>());   // "0x205"
+    configuration.CanAddresses.HotWater.Now = convertHexString(CAN_Addresses_HotWater["Now"].as<const char*>());                                 // "0x254"
+    configuration.CanAddresses.HotWater.BufferOperation = convertHexString(CAN_Addresses_HotWater["BufferOperation"].as<const char*>());         // "0x20B"
 
     configuration
         .CanAddresses
         .HotWater
-        .ContinousFlowSetpointTemperature = CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"].as<byte>(); // "0x255"
+        .ContinousFlowSetpointTemperature = convertHexString(CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"].as<const char*>()); // "0x255"
 
     JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses["MixedCircuit"];
-    configuration.CanAddresses.MixedCircuit.Pump = CAN_Addresses_MixedCircuit["Pump"].as<byte>();                 // "0x404"
-    configuration.CanAddresses.MixedCircuit.FeedSetpoint = CAN_Addresses_MixedCircuit["FeedSetpoint"].as<byte>(); // "0x405"
-    configuration.CanAddresses.MixedCircuit.FeedCurrent = CAN_Addresses_MixedCircuit["FeedCurrent"].as<byte>();   // "0x440"
-    configuration.CanAddresses.MixedCircuit.Economy = CAN_Addresses_MixedCircuit["Economy"].as<byte>();           // "0x407"
+    configuration.CanAddresses.MixedCircuit.Pump = convertHexString(CAN_Addresses_MixedCircuit["Pump"].as<const char*>());                 // "0x404"
+    configuration.CanAddresses.MixedCircuit.FeedSetpoint = convertHexString(CAN_Addresses_MixedCircuit["FeedSetpoint"].as<const char*>()); // "0x405"
+    configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char*>());   // "0x440"
+    configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char*>());           // "0x407"
 
     int AuxilarySensors_Count = doc["AuxilarySensors"]["Count"]; // 4
     // This might cause trouble if too many sensors are added... we'll have to see where this is going.

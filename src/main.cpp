@@ -219,7 +219,7 @@ void loop()
 
     // If we didn't spot a controller message on the network for x seconds we will take over control.
     // As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
-    if (currentMillis - controllerMessageTimer >= controllerMessageTimeout)
+    if (currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
     {
       // Bail out if we already set this...
       if (!Override)
