@@ -12,14 +12,18 @@
   - [Prerequisites](#prerequisites)
   - [Features](#features)
     - [MQTT](#mqtt)
+      - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
     - [Heating Parameters](#heating-parameters)
     - [Night/Economy Mode](#nighteconomy-mode)
+      - [Option #1 (MQTT):](#option-1-mqtt)
+      - [Option #2 (Amend Code):](#option-2-amend-code)
     - [Switch Off/On](#switch-offon)
     - [Boost](#boost)
     - [Fast Heatup](#fast-heatup)
     - [Fallback and Failsafe](#fallback-and-failsafe)
     - [Automatic Controller Detection](#automatic-controller-detection)
     - [External Temperature Sensors](#external-temperature-sensors)
+      - [Configuration](#configuration)
     - [Dynamic Adaption](#dynamic-adaption)
     - [Calculate yourself](#calculate-yourself)
     - [Valve-based control](#valve-based-control)
@@ -87,7 +91,61 @@ Again, when in doubt, ask a technician.
 
 ### MQTT
 Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
-The topics are described inside `mqtt.cpp`
+The topics are described inside `/data/configuration.json`
+
+To send parameters to the heating controller, you just have to form a JSON and send it to the topic you defined in `/data/configuration.json`
+
+The `MQTT` section has everything and this is where you define the topics:
+
+```json
+    "MQTT": {
+        "Server": "1.2.3.4",
+        "Port": 1883,
+        "User": "mqtt",
+        "Password": "mqtt",
+        "Topics": {
+            // Topic for receiving temperatures and status
+            "HeatingValues": "cerasmarter/heating/values",
+            // Send values here to steer the heating circuit and functions
+            "HeatingParameters": "cerasmarter/heating/parameters",
+            // Topic for receiving temperatures and status
+            "WaterValues": "cerasmarter/water/values",
+            // Send values here to steer the hot water circuit and functions
+            "WaterParameters": "cerasmarter/water/parameters",
+            // Topic for receiving temperatures from auxilary sensors
+            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            // Topic for receiving status information
+            "Status": "cerasmarter/status",
+            // Send values here to receive values on demand
+            "StatusRequest": "cerasmarter/status/get"
+        }
+    },
+```
+
+#### Example Parameter JSON for setting Heating Parameters:
+```json
+{
+  //Enable the heating mode
+  "Enabled": false,
+  //Setpoint for Feed Temperature
+  "FeedSetpoint": 0,
+  "FeedBaseSetpoint": -10,
+  "FeedCutOff": 22,
+  "FeedMinimum": 10,
+  "AuxilaryTemperature": 11.6,
+  "AmbientTemperature": 0,
+  "TargetAmbientTemperature": 21,
+  "OnDemandBoost": false,
+  "OnDemandBoostDuration": 600,
+  "FastHeatup": false,
+  "Adaption": 0,
+  "ValveScaling": 1,
+  "ValveScalingMaxOpening": 100,
+  "ValveScalingOpening": 75,
+  "DynamicAdaption": 1,
+  "OverrideSetpoint": false
+}
+```
 
 ### Heating Parameters
 Originally the TAXXX and integrated Heatronic will follow a set of parameters to determine the right feed temperature according to outside temperatures. These values are commonly referred to as "base point" and "end point" and represent a linear regulation by a reference temperature - the environmental temperature on the outside.
@@ -100,12 +158,21 @@ The end point is basically the temperature at which the heating should switch of
 ![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
 *In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
 
-See `commandedValues.Heating.BasepointTemperature` for base point, `commandedValues.Heating.EndpointTemperature` for end point or "cut off" temperature. 
+See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" temperature 
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters)
 
 ### Night/Economy Mode
 There are two ways to switch the economy mode.
-1) Send `0` or `1` to the topic described inside `mqtt.cpp` named `subscription_OnOff`. It will then select the feed temperature according to `commandedValues.Heating.MinimumFeedTemperature` inside `mqtt.cpp` and enable economy mode.
-2) Set `ceraValues.Heating.Active` to `false` or `true` depending on if you want to switch economy on or off.
+#### Option #1 (MQTT):
+ Set `Enabled` to `false` or `0` using the Parameters JSON file which you send to the Heating Parameters Topic defined in `/data/configuration.json`
+
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+"Enabled": true,
+```
+
+#### Option #2 (Amend Code):
+ Set `commandedValues.Heating.Active` to `false` or `true` depending on if you want to switch economy on or off.
 
 ### Switch Off/On
 
@@ -114,35 +181,50 @@ See [Night/Economy Mode](#nighteconomy-mode)
 Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
 
 ### Boost
-Boost function sets the feed temperature to the maximum reported value (`ceraValues.Heating.FeedMaximum`) for a selected period of time (default: 300 seconds). Change `commandedValues.Heating.BoostDuration` inside `mqtt.cpp` to the desired duration (Seconds!). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
+Boost function sets the feed temperature to the maximum reported value (`ceraValues.Heating.FeedMaximum`) for a selected period of time (default: 300 seconds). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
 Due to the natural lag of a heating system you should fire this function before you boost a specific radiator.
 
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+  "OnDemandBoost": false,
+  "OnDemandBoostDuration": 600,
+```
+
 ### Fast Heatup
-Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTemperature`) to a given target value (`commandedValues.Heating.TargetAmbientTemperature`) and sets the feed temperature to maximum (`ceraValues.Heating.FeedMaximum`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. If you don't want to use it, set `commandedValues.Heating.FastHeatup` default value inside `mqtt.cpp` from `true` to `false`
+Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTemperature`) to a given target value (`commandedValues.Heating.TargetAmbientTemperature`) and sets the feed temperature to maximum (`ceraValues.Heating.FeedMaximum`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. 
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
 *This is how the fast heatup function works visually*
 
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+  "FastHeatup": false,
+```
+*set to `true` to enable this feature*
+
 ### Fallback and Failsafe
 
-The parameters defined within `heating.cpp` will become active when the connection to the MQTT broker has been lost.
+The parameters defined within `heating.h` will become active when the connection to the MQTT broker has been lost.
 
 ```c++
-//——————————————————————————————————————————————————————————————————————————————
-//  Constants for heating control
-//——————————————————————————————————————————————————————————————————————————————
+  //-- Fallback Values
+  //TODO: Should be configurable using configuration.json
+  struct FallBack_
+  {
+    //-- Basepoint Temperature
+    double BasepointTemperature = -10.0F;
+    //-- Endpoint Temperature
+    double EndpointTemperature = 31.0F;
+    //-- Ambient Temperature
+    double AmbientTemperature = 17.0F;
+    //-- Minimum ("Anti Freeze") Temperature.
+    double MinimumFeedTemperature = 10.0F;
+    //-- Enforces the fallback values when set to TRUE
+    bool isOnFallback = false;
 
-//Basepoint for linear temperature calculation
-const int calcHeatingBasepoint = -15;
-
-//Endpoint for linear temperature calculation
-const int calcHeatingEndpoint = 21;
-
-//Minimum Feed Temperature. This is the base value for calculations. Setting this as the setpoint will trigger the economy mode.
-const int calcTriggerAntiFreeze = 10;
-
-//-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
-HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
-HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
+    //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
+    HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
+    HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
+  } Fallback;
 ```
 
 The `HeatingScheduleEntry` represents a very basic timeslot:
@@ -156,7 +238,18 @@ The aforementioned values say:
 
 ### Automatic Controller Detection
 
-Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending ontrol messages. If there is no controller message on the network for 30 seconds (defined by `controllerMessageTimeout`) it will resume control and the `Override` flag returns to true.
+Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `BusMessageTimeOut` within `/data/configuration.json`) it will resume control and the `Override` flag returns to true.
+
+Example:
+```json
+    "General": {
+        "BusMessageTimeout": 30,
+        "Debug": false,
+        "Sniffing": true
+    },
+```
+*Timeout is set to 30 seconds*
+
 
 You could implement this as a solution to bring in the original controller when something isn't working as expected and you don't have direct access to the ESP. You could switch back on/plug in the original TAxxx unit to run it in OEM mode.
 Maybe you switch on a relay that triggers the voltage supply for the original controller or you instruct someone to plug the TAxxx unit back in.
@@ -166,7 +259,78 @@ Maybe you switch on a relay that triggers the voltage supply for the original co
 
 The oneWire and DallasTemperature libraries are included and used to fetch additional temperatures like the return temperature which isn't available on the bus.
 
-See `t_sensors.h` for setting up addresses.
+#### Configuration
+
+Configured using `/data/configuration.json`
+**IMPORTANT**
+The `Count` has to be less or equal the amount of sensor you have defined under `Sensors` or else the program will crash!
+
+Each sensor is defined by a label, if it's used to reference the return temperature and its address.
+In the following example the sensor is called "Feed" (`"Label": "Feed"`) and shouldn't be used as a reference temperature (`"IsReturnValue": false`) in [Dynamic Adaption](#dynamic-adaption) Mode.
+Its address is set as an array of the string representation of the hex values
+```
+                [
+                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
+                ]  
+```
+
+The completed sensor block looks like this:
+```json
+            {
+                "Label": "Feed",
+                "IsReturnValue": false,
+                "Address":         
+                [
+                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
+                ]                
+            },
+```
+
+Full example with 4 sensors:
+```json
+    "AuxilarySensors":
+    {
+        "Count": 4,
+        "Sensors":
+        [
+            {
+                "Label": "Feed",
+                "IsReturnValue": false,
+                "Address":         
+                [
+                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
+                ]                
+            },
+            {
+                "Label": "Return",
+                "IsReturnValue": true,
+                "Address":
+                [
+                    "0x28", "0x6F", "0x9C", "0xF6", "0x42", "0x20", "0x01", "0xF6"
+                ]
+            },
+            {
+                "Label": "Exhaust",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0x6D", "0x98", "0xF5", "0x42", "0x20", "0x01", "0x0F"
+                ]
+            },
+            {
+                "Label": "Ambient",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0xBF", "0x39", "0x10", "0x42", "0x20", "0x01", "0x93"
+                ]
+            }
+        ]
+    },
+```
+
+**IMPORTANT**
+If you set more than one sensor as `"IsReturnValue": true` the last one on the list will be the actual reference. Make sure you only set the one desired sensor as a reference.
 
 ### Dynamic Adaption
 
@@ -176,17 +340,30 @@ Adaption = Desired target room temperature - feed temperature (+ Manual Adaption
 
 This means that the setpoint of the feed will be lowered by the difference. You don't have to pump in that much energy when 90% of it returns to the heat exchanger which by itself will always try to steer the feed temperature to the average setpoint.
 
-This kind of adaption is, of course, very simple and rough. As soon as this mode is active, the `mqttAdaption` value will alter the value accordingly so in my instance I put in additional 5° `mqttAdaption` so if the temperature would be lowered to around 35° feed, it will be actually set to 40°.
+This kind of adaption is, of course, very simple and rough. As soon as this mode is active, the `Adaption` value will alter the value accordingly so in my instance I put in additional 5° `Adaption` so if the temperature would be lowered to around 35° feed, it will be actually set to 40°.
+
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+  "Adaption": 0
+```
 
 ### Calculate yourself
 
-You can do your own calculations and just tell the control to set the temperature accordingly by sending a `1` or `0` via topic `subscription_OverrideSetpoint` to enable or disable this feature and the desired temperature to `subscription_FeedSetpoint`
+You can do your own calculations and just tell the control to set the temperature accordingly by setting `1|0` or `true|false` via parameters topic to enable or disable this feature and set the desired `FeedSetpoint`
+
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+  [...]
+  "FeedSetpoint": 70,
+  [...]
+  "OverrideSetpoint": true
+```
 
 ### Valve-based control
 
-This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `commandedValues.Heating.MaxValveOpening`) to the `commandedValues.Heating.MinimumFeedTemperature` plus `mqttAdaption` and `ceraValues.Heating.FeedMaximum` 
+This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `ValveScalingMaxOpening`) to the `FeedMinimum` plus `Adaption` and `FeedMaximum` (Reported on the topic defined at `HeatingValues` within [Configuration](data/configuration.json))
 This is the most demand focused function yet because if you always report the most open valve in the circuit, you end up with a very responsive system that will react on demand immediately.
-This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `commandedValues.Heating.DynamicAdaption` which will then add a value mapped between `commandedValues.Heating.BasepointTemperature` and `commandedValues.Heating.EndpointTemperature` to `0` and `commandedValues.Heating.FeedAdaption`
+This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `DynamicAdaption` which will then add a value mapped between `FeedBaseSetpoint` and `FeedCutoff`. Next set `Adaption` according to your needs.
 
 Example for dynamic adaption together with valve scaling:
 - Outside Temperature is 5°
@@ -207,12 +384,25 @@ Feed Calculation: (Valve Opening - Min-Valve Opening) * (Max Feed - (Min-Feed + 
 
 Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
 
+[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+```json
+{
+[...]
+  //Enable valve scaling
+  "ValveScaling": true,
+  //The maximum value of a valve
+  "ValveScalingMaxOpening": 100,
+  //The current valve opening
+  "ValveScalingOpening": 75,
+[...]
+}
+```
 
 ### OTA Updates and Console
 
 The standard "Arduino OTA" procedure is included which means you can upload the code to your ESP32 without having to plug in the USB cable. See `platformio.ini` and modify the IP address accordingly.
 
-Debug info can be retrieved sing a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
+Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
 ## Hints
 - If you just wanna read then you have to set the variable `Override` to `false`. This way nothing will be sent on the bus but you can read everything.

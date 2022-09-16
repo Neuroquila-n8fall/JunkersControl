@@ -85,6 +85,7 @@ struct CeraValues
   } MixedCircuit;
 
   //-- Fallback Values
+  //TODO: Should be configurable using configuration.json
   struct FallBack_
   {
     //-- Basepoint Temperature
