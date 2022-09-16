@@ -376,7 +376,7 @@ void loop()
           // Activate Heating Profile by overwriting the fields with fallback values
           commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.BasepointTemperature;
           commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.EndpointTemperature;
-          ceraValues.Heating.Active = true;
+          commandedValues.Heating.Active = true;
           return; // important!
         }
       }
@@ -390,7 +390,7 @@ void loop()
           // Set both Base and Endpoint to the anti-freeze setting.
           commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
           commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
-          ceraValues.Heating.Active = false;
+          commandedValues.Heating.Active = false;
         }
       }
     }

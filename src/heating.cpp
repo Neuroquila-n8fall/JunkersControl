@@ -19,7 +19,7 @@ double CalculateFeedTemperature()
     
     //Map the current ambient temperature to the desired feed temperature:
     //        Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
-    if (!ceraValues.Heating.Active)
+    if (!commandedValues.Heating.Active)
     {
         if (ceraValues.Fallback.isOnFallback)
         {

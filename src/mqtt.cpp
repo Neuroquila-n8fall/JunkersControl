@@ -133,9 +133,8 @@ void callback(char *topic, byte *payload, unsigned int length)
       return;
     }
 
-    //Request Enable/Disable Heating and set the status of the heating accordlingly
+    //Request Enable/Disable Heating and set the status of the heating accordingly
     commandedValues.Heating.Active = doc["Enabled"];
-    ceraValues.Heating.Active = commandedValues.Heating.Active;
 
     commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
     commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
