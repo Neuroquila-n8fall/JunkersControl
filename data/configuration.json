@@ -10,12 +10,14 @@
         "User": "mqtt",
         "Password": "mqtt",
         "Topics": {
+            "HeatingValues": "cerasmarter/heating/values",
             "HeatingParameters": "cerasmarter/heating/parameters",
+            "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/parameters",
-            "Status": "cerasmarter/status"
+            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "Status": "cerasmarter/status",
+            "StatusRequest": "cerasmarter/status/get"
         }
-    },
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
