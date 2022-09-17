@@ -1,0 +1,19 @@
+{
+    "Enabled": false,
+    "FeedSetpoint": 0,
+    "FeedBaseSetpoint": -10,
+    "FeedCutOff": 22,
+    "FeedMinimum": 10,
+    "AuxilaryTemperature": 11.6,
+    "AmbientTemperature": 0,
+    "TargetAmbientTemperature": 21,
+    "OnDemandBoost": false,
+    "OnDemandBoostDuration": 600,
+    "FastHeatup": false,
+    "Adaption": 0,
+    "ValveScaling": true,
+    "ValveScalingMaxOpening": 100,
+    "ValveScalingOpening": 75,
+    "DynamicAdaption": true,
+    "OverrideSetpoint": false
+}

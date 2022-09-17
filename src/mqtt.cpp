@@ -25,7 +25,7 @@ void reconnectMqtt()
   // Loop until we're reconnected
   while (!client.connected())
   {
-    
+
     Serial.print("Attempting MQTT connection...");
 
     String clientId = generateClientId();
@@ -107,19 +107,47 @@ void callback(char *topic, byte *payload, unsigned int length)
     bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
     bool Status = doc["Status"];                             // false
 
-    if (HeatingTemperatures) PublishHeatingTemperatures();    
+    if (HeatingTemperatures)
+      PublishHeatingTemperatures();
 
-    if (WaterTemperatures) PublishWaterTemperatures();
+    if (WaterTemperatures)
+      PublishWaterTemperatures();
 
-    if (AuxilaryTemperatures) PublishAuxilaryTemperatures();
+    if (AuxilaryTemperatures)
+      PublishAuxilaryTemperatures();
 
-    if (Status) PublishStatus();
-
+    if (Status)
+      PublishStatus();
   }
 
   // Receiving Heating Parameters
   if (strcmp(topic, configuration.Mqtt.Topics.HeatingParameters) == 0)
   {
+
+    /*
+    Example Json:
+    {
+      "Enabled": false,
+      "FeedSetpoint": 0,
+      "FeedBaseSetpoint": -10,
+      "FeedCutOff": 22,
+      "FeedMinimum": 10,
+      "AuxilaryTemperature": 11.6,
+      "AmbientTemperature": 0,
+      "TargetAmbientTemperature": 21,
+      "OnDemandBoost": false,
+      "OnDemandBoostDuration": 600,
+      "FastHeatup": false,
+      "Adaption": 0,
+      "ValveScaling": true,
+      "ValveScalingMaxOpening": 100,
+      "ValveScalingOpening": 75,
+      "DynamicAdaption": true,
+      "OverrideSetpoint": false
+    }
+    */
+
+
     const int docSize = 384;
     StaticJsonDocument<docSize> doc;
     bool setFeedImmediately = false;
@@ -133,18 +161,17 @@ void callback(char *topic, byte *payload, unsigned int length)
       return;
     }
 
-    //Request Enable/Disable Heating and set the status of the heating accordingly
+    // Request Enable/Disable Heating and set the status of the heating accordingly
     commandedValues.Heating.Active = doc["Enabled"];
 
     commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
     commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
-    commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];    
-    commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];    
+    commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
+    commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
     commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
     commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
     commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
 
-    
     if (doc["OnDemandBoost"] != commandedValues.Heating.Boost)
     {
       commandedValues.Heating.Boost = doc["OnDemandBoost"];
@@ -160,12 +187,12 @@ void callback(char *topic, byte *payload, unsigned int length)
       commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     }
 
-    commandedValues.Heating.FastHeatup = doc["FastHeatup"];    
-    commandedValues.Heating.FeedAdaption = doc["Adaption"];    
-    commandedValues.Heating.ValveScaling = doc["ValveScaling"];    
-    commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];    
-    commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];    
-    commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];    
+    commandedValues.Heating.FastHeatup = doc["FastHeatup"];
+    commandedValues.Heating.FeedAdaption = doc["Adaption"];
+    commandedValues.Heating.ValveScaling = doc["ValveScaling"];
+    commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
+    commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
+    commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
     commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
 
     if (setFeedImmediately)
@@ -174,6 +201,14 @@ void callback(char *topic, byte *payload, unsigned int length)
     // Receiving Water Parameters
     if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
     {
+
+      /*
+      Example Json:
+      {
+        "Setpoint": 40
+      }
+      */
+
       const int docSize = 16;
       StaticJsonDocument<docSize> doc;
       DeserializationError error = deserializeJson(doc, (char *)payload, length);
@@ -197,13 +232,13 @@ void PublishStatus()
 {
   /* Example JSON
   {
-			"GasBurner": true,
-			"Pump": true,
-			"Error": 0..255,
-			"Season": true,
-			"Working": true,
-			"Boost": true,
-			"FastHeatup": true			
+      "GasBurner": true,
+      "Pump": true,
+      "Error": 0..255,
+      "Season": true,
+      "Working": true,
+      "Boost": true,
+      "FastHeatup": true
   }
   */
   StaticJsonDocument<384> doc;
@@ -226,10 +261,10 @@ void PublishHeatingTemperatures()
 {
   /* Example JSON
   {
-			"FeedMaximum": 75.10,
-			"FeedCurrent": 30.10,
-			"FeedSetpoint": 10.10,
-			"Outside": 15.10
+      "FeedMaximum": 75.10,
+      "FeedCurrent": 30.10,
+      "FeedSetpoint": 10.10,
+      "Outside": 15.10
   }
   */
 
@@ -248,14 +283,16 @@ void PublishHeatingTemperatures()
 
 void PublishWaterTemperatures()
 {
-  //TODO: Gather HW temperatures
+  // TODO: Gather HW temperatures
   /* Example JSON
-		{
-			"Maximum": 75.10,
-			"Current": 30.10,
-			"Setpoint": 10.10,
-      ""
-		}
+    {
+      "Maximum": 75.10,
+      "Current": 30.10,
+      "Setpoint": 10.10,
+      "CFSetpoint": 20.00,
+      "Now": true,
+      "Buffer": false
+    }
   */
 
   StaticJsonDocument<384> doc;
@@ -277,12 +314,10 @@ void PublishAuxilaryTemperatures()
 {
   /*
   {
-
-			"Feed": 30.10,
-			"Return": 30.10,
-			"Exhaust": 50.10,
-			"Ambient": 17.10
-
+      "Feed": 30.10,
+      "Return": 30.10,
+      "Exhaust": 50.10,
+      "Ambient": 17.10
   }
   */
 
