@@ -1,0 +1,115 @@
+{
+    "Wifi": {
+        "SSID": "ssid",
+        "Password": "pass",
+        "Hostname": "CERASMARTER"
+    },
+    "MQTT": {
+        "Server": "1.2.3.4",
+        "Port": 1883,
+        "User": "mqtt",
+        "Password": "mqtt",
+        "Topics": {
+            "HeatingValues": "cerasmarter/heating/values",
+            "HeatingParameters": "cerasmarter/heating/parameters",
+            "WaterValues": "cerasmarter/water/values",
+            "WaterParameters": "cerasmarter/water/parameters",
+            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "Status": "cerasmarter/status",
+            "StatusRequest": "cerasmarter/status/get"
+        }
+    "Features": {
+        "HeatingParameters": true,
+        "WaterParameters": false,
+        "AuxilaryParameters": false
+    },
+    "Time": {
+        "Timezone": "Europe/Berlin"
+    },
+    "General": {
+        "BusMessageTimeout": 30,
+        "Debug": false,
+        "Sniffing": false
+    },
+    "CAN": {
+        "Quartz": 16,
+        "Addresses": {
+            "Controller": {
+                "FlameStatus": "0x209",
+                "Error": "0x206",
+                "DateTime": "0x256"
+            },
+            "Heating": {
+                "FeedCurrent": "0x201",
+                "FeedMax": "0x200",
+                "FeedSetpoint": "0x252",
+                "OutsideTemperature": "0x207",
+                "Pump": "0x20A",
+                "Season": "0x20C",
+                "Operation": "0x250",
+                "Power": "0x251"
+            },
+            "HotWater": {
+                "SetpointTemperature": "0x203",
+                "MaxTemperature": "0x204",
+                "CurrentTemperature": "0x205",
+                "Now": "0x254",
+                "BufferOperation": "0x20B",
+                "ContinousFlow": {
+                    "SetpointTemperature": "0x255"
+                }
+            },
+            "MixedCircuit": {
+                "Pump": "0x404",
+                "FeedSetpoint": "0x405",
+                "FeedCurrent": "0x440",
+                "Economy": "0x407"
+            }
+        }
+    },
+    "AuxilarySensors":
+    {
+        "Count": 4,
+        "Sensors":
+        [
+            {
+                "Label": "Feed",
+                "IsReturnValue": false,
+                "Address":         
+                [
+                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
+                ]                
+            },
+            {
+                "Label": "Return",
+                "IsReturnValue": true,
+                "Address":
+                [
+                    "0x28", "0x6F", "0x9C", "0xF6", "0x42", "0x20", "0x01", "0xF6"
+                ]
+            },
+            {
+                "Label": "Exhaust",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0x6D", "0x98", "0xF5", "0x42", "0x20", "0x01", "0x0F"
+                ]
+            },
+            {
+                "Label": "Ambient",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0xBF", "0x39", "0x10", "0x42", "0x20", "0x01", "0x93"
+                ]
+            }
+        ]
+    },
+    "LEDs": {
+        "Wifi": 26,
+        "Status": 27,
+        "Mqtt": 14,
+        "Heating": 25
+    }
+}
