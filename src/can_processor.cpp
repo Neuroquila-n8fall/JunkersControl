@@ -83,7 +83,7 @@ void setupCan()
     Serial.print(settings.samplePointFromBitStart());
     Serial.println("%");
   }
-  else
+  if (errorCode != 0)
   {
     Serial.print("Configuration error 0x");
     Serial.println(errorCode, HEX);
