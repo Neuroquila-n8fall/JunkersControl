@@ -147,6 +147,10 @@ The `MQTT` section has everything and this is where you define the topics:
 }
 ```
 
+#### Examples & Detailed Explanation
+- See [MQTT Message Exchange: Receive](assets/Examples/MQTT_Message_Exchange/Receive/README.md)
+- See [MQTT Message Exchange: Send](assets/Examples/MQTT_Message_Exchange/Send/README.md)
+
 ### Heating Parameters
 Originally the TAXXX and integrated Heatronic will follow a set of parameters to determine the right feed temperature according to outside temperatures. These values are commonly referred to as "base point" and "end point" and represent a linear regulation by a reference temperature - the environmental temperature on the outside.
 The original controller will take the desired minimum feed temperature at -15°C as the end point and the required feed temperature at 20°C as the base point.
@@ -261,76 +265,9 @@ The oneWire and DallasTemperature libraries are included and used to fetch addit
 
 #### Configuration
 
-Configured using `/data/configuration.json`
-**IMPORTANT**
-The `Count` has to be less or equal the amount of sensor you have defined under `Sensors` or else the program will crash!
+Configured using `/data/configuration.json`. 
 
-Each sensor is defined by a label, if it's used to reference the return temperature and its address.
-In the following example the sensor is called "Feed" (`"Label": "Feed"`) and shouldn't be used as a reference temperature (`"IsReturnValue": false`) in [Dynamic Adaption](#dynamic-adaption) Mode.
-Its address is set as an array of the string representation of the hex values
-```
-                [
-                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
-                ]  
-```
-
-The completed sensor block looks like this:
-```json
-            {
-                "Label": "Feed",
-                "IsReturnValue": false,
-                "Address":         
-                [
-                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
-                ]                
-            },
-```
-
-Full example with 4 sensors:
-```json
-    "AuxilarySensors":
-    {
-        "Count": 4,
-        "Sensors":
-        [
-            {
-                "Label": "Feed",
-                "IsReturnValue": false,
-                "Address":         
-                [
-                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
-                ]                
-            },
-            {
-                "Label": "Return",
-                "IsReturnValue": true,
-                "Address":
-                [
-                    "0x28", "0x6F", "0x9C", "0xF6", "0x42", "0x20", "0x01", "0xF6"
-                ]
-            },
-            {
-                "Label": "Exhaust",
-                "IsReturnValue": false,
-                "Address":
-                [
-                    "0x28", "0x6D", "0x98", "0xF5", "0x42", "0x20", "0x01", "0x0F"
-                ]
-            },
-            {
-                "Label": "Ambient",
-                "IsReturnValue": false,
-                "Address":
-                [
-                    "0x28", "0xBF", "0x39", "0x10", "0x42", "0x20", "0x01", "0x93"
-                ]
-            }
-        ]
-    },
-```
-
-**IMPORTANT**
-If you set more than one sensor as `"IsReturnValue": true` the last one on the list will be the actual reference. Make sure you only set the one desired sensor as a reference.
+See [Auxilary Sensors](assets/Configuration.md#auxilary-sensors)
 
 ### Dynamic Adaption
 
@@ -411,14 +348,19 @@ Debug info can be retrieved using a very basic telnet implementation. Simply con
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
 
-## Configuration / Setup
-1) See `configuration.json` inside the `data` folder to configure the project to your requirements.
-2) Upload the project
-3) Now It will format the SPIFFS filesystem.
-4) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
-5) It will now read this config and will reach operational status
+## Getting Started
+1) Make a copy of `configuration.json.template` inside the `data` folder and name it `configuration.json`
+2) Use this `configuration.json` to configure the project to your requirements.
+3) Upload the project
+4) Now It will format the SPIFFS filesystem.
+5) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
+6) It will now read this config and will reach operational status
 
 You should be able to perform OTA updates now for both application and configuration.
+
+### Configuration
+
+
 
 ## Dedicated PCB
 
