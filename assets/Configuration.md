@@ -2,7 +2,7 @@
 
 ## Template
 
-See [Configuration Template](../data/configuration.json.template)
+Find the [Configuration Template](Templates/Configurations/configuration.json) and copy it to the `data` folder first!
 
 ### Wifi
 

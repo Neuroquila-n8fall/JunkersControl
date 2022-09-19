@@ -146,6 +146,27 @@ Be aware, though, that you can only "suggest" temperatures to the heating. It wi
 
 - [Water Parameters](ExampleWaterParameters.json) lets you configure the temperature and behavior of your hot water circuit
 
+###### Setpoint
+
+```json
+{
+    "Setpoint": 40
+}
+```
+
+This is the desired water temperature. The same rules apply like for the heating. You can't go beyond the maximum capabilities of your boiler. It will stop at the maximum allowed temperature.
+
 ## Request Parameters & Status
 
 - [Request Status](ExampleRequestStatus.json) lets you request values on demand rather than waiting for the ESP to send it.
+
+```json
+{
+    "HeatingTemperatures": true,
+    "WaterTemperatures": true,
+    "AuxilaryTemperatures": true,
+    "Status": true
+}
+```
+
+This will trigger a value update on the individual topics. You can disable all features, for example, and time the updates on your own this way since sending this message will yield values no matter what.

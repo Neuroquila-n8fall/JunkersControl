@@ -349,7 +349,7 @@ Debug info can be retrieved using a very basic telnet implementation. Simply con
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
 
 ## Getting Started
-1) Make a copy of `configuration.json.template` inside the `data` folder and name it `configuration.json`
+1) Copy [Configuration.json](assets/Templates/Configurations/configuration.json) to the `data` folder.
 2) Use this `configuration.json` to configure the project to your requirements.
 3) Upload the project
 4) Now It will format the SPIFFS filesystem.
@@ -360,7 +360,7 @@ You should be able to perform OTA updates now for both application and configura
 
 ### Configuration
 
-
+See the [Configuration](assets/Configuration.md) guide for details.
 
 ## Dedicated PCB
 
