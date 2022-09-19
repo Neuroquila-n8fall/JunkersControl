@@ -1,0 +1,84 @@
+{
+    "binary_sensor": {
+        "General": [
+            {
+                "GasBurner": {
+                    "Label": "Flame Lit",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.General.GasBurner }}"
+                }
+            }
+        ],
+        "Heating": [
+            {
+                "Pump": {
+                    "Label": "Pump Active",
+                    "dev_cla": "running",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Heating.Pump }}"
+                }
+            },
+            {
+                "Season": {
+                    "Label": "Seasonal Mode",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Heating.Season }}"
+                }
+            },
+            {
+                "Working": {
+                    "Label": "Operation",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Heating.Working }}"
+                }
+            },
+            {
+                "Boost": {
+                    "Label": "Boost",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Heating.Boost }}"
+                }
+            },
+            {
+                "FastHeatup": {
+                    "Label": "FastHeatup",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Heating.FastHeatup }}"
+                }
+            }
+        ],
+        "Water": [
+            {
+                "Now": {
+                    "Label": "Hot Water NOW Switch",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Water.Now }}"
+                }
+            },
+            {
+                "Buffer": {
+                    "Label": "Buffer Mode",
+                    "frc_upd": true,
+                    "pl_off": "false",
+                    "pl_on": "true",
+                    "val_tpl": "{{ value_json.Water.Buffer }}"
+                }
+            }
+        ]
+            
+    }
+}

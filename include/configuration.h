@@ -69,6 +69,16 @@ struct Configuration
         bool Sniffing;         // Output every CAN message von the bus
     } General;
 
+    struct HomeAssistant_
+    {
+        String AutoDiscoveryPrefix;
+        bool Enabled = false;
+        int OffDelay;
+        String DeviceId;
+        String StateTopic;
+        String TempUnit;
+    } HomeAssistant;
+
     struct LEDs_
     {
         int StatusLed;  // Status LED GPIO, ex. 27

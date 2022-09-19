@@ -235,11 +235,11 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(3)
   {
+    char printbuf[255];
+
     // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
     if (lastHeatingMessageTime - currentMillis >= 2000 && lastSentMessageTime - currentMillis >= 1000)
-    {
-
-      char printbuf[255];
+    {   
 
       // Send desired Values to the heating controller
       // Note that it cannot perform unrealistic actions.
@@ -329,6 +329,7 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(5)
   {
+
     // Publish Status
     PublishStatus();
 
@@ -346,7 +347,7 @@ void loop()
 
     // Publish Water Temperatures
     if (configuration.Features.Features_WaterParameters)
-      PublishWaterTemperatures();
+     PublishWaterTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————
@@ -359,7 +360,7 @@ void loop()
     {
 
       // Note: negate this statement to try out the fallback mode.
-      if (!Debug)
+      if (!client.connected() && !ceraValues.Fallback.isOnFallback)
       {
         // Activate fallback
         ceraValues.Fallback.isOnFallback = true;

@@ -1,0 +1,88 @@
+{    "sensor": {
+        "General": [
+            {
+                "Error": {
+                    "Label": "Error",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.General.Error }}"
+                }
+            }
+        ],
+        "Heating": [
+            {
+                "FeedCurrent": {
+                    "Label": "Current Feed Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Heating.FeedCurrent | float(default=0) }}"
+                }
+            },
+            {
+                "FeedMaximum": {
+                    "Label": "Maximum Feed Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Heating.FeedMaximum | float(default=0) }}"
+                }
+            },
+            {
+                "FeedSetpoint": {
+                    "Label": "Setpoint Feed Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Heating.FeedSetpoint | float(default=0) }}"
+                }
+            },
+            {
+                "Outside": {
+                    "Label": "Outside Temperature Reading",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Heating.Outside | float(default=0) }}"
+                }
+            }
+        ],
+        "Water": [
+            {
+                "Maximum": {
+                    "Label": "Maximum Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Water.Maximum | float(default=0) }}"
+                }
+            },
+            {
+                "Current": {
+                    "Label": "Current Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Water.Current | float(default=0) }}"
+                }
+            },
+            {
+                "Setpoint": {
+                    "Label": "Setpoint Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Water.Setpoint | float(default=0) }}"
+                }
+            },
+            {
+                "CFSetpoint": {
+                    "Label": "Continous Flow Setpoint Temperature",
+                    "unit_of_meas": "°C",
+                    "dev_cla": "temperature",
+                    "frc_upd": true,
+                    "val_tpl": "{{ value_json.Water.CFSetpoint | float(default=0) }}"
+                }
+            }
+        ]
+    }
+}

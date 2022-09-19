@@ -5,6 +5,7 @@
 #include <telnet.h>
 #include <heating.h>
 #include <ArduinoJson.h>
+#include <ha_autodiscovery.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MQTT Client (uses Wifi Client)
@@ -38,6 +39,11 @@ void reconnectMqtt()
       client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
       client.subscribe(configuration.Mqtt.Topics.WaterParameters);
       client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+      if (configuration.HomeAssistant.Enabled)
+      {
+        SetupAutodiscovery(HaSensorsFileName);
+        SetupAutodiscovery(HaBinarySensorsFileName);
+      }
     }
     else
     {
@@ -108,16 +114,24 @@ void callback(char *topic, byte *payload, unsigned int length)
     bool Status = doc["Status"];                             // false
 
     if (HeatingTemperatures)
+    {
       PublishHeatingTemperatures();
+    }
 
     if (WaterTemperatures)
+    {
       PublishWaterTemperatures();
+    }
 
     if (AuxilaryTemperatures)
+    {
       PublishAuxilaryTemperatures();
+    }
 
     if (Status)
+    {
       PublishStatus();
+    }
   }
 
   // Receiving Heating Parameters
@@ -146,7 +160,6 @@ void callback(char *topic, byte *payload, unsigned int length)
       "OverrideSetpoint": false
     }
     */
-
 
     const int docSize = 384;
     StaticJsonDocument<docSize> doc;
@@ -223,7 +236,6 @@ void callback(char *topic, byte *payload, unsigned int length)
 
       // TODO: Water Temperature Setpoint variable to be populated here...
       commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
-
     }
   }
 }
@@ -243,6 +255,13 @@ void PublishStatus()
   */
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("General");
+  }
+
   jsonObj["GasBurner"] = ceraValues.General.FlameLit;
   jsonObj["Pump"] = ceraValues.Heating.PumpActive;
   jsonObj["Error"] = ceraValues.General.Error;
@@ -254,7 +273,26 @@ void PublishStatus()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.Status, buffer, n);
+
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    char topic[255];
+    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "General");
+    client.publish(topic, buffer, n);
+  }
+  else
+  {
+    client.publish(configuration.Mqtt.Topics.Status, buffer, n);
+  }
+
+  if (Debug)
+  {
+    serializeJsonPretty(doc, buffer);
+    WriteToConsoles("//START\r\n[MQTT - SEND STATUS]\r\n");
+    WriteToConsoles(buffer);
+    WriteToConsoles("//END\r\n");
+  }
 }
 
 void PublishHeatingTemperatures()
@@ -270,6 +308,13 @@ void PublishHeatingTemperatures()
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("Heating");
+  }
+
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
   jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
@@ -278,7 +323,26 @@ void PublishHeatingTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
+
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    char topic[255];
+    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Heating");
+    client.publish(topic, buffer, n);
+  }
+  else
+  {
+    client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
+  }
+
+  if (Debug)
+  {
+    serializeJsonPretty(doc, buffer);
+    WriteToConsoles("//START\r\n[MQTT - SEND HEATING]\r\n");
+    WriteToConsoles(buffer);
+    WriteToConsoles("//END\r\n");
+  }
 }
 
 void PublishWaterTemperatures()
@@ -297,6 +361,13 @@ void PublishWaterTemperatures()
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("Water");
+  }
+
   jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
   jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
   jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
@@ -307,7 +378,27 @@ void PublishWaterTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
+
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    char topic[255];
+    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Water");
+    client.publish(topic, buffer, n);
+  }
+  else
+  {
+
+    client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
+  }
+
+  if (Debug)
+  {
+    serializeJsonPretty(doc, buffer);
+    WriteToConsoles("//START\r\n[MQTT - SEND HOTWATER]\r\n");
+    WriteToConsoles(buffer);
+    WriteToConsoles("//END\r\n");
+  }
 }
 
 void PublishAuxilaryTemperatures()
@@ -323,6 +414,13 @@ void PublishAuxilaryTemperatures()
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("Auxilary");
+  }
+
   for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
   {
     Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
@@ -332,5 +430,24 @@ void PublishAuxilaryTemperatures()
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
-  client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
+
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    char topic[255];
+    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Auxilary");
+    client.publish(topic, buffer, n);
+  }
+  else
+  {
+    client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
+  }
+
+  if (Debug)
+  {
+    serializeJsonPretty(doc, buffer);
+    WriteToConsoles("//START\r\n[MQTT - SEND AUX]\r\n");
+    WriteToConsoles(buffer);
+    WriteToConsoles("//END\r\n");
+  }
 }

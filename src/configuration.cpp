@@ -92,6 +92,15 @@ bool ReadConfiguration()
     configuration.General.Debug = GeneralSettings["Debug"];
     configuration.General.Sniffing = GeneralSettings["Sniffing"];
 
+    JsonObject HomeAssistantSettings = doc["HomeAssistant"];
+    configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"];
+    configuration.HomeAssistant.DeviceId = HomeAssistantSettings["DeviceId"].as<String>();
+    configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"];
+    configuration.HomeAssistant.AutoDiscoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
+    configuration.HomeAssistant.StateTopic = "cerasmarter/" + configuration.HomeAssistant.DeviceId + "/%s/state";
+    configuration.HomeAssistant.TempUnit = HomeAssistantSettings["TempUnit"].as<String>();
+    
+
     JsonObject Leds = doc["LEDs"];
     configuration.LEDs.WifiLed = Leds["Wifi"];       // 26
     configuration.LEDs.StatusLed = Leds["Status"];   // 27
