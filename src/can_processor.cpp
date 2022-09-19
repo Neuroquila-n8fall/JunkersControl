@@ -97,6 +97,12 @@ void processCan()
   if (can.receive(Message))
   {
     unsigned long curMillis = millis();
+
+    if (Debug || configuration.General.Sniffing)
+    {
+      WriteMessage(Message);
+    }
+
     // Buffer for sending console output. 100 chars should be enough for now:
     //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
     char printBuf[100];
@@ -114,11 +120,6 @@ void processCan()
       Override = false;
 
       WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
-    }
-
-    if (Debug || configuration.General.Sniffing)
-    {
-      WriteMessage(Message);
     }
 
     /*************************************
