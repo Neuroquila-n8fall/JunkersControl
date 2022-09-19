@@ -1,5 +1,9 @@
 # JunkersControl
 
+## Community
+
+[I'm currently building up a Discord server](https://discord.gg/9Wrndbqu7t)
+
 ## Table of contents
 - [JunkersControl](#junkerscontrol)
   - [Table of contents](#table-of-contents)
