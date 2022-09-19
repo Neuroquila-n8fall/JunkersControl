@@ -97,7 +97,7 @@ bool ReadConfiguration()
     configuration.HomeAssistant.DeviceId = HomeAssistantSettings["DeviceId"].as<String>();
     configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"];
     configuration.HomeAssistant.AutoDiscoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
-    configuration.HomeAssistant.StateTopic = "cerasmarter/" + configuration.HomeAssistant.DeviceId + "/%s/state";
+    configuration.HomeAssistant.StateTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/cerasmarter/";
     configuration.HomeAssistant.TempUnit = HomeAssistantSettings["TempUnit"].as<String>();
     
 

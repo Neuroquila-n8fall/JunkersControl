@@ -49,13 +49,12 @@ void SetupAutodiscoveryForAuxSensors()
         label.replace(" ", "-");
         char *valTempl;
         sprintf(valTempl, "{{ value_json.Auxilary.%s }}", label);
-        char *topic;
-        sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Auxilary");
+        String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
         CreateAndPublishAutoDiscoverySensorJson(
             label.c_str(),
             configuration.HomeAssistant.TempUnit.c_str(),
             valTempl,
-            (String)topic);
+            topic);
     }
 }
 
@@ -131,12 +130,11 @@ void SetupAutodiscovery(const char *fileName)
                 {
                     label = curKey;
                 }
+                // Topic Abbreviation
+                CurrentSensor["~"] = configuration.HomeAssistant.StateTopic + InternalDevCategory.key().c_str();
+                CurrentSensor["stat_t"] = "~/state";
                 CurrentSensor["name"] = configuration.HomeAssistant.DeviceId + "_" + label;
-
-                char topic[255];
-                sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), InternalDevCategory.key().c_str());
-                CurrentSensor["uniq_id"] = configuration.HomeAssistant.DeviceId + "_" + curKey;
-                CurrentSensor["stat_t"] = topic;
+                CurrentSensor["uniq_id"] = configuration.HomeAssistant.DeviceId + "_" + curKey;                
                 CurrentSensor["off_delay"] = configuration.HomeAssistant.OffDelay;
                 // Remove "Label" Value because it isn't specified for HA AD
                 CurrentSensor.remove("Label");

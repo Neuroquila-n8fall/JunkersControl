@@ -76,6 +76,11 @@ void setupMqttClient()
   client.setKeepAlive(10);
 }
 
+String boolToJsonValue(bool src)
+{
+  return (src) ? "true" : "false";
+}
+
 // Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
@@ -262,13 +267,8 @@ void PublishStatus()
     jsonObj = doc.createNestedObject("General");
   }
 
-  jsonObj["GasBurner"] = ceraValues.General.FlameLit;
-  jsonObj["Pump"] = ceraValues.Heating.PumpActive;
+  jsonObj["GasBurner"] = boolToJsonValue(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
-  jsonObj["Season"] = ceraValues.Heating.Season;
-  jsonObj["Working"] = ceraValues.Heating.Active;
-  jsonObj["Boost"] = commandedValues.Heating.Boost;
-  jsonObj["FastHeatup"] = commandedValues.Heating.FastHeatup;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -277,9 +277,8 @@ void PublishStatus()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    char topic[255];
-    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "General");
-    client.publish(topic, buffer, n);
+    String topic = configuration.HomeAssistant.StateTopic + "General/state";
+    client.publish(topic.c_str(), buffer, n);
   }
   else
   {
@@ -319,6 +318,11 @@ void PublishHeatingTemperatures()
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
   jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
+  jsonObj["Pump"] = boolToJsonValue(ceraValues.Heating.PumpActive);
+  jsonObj["Season"] = boolToJsonValue(ceraValues.Heating.Season);
+  jsonObj["Working"] = boolToJsonValue(ceraValues.Heating.Active);
+  jsonObj["Boost"] = boolToJsonValue(commandedValues.Heating.Boost);
+  jsonObj["FastHeatup"] = boolToJsonValue(commandedValues.Heating.FastHeatup);
 
   // Publish Data on MQTT
   char buffer[768];
@@ -327,9 +331,8 @@ void PublishHeatingTemperatures()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    char topic[255];
-    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Heating");
-    client.publish(topic, buffer, n);
+    String topic = configuration.HomeAssistant.StateTopic + "Heating/state";
+    client.publish(topic.c_str(), buffer, n);
   }
   else
   {
@@ -372,8 +375,8 @@ void PublishWaterTemperatures()
   jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
   jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
   jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
-  jsonObj["Now"] = ceraValues.Hotwater.Now;
-  jsonObj["Buffer"] = ceraValues.Hotwater.BufferMode;
+  jsonObj["Now"] = boolToJsonValue(ceraValues.Hotwater.Now);
+  jsonObj["Buffer"] = boolToJsonValue(ceraValues.Hotwater.BufferMode);
 
   // Publish Data on MQTT
   char buffer[768];
@@ -382,9 +385,8 @@ void PublishWaterTemperatures()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    char topic[255];
-    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Water");
-    client.publish(topic, buffer, n);
+    String topic = configuration.HomeAssistant.StateTopic + "Water/state";
+    client.publish(topic.c_str(), buffer, n);
   }
   else
   {
@@ -434,9 +436,8 @@ void PublishAuxilaryTemperatures()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    char topic[255];
-    sprintf(topic, configuration.HomeAssistant.StateTopic.c_str(), "Auxilary");
-    client.publish(topic, buffer, n);
+    String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
+    client.publish(topic.c_str(), buffer, n);
   }
   else
   {
