@@ -7,8 +7,9 @@
 extern void SendMessage(CANMessage msg);
 extern void SetDateTime();
 extern void Reboot();
-extern CANMessage PrepareMessage(uint32_t id);
-void WriteMessage(CANMessage msg);
+extern CANMessage PrepareMessage(uint32_t id, int length = 8);
+extern void WriteMessage(CANMessage msg);
+extern bool SafeToSendMessage(bool dontWaitForController = true);
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation

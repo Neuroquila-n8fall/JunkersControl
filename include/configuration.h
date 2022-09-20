@@ -104,6 +104,8 @@ struct Configuration
             uint16_t Season;
             uint16_t Operation;
             uint16_t Power;
+            uint16_t Mode;
+            uint16_t Economy;
         } Heating;
 
         struct General_

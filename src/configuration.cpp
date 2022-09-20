@@ -42,7 +42,7 @@ bool ReadConfiguration()
     }
 
     // Open and parse the file
-    const int docSize = 3072;
+    const int docSize = 4096;
     StaticJsonDocument<docSize> doc;
     DeserializationError error = deserializeJson(doc, file);
 
@@ -126,6 +126,8 @@ bool ReadConfiguration()
     configuration.CanAddresses.Heating.Season = convertHexString(CAN_Addresses_Heating["Season"].as<const char*>());                         // "0x20C"
     configuration.CanAddresses.Heating.Operation = convertHexString(CAN_Addresses_Heating["Operation"].as<const char*>());                   // "0x250"
     configuration.CanAddresses.Heating.Power = convertHexString(CAN_Addresses_Heating["Power"].as<const char*>());                           // "0x251"
+    configuration.CanAddresses.Heating.Mode = convertHexString(CAN_Addresses_Heating["Mode"].as<const char*>());                             // "0x258"
+    configuration.CanAddresses.Heating.Economy = convertHexString(CAN_Addresses_Heating["Economy"].as<const char*>());                       // "0x253"
 
     JsonObject CAN_Addresses_HotWater = CAN_Addresses["HotWater"];
     configuration.CanAddresses.HotWater.SetpointTemperature = convertHexString(CAN_Addresses_HotWater["SetpointTemperature"].as<const char*>()); // "0x203"

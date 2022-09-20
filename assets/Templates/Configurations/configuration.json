@@ -56,7 +56,9 @@
                 "Pump": "0x20A",
                 "Season": "0x20C",
                 "Operation": "0x250",
-                "Power": "0x251"
+                "Power": "0x251",
+                "Mode": "0x258",
+                "Economy": "0x253"
             },
             "HotWater": {
                 "SetpointTemperature": "0x203",

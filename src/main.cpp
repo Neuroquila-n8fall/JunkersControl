@@ -22,7 +22,6 @@
 // NTP Timesync
 #include <timesync.h>
 
-
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
@@ -233,13 +232,15 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   // Control Actions
   //——————————————————————————————————————————————————————————————————————————————
-  runEverySeconds(3)
+
+  // TODO: Seek for a more elegant solution to send each message every 30 seconds. Right now it's 5 because we have 6 Steps and we want an interval of 30 seconds so 30/6 = 5 seconds delay.
+  runEverySeconds(5)
   {
     char printbuf[255];
 
     // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
-    if (lastHeatingMessageTime - currentMillis >= 2000 && lastSentMessageTime - currentMillis >= 1000)
-    {   
+    if (SafeToSendMessage)
+    {
 
       // Send desired Values to the heating controller
       // Note that it cannot perform unrealistic actions.
@@ -250,7 +251,7 @@ void loop()
       //   to have been incoorporated into the controller as well because values arrive in
       //   intervals of approximately 1 second.
 
-      CANMessage msg = PrepareMessage(0x0);
+      CANMessage msg;
 
       double feedTemperature = 0.0F;
       int feedSetpoint = 0;
@@ -259,7 +260,7 @@ void loop()
       {
       case 0:
         // Switch economy mode. This is always the opposite of the desired operational state
-        msg.id = 0x253;
+        msg = PrepareMessage(configuration.CanAddresses.Heating.Economy, 1);
         msg.data[0] = !commandedValues.Heating.Active;
         if (Debug)
         {
@@ -272,7 +273,7 @@ void loop()
       // Temperature regulation mode
       //  1 = Weather guided | 0 = Room Temperature Guided
       case 1:
-        msg.id = 0x258;
+        msg = PrepareMessage(configuration.CanAddresses.Heating.Mode, 1);
         msg.data[0] = 1;
         break;
 
@@ -283,7 +284,7 @@ void loop()
         // Transform it into the int representation
         feedSetpoint = ConvertFeedTemperature(feedTemperature);
 
-        msg.id = 0x252;
+        msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint, 1);
         msg.data[0] = feedSetpoint;
         if (Debug)
         {
@@ -296,19 +297,19 @@ void loop()
 
       // DHW "Now"
       case 3:
-        msg.id = 0x254;
+        msg = PrepareMessage(configuration.CanAddresses.HotWater.Now, 1);
         msg.data[0] = 0x01;
         break;
 
       // DHW Temperature Setpoint
       case 4:
-        msg.id = 0x255;
+        msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
         msg.data[0] = 20;
         break;
 
       case 5:
         // Request? Data
-        msg.id = 0xF9;
+        msg = PrepareMessage(0xF9, 0);
         break;
 
       default:
@@ -347,7 +348,7 @@ void loop()
 
     // Publish Water Temperatures
     if (configuration.Features.Features_WaterParameters)
-     PublishWaterTemperatures();
+      PublishWaterTemperatures();
   }
 
   //——————————————————————————————————————————————————————————————————————————————
@@ -439,8 +440,6 @@ void SendMessage(CANMessage msg)
     }
     can.tryToSend(msg);
     lastSentMessageTime = millis();
-
-
   }
 }
 
@@ -484,7 +483,8 @@ void SetDateTime()
   {
     if (lastSentMessageTime - millis() >= 1000)
     {
-      CANMessage msg = PrepareMessage(0x256);
+      
+      CANMessage msg = PrepareMessage(configuration.CanAddresses.General.DateTime, 4);
 
       // Get day of week:
       //  --> N = ISO-8601 numeric representation of the day of the week. (1 = Monday, 7 = Sunday)
@@ -506,16 +506,27 @@ void SetDateTime()
   }
 }
 
-CANMessage PrepareMessage(uint32_t id)
+CANMessage PrepareMessage(uint32_t id, int length /* = 8 */)
 {
   CANMessage msg;
   // This was the culprit of messages not arriving as they should.
   // We have to set up the length of the message first. The heating doesn't care about that much but the library does!
-  msg.len = 8;
+  msg.len = length;
   // These are here for reference only and are the default values of the ctr
   msg.ext = false;
   msg.rtr = false;
   msg.idx = 0;
   msg.id = id;
   return msg;
+}
+
+/// @brief Returns if the last sent or received message was a second away
+/// @param dontWaitForController Just check for the last message timestamp we sent and not this of the controller.
+/// @return
+bool SafeToSendMessage(bool dontWaitForController /*= true*/)
+{
+  if (dontWaitForController)
+    return (lastSentMessageTime - millis() >= 1000);
+
+  return (lastHeatingMessageTime - millis() >= 1000 && lastSentMessageTime - millis() >= 1000);
 }
