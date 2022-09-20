@@ -32,6 +32,14 @@
         "Debug": false,
         "Sniffing": false
     },
+    "HomeAssistant":
+    {
+        "AutoDiscoveryPrefix": "homeassistant",
+        "OffDelay": 30,
+        "Enabled": false,
+        "DeviceId": "cerasmarter_1",
+        "TempUnit": "°C"
+    },
     "CAN": {
         "Quartz": 16,
         "Addresses": {

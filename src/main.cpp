@@ -324,12 +324,6 @@ void loop()
     }
   }
 
-  runEverySeconds(30)
-  {
-    CANMessage msg = PrepareMessage(0xF9);
-    SendMessage(msg);
-  }
-
   //——————————————————————————————————————————————————————————————————————————————
   // Actions performed every five seconds
   //——————————————————————————————————————————————————————————————————————————————
