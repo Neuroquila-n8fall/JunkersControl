@@ -100,7 +100,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
   TopicBuf = topic;
 
-  // Command Topics
+  // Command Topics for HA auto discovery.
   if (TopicBuf.endsWith(F("/set")))
   {
     WriteToConsoles("Received SET Topic: ");
@@ -115,7 +115,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     // Remove Category from string
     TopicBuf.replace(category,"");
     TopicBuf.replace(F("/set"),"");
-    String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length() -1);
+    String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length());
     parameterName.replace(F("/"),"");
 
     WriteToConsoles("Received Values for Category: ");
@@ -126,6 +126,15 @@ void callback(char *topic, byte *payload, unsigned int length)
     WriteToConsoles(PayloadBuf);
     WriteToConsoles("\r\n");
     
+    // Setting Values coming from HA.
+    // NOTE: This is all hardcoded on purpose as we have no means of determining which variable is targeted
+    if(category == "Heating")
+    {
+      if(parameterName == "BoostDuration")
+      {
+
+      }
+    }
   }
   
 
