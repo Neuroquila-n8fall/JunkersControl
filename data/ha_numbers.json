@@ -1,0 +1,45 @@
+{
+    "number":{
+        "Heating": [
+            {
+                "Setpoint": {
+                    "Label": "Feed Setpoint",
+                    "unit_of_meas": "°C",
+                    "min": 0,
+                    "max": 100,
+                    "stat_t": "~/istate",
+                    "cmd_t": "~/set"
+                }
+            },
+            {
+                "BoostDuration": {
+                    "Label": "Boost Duration",
+                    "unit_of_meas": "s",
+                    "min": 0,
+                    "stat_t": "~/istate",
+                    "cmd_t": "~/set"
+                }
+            },
+            {
+                "RoomReferenceT": {
+                    "Label": "Room Reference Temperature",
+                    "unit_of_meas": "°C",
+                    "stat_t": "~/istate",
+                    "cmd_t": "~/set"
+                }
+            }
+        ],
+        "Water": [
+            {
+                "Setpoint": {
+                    "Label": "Setpoint",
+                    "unit_of_meas": "°C",
+                    "min": 0,
+                    "max": 100,
+                    "stat_t": "~/istate",
+                    "cmd_t": "~/set"
+                }
+            }
+        ]
+    }
+}

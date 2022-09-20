@@ -13,6 +13,8 @@
 PubSubClient client(espClient);
 
 CommandedValues commandedValues;
+String TopicBuf;
+String PayloadBuf;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
@@ -43,6 +45,7 @@ void reconnectMqtt()
       {
         SetupAutodiscovery(HaSensorsFileName);
         SetupAutodiscovery(HaBinarySensorsFileName);
+        SetupAutodiscovery(HaNumbersFileName);
       }
     }
     else
@@ -84,12 +87,47 @@ String boolToJsonValue(bool src)
 // Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
+  // NOTE ON STRING USAGE: We're not risking heavy fragmentation since we're on an ESP32
+
+  // Append string terminator for safety
   payload[length] = '\0';
-  String s = String((char *)payload);
-  if (!s)
+  // Check if the payload translates to a valid string.
+  PayloadBuf = String((char *)payload);
+  if (!PayloadBuf)
   {
     return;
   }
+
+  TopicBuf = topic;
+
+  // Command Topics
+  if (TopicBuf.endsWith(F("/set")))
+  {
+    WriteToConsoles("Received SET Topic: ");
+    WriteToConsoles(TopicBuf);
+    WriteToConsoles("\r\n");
+    // Remove prefixes
+    TopicBuf.replace(configuration.HomeAssistant.AutoDiscoveryPrefix + "/","");
+    TopicBuf.replace(configuration.HomeAssistant.DeviceId + "/","");
+    // Try to get the category
+    String category = TopicBuf.substring(0,TopicBuf.indexOf('/'));
+    category.replace("/","");
+    // Remove Category from string
+    TopicBuf.replace(category,"");
+    TopicBuf.replace(F("/set"),"");
+    String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length() -1);
+    parameterName.replace(F("/"),"");
+
+    WriteToConsoles("Received Values for Category: ");
+    WriteToConsoles(category);
+    WriteToConsoles(" Parameter Name: ");
+    WriteToConsoles(parameterName);
+    WriteToConsoles(" Payload: ");
+    WriteToConsoles(PayloadBuf);
+    WriteToConsoles("\r\n");
+    
+  }
+  
 
   // Status Requested
   if (strcmp(topic, configuration.Mqtt.Topics.StatusRequest) == 0)
@@ -239,7 +277,7 @@ void callback(char *topic, byte *payload, unsigned int length)
         return;
       }
 
-      // TODO: Water Temperature Setpoint variable to be populated here...
+      
       commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
     }
   }

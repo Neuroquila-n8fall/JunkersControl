@@ -67,6 +67,8 @@ struct CommandedValues
 };
 
 extern CommandedValues commandedValues;
+extern String TopicBuf;
+extern String PayloadBuf;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions

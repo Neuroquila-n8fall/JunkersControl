@@ -3,6 +3,7 @@
 
 const char *HaSensorsFileName = (char *)"/ha_sensors.json";
 const char *HaBinarySensorsFileName = (char *)"/ha_binarysensors.json";
+const char *HaNumbersFileName = (char *)"/ha_numbers.json";
 
 /// @brief Create a JSON definition of a HA sensor.
 /// @param name Name of the Sensor. Example: "Heating Feed Setpoint Temperature"
@@ -131,13 +132,36 @@ void SetupAutodiscovery(const char *fileName)
                     label = curKey;
                 }
                 // Topic Abbreviation
-                CurrentSensor["~"] = configuration.HomeAssistant.StateTopic + InternalDevCategory.key().c_str();
-                CurrentSensor["stat_t"] = "~/state";
+                String baseTopic = configuration.HomeAssistant.StateTopic;
+                baseTopic += InternalDevCategory.key().c_str();
+                CurrentSensor["~"] = baseTopic;
+                // Set the default state topic only if it hasn't been defined (special cases for numbers, switches)
+                const char *stat_t = CurrentSensor["stat_t"];
+                if (!stat_t)
+                    CurrentSensor["stat_t"] = "~/state";
                 CurrentSensor["name"] = configuration.HomeAssistant.DeviceId + "_" + label;
-                CurrentSensor["uniq_id"] = configuration.HomeAssistant.DeviceId + "_" + curKey;                
+                CurrentSensor["uniq_id"] = configuration.HomeAssistant.DeviceId + "_" + curKey;
                 CurrentSensor["off_delay"] = configuration.HomeAssistant.OffDelay;
                 // Remove "Label" Value because it isn't specified for HA AD
                 CurrentSensor.remove("Label");
+
+                // Subscribe to cmd topic, if set.
+                const char *cmd_t = CurrentSensor["cmd_t"];
+                if (cmd_t)
+                {
+                    // <basetopic>/<value name>/set
+                    String cmdTopic = baseTopic;
+                    cmdTopic += "/";
+                    cmdTopic += curKey;
+                    cmdTopic += CurrentSensor["cmd_t"].as<String>();
+                    cmdTopic.replace("~", "");
+                    client.subscribe(cmdTopic.c_str());
+
+                    // Assemble a specific command topic from the key: ~/<value name>/set
+                    cmdTopic = CurrentSensor["cmd_t"].as<String>();
+                    cmdTopic.replace("~", "");
+                    CurrentSensor["cmd_t"] = "~/" + curKey + cmdTopic;
+                }
 
                 // Sensor is assembled. We have to transmit this config to HA now in order to get it working
                 char buffer[768];
@@ -147,6 +171,7 @@ void SetupAutodiscovery(const char *fileName)
                     Serial.println(discoveryTopic);
                     serializeJsonPretty(CurrentSensor, Serial);
                 };
+
                 client.publish(discoveryTopic.c_str(), buffer, n);
             }
         }
