@@ -278,17 +278,11 @@ void loop()
         break;
 
       case 2:
-
-        // Get raw Setpoint
-        feedTemperature = CalculateFeedTemperature();
-        // Transform it into the int representation
-        feedSetpoint = ConvertFeedTemperature(feedTemperature);
-
-        msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint, 1);
-        msg.data[0] = feedSetpoint;
+        SetFeedTemperature();
+        
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s, Feed Setpoint is %.2f, INT representation (half steps) is %i", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO", feedTemperature, feedSetpoint);
+          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
           String message(printbuf);
           WriteToConsoles(message + "\r\n");
         }
