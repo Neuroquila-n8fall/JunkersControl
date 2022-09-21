@@ -32,8 +32,7 @@ double temp = 0.00F;
 // Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
 {
-  CANMessage msg = PrepareMessage(0x252);
-
+  CANMessage msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint,1);
   char printbuf[255];
   int feedSetpoint = 0;
 
