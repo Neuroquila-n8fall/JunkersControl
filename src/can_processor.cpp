@@ -37,18 +37,21 @@ void SetFeedTemperature()
   int feedSetpoint = 0;
 
   // Get raw Setpoint
-
   commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
+
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
-  msg.data[0] = feedSetpoint;
   if (Debug)
   {
     sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
     String message(printbuf);
     WriteToConsoles(message + "\r\n");
   }
+
+  msg.data[0] = feedSetpoint;
+
+  SendMessage(msg);
 }
 
 void setupCan()
