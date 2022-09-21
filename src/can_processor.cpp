@@ -108,7 +108,7 @@ void processCan()
     char printBuf[100];
 
     // Check for other controllers on the network by watching out for messages that are greater than 0x250
-    if (Message.id > 0x250 && Message.id < 0x400)
+    if (Message.id > 0x250 && Message.id < 0x300)
     {
       controllerMessageTimer = curMillis;
 
@@ -138,7 +138,7 @@ void processCan()
     char errorCode[2];
 
     // Take note of the last time we received a message from the boiler
-    if (Message.id < 0x250 || Message.id > 0x400)
+    if (Message.id < 0x250 || Message.id > 0x300)
     {
       lastHeatingMessageTime = millis();
     }
