@@ -44,6 +44,8 @@ struct CeraValues
     bool Active = true;
     //-- Analog value of heating power
     int HeatingPower = 0;
+    //-- Economy Setting
+    bool Economy = false;
   } Heating;
   //-- General Values, i.e. Flame, Error, ...
   struct General_
