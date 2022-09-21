@@ -213,6 +213,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
     commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
 
+    // Dispatch Feed Setpoint immediately
     if (setFeedImmediately)
       SetFeedTemperature();
 
@@ -316,7 +317,7 @@ void PublishHeatingTemperatures()
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
-  jsonObj["FeedSetpoint"] = (Override) ? CalculateFeedTemperature() : ceraValues.Heating.FeedSetpoint;
+  jsonObj["FeedSetpoint"] = (Override) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
   jsonObj["Pump"] = boolToJsonValue(ceraValues.Heating.PumpActive);
   jsonObj["Season"] = boolToJsonValue(ceraValues.Heating.Season);
