@@ -100,9 +100,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      WriteToConsoles("[Status Request] Error Processing JSON: ");
-      WriteToConsoles(error.c_str());
-      WriteToConsoles("\r\n");
+      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
     /* Example JSON:
@@ -173,9 +171,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      WriteToConsoles("[Heating Parameters] Error Processing JSON: ");
-      WriteToConsoles(error.c_str());
-      WriteToConsoles("\r\n");
+      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
 
@@ -234,9 +230,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
       if (error)
       {
-        WriteToConsoles("[Water Parameters] Error Processing JSON: ");
-        WriteToConsoles(error.c_str());
-        WriteToConsoles("\r\n");
+        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
         return;
       }
 
@@ -271,6 +265,17 @@ void PublishStatus()
   jsonObj["GasBurner"] = boolToJsonValue(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
 
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND STATUS]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
+
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
@@ -284,14 +289,6 @@ void PublishStatus()
   else
   {
     client.publish(configuration.Mqtt.Topics.Status, buffer, n);
-  }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND STATUS]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
   }
 }
 
@@ -325,6 +322,17 @@ void PublishHeatingTemperatures()
   jsonObj["Boost"] = boolToJsonValue(commandedValues.Heating.Boost);
   jsonObj["FastHeatup"] = boolToJsonValue(commandedValues.Heating.FastHeatup);
 
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND HEATING]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
+
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
@@ -338,14 +346,6 @@ void PublishHeatingTemperatures()
   else
   {
     client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
-  }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND HEATING]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
   }
 }
 
@@ -379,6 +379,17 @@ void PublishWaterTemperatures()
   jsonObj["Now"] = boolToJsonValue(ceraValues.Hotwater.Now);
   jsonObj["Buffer"] = boolToJsonValue(ceraValues.Hotwater.BufferMode);
 
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND WATER]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
+
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
@@ -393,14 +404,6 @@ void PublishWaterTemperatures()
   {
 
     client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
-  }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND HOTWATER]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
   }
 }
 
@@ -430,6 +433,17 @@ void PublishAuxilaryTemperatures()
     jsonObj[curSensor.Label] = ceraValues.Auxilary.Temperatures[i];
   }
 
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND AUX]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
+
   // Publish Data on MQTT
   char buffer[768];
   size_t n = serializeJson(doc, buffer);
@@ -443,13 +457,5 @@ void PublishAuxilaryTemperatures()
   else
   {
     client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
-  }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND AUX]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
   }
 }

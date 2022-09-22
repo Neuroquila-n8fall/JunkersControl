@@ -4,6 +4,11 @@
 #include <Arduino.h>
 #include <ACAN2515.h>
 
+// Mute MQTT Flag
+#ifndef MUTE_MQTT
+#define MUTE_MQTT 0
+#endif
+
 extern void SendMessage(CANMessage msg);
 extern void SetDateTime();
 extern void Reboot();

@@ -29,7 +29,7 @@ bool ReadConfiguration()
 
     if (!SPIFFS.exists(configFileName))
     {
-        WriteToConsoles("Configuration file could not be found. Please upload it first.\r\n");
+        Log.println("Configuration file could not be found. Please upload it first.");
         return false;
     }
 
@@ -37,7 +37,7 @@ bool ReadConfiguration()
 
     if (!file)
     {
-        WriteToConsoles("Configuration file could not be loaded. Consider checking and reuploading it.\r\n");
+        Log.println("Configuration file could not be loaded. Consider checking and reuploading it.");
         return false;
     }
 
@@ -48,16 +48,13 @@ bool ReadConfiguration()
 
     if (error)
     {
-        WriteToConsoles("Error processing configuration: ");
-        WriteToConsoles(error.c_str());
-        WriteToConsoles("\r\n");
+        Log.printf("Error processing configuration: %s\r\n", error.c_str());
         return false;
     }
 
     if (Debug)
     {
-
-        serializeJsonPretty(doc, Serial);
+        serializeJsonPretty(doc, Log);
     }
 
     strlcpy(configuration.Wifi.SSID, doc["Wifi"]["SSID"], sizeof(configuration.Wifi.SSID));             // "ssid"
@@ -170,14 +167,14 @@ bool ReadConfiguration()
         {
             if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
             {
-                Serial.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.");
+                Log.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.");
             }            
             if(newSensor.UseAsReturnValueReference)
             {
-                Serial.println("INFO: The following sensor will be used as a return temperature reference.");
+                Log.println("INFO: The following sensor will be used as a return temperature reference.");
                 tempReferenceSensorSet = true;
             }
-            Serial.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
+            Log.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
         }
     }
     // Set the amount of sensors

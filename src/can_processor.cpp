@@ -44,9 +44,7 @@ void SetFeedTemperature()
 
   if (Debug)
   {
-    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
-    String message(printbuf);
-    WriteToConsoles(message + "\r\n");
+    Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
   }
 
   msg.data[0] = feedSetpoint;
@@ -64,31 +62,31 @@ void setupCan()
                                        { can.isr(); });
   if (errorCode == 0 && Debug)
   {
-    Serial.print("Bit Rate prescaler: ");
-    Serial.println(settings.mBitRatePrescaler);
-    Serial.print("Propagation Segment: ");
-    Serial.println(settings.mPropagationSegment);
-    Serial.print("Phase segment 1: ");
-    Serial.println(settings.mPhaseSegment1);
-    Serial.print("Phase segment 2: ");
-    Serial.println(settings.mPhaseSegment2);
-    Serial.print("SJW: ");
-    Serial.println(settings.mSJW);
-    Serial.print("Triple Sampling: ");
-    Serial.println(settings.mTripleSampling ? "yes" : "no");
-    Serial.print("Actual bit rate: ");
-    Serial.print(settings.actualBitRate());
-    Serial.println(" bit/s");
-    Serial.print("Exact bit rate ? ");
-    Serial.println(settings.exactBitRate() ? "yes" : "no");
-    Serial.print("Sample point: ");
-    Serial.print(settings.samplePointFromBitStart());
-    Serial.println("%");
+    Log.print("Bit Rate prescaler: ");
+    Log.println(settings.mBitRatePrescaler);
+    Log.print("Propagation Segment: ");
+    Log.println(settings.mPropagationSegment);
+    Log.print("Phase segment 1: ");
+    Log.println(settings.mPhaseSegment1);
+    Log.print("Phase segment 2: ");
+    Log.println(settings.mPhaseSegment2);
+    Log.print("SJW: ");
+    Log.println(settings.mSJW);
+    Log.print("Triple Sampling: ");
+    Log.println(settings.mTripleSampling ? "yes" : "no");
+    Log.print("Actual bit rate: ");
+    Log.print(settings.actualBitRate());
+    Log.println(" bit/s");
+    Log.print("Exact bit rate ? ");
+    Log.println(settings.exactBitRate() ? "yes" : "no");
+    Log.print("Sample point: ");
+    Log.print(settings.samplePointFromBitStart());
+    Log.println("%");
   }
   if (errorCode != 0)
   {
-    Serial.print("Configuration error 0x");
-    Serial.println(errorCode, HEX);
+    Log.print("Configuration error 0x");
+    Log.println(errorCode, HEX);
   }
 }
 
@@ -121,7 +119,7 @@ void processCan()
       // Switch off override if another controller sends messages on the network.
       Override = false;
 
-      WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
+      Log.println("Detected another controller on the network. Disabling Override");
     }
 
     /*************************************
@@ -227,7 +225,7 @@ void processCan()
       // Temperatures above 200 are considered invalid.
       if (temp > 200.0)
       {
-        WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
+        Log.println("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         return;
       };
 

@@ -7,6 +7,7 @@
 const uint TelnetServerPort = 23;
 WiFiServer TelnetServer(TelnetServerPort);
 WiFiClient TelnetRemoteClient;
+ConsoleWriter Log;
 
 //Checks for new Telnet connections
 void CheckForConnections()
@@ -30,17 +31,6 @@ void CheckForConnections()
       TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi.Hostname, WiFi.localIP().toString().c_str());
       TelnetRemoteClient.println("——————————————————————————");
     }
-  }
-}
-
-//Write messages to both Serial and Telnet Clients
-void WriteToConsoles(String message)
-{  
-  Serial.print(message);
-  //Print Message only if a client is connected and there is no data in the receive buffer.
-  if (TelnetRemoteClient.connected() && TelnetRemoteClient.available() == 0)
-  {
-    TelnetRemoteClient.print(message);
   }
 }
 

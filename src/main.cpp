@@ -73,7 +73,7 @@ void setup()
 
   if (!result)
   {
-    WriteToConsoles("Unable to read configuration.");
+    Log.println("Unable to read configuration.");
     return;
   }
 
@@ -205,9 +205,7 @@ void loop()
         commandedValues.Heating.BoostTimeCountdown--;
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG BOOST: Time: %i Left: %i \r\n", commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
-          String message(printbuf);
-          WriteToConsoles(message);
+          Log.printf("DEBUG BOOST: Time: %i Left: %i \r\n", commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
         }
       }
       else
@@ -224,7 +222,7 @@ void loop()
       if (!Override)
       {
         Override = true;
-        WriteToConsoles("No other controller on the network. Enabling Override.\r\n");
+        Log.println("No other controller on the network. Enabling Override.");
       }
     }
   }
@@ -264,9 +262,7 @@ void loop()
         msg.data[0] = !commandedValues.Heating.Active;
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating Economy: %d", currentStep, !commandedValues.Heating.Active);
-          String message(printbuf);
-          WriteToConsoles(message + "\r\n");
+          Log.printf("DEBUG STEP CHAIN #%i: Heating Economy: %d\r\n", currentStep, !commandedValues.Heating.Active);
         }
         break;
 
@@ -282,9 +278,7 @@ void loop()
         
         if (Debug)
         {
-          sprintf(printbuf, "DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
-          String message(printbuf);
-          WriteToConsoles(message + "\r\n");
+          Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
         }
 
         break;
@@ -359,7 +353,7 @@ void loop()
       {
         // Activate fallback
         ceraValues.Fallback.isOnFallback = true;
-        WriteToConsoles("Connection lost. Switching over to fallback mode!\r\n");
+        Log.println("Connection lost. Switching over to fallback mode!");
       }
 
       // Check if the profile has to be changed depending on the time schedule.
@@ -395,7 +389,7 @@ void loop()
     if (client.connected() && ceraValues.Fallback.isOnFallback)
     {
       ceraValues.Fallback.isOnFallback = false;
-      WriteToConsoles("Connection established. Switching over to SCADA!\r\n");
+      Log.println("Connection established. Switching over to SCADA!");
     }
 
     if (TimeIsSynced() && !AlarmIsSet)
@@ -426,10 +420,7 @@ void SendMessage(CANMessage msg)
   {
     if (Debug)
     {
-      sprintf(printbuf, "DEBUG STEP CHAIN #%i: Sending CAN Message", currentStep);
-      String message(printbuf);
-      WriteToConsoles(message + "\r\n");
-
+      Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
       WriteMessage(msg);
     }
     can.tryToSend(msg);
@@ -466,8 +457,7 @@ void WriteMessage(CANMessage msg)
   String consoleMessage(printbuf);
   consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
   consoleMessage += data;
-  WriteToConsoles(consoleMessage);
-  WriteToConsoles("\r\n");
+  Log.println(consoleMessage);
 }
 
 void SetDateTime()
@@ -490,9 +480,7 @@ void SetDateTime()
       msg.data[3] = 4;
       if (Debug)
       {
-        sprintf(printbuf, "DEBUG: Date and Time DOW:%i H:%i M:%i", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
-        String message(printbuf);
-        WriteToConsoles(message + "\r\n");
+        Log.printf("DEBUG: Date and Time DOW:%i H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
       }
 
       SendMessage(msg);

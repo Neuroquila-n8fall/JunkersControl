@@ -49,17 +49,14 @@ void ReadTemperatures()
             
             if (Debug)
             {
-                sprintf(printBuf, "DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
-                String message(printBuf);
-                WriteToConsoles(message);
+                Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
             }
         }
         else
         {
             if (Debug)
             {
-                sprintf(printBuf, "DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
-                WriteToConsoles(printBuf);
+                Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
             }
         }
     }
