@@ -54,6 +54,8 @@ struct CeraValues
     bool FlameLit = false;
     //-- Readings of the temperature sensor on the outside
     double OutsideTemperature = 0.00F;
+    //-- Received OutsideTemperature
+    bool HasReceivedOT = false;
     //-- Errorcode, if any, defaults to 0x0 as "operational"
     uint8_t Error = 0x000;
   } General;

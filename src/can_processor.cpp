@@ -216,12 +216,26 @@ void processCan()
       // Concat bytes 0 and 1 and divide the resulting INT by 100
       rawTemp = (Message.data[0] << 8) + Message.data[1];
       temp = rawTemp / 100.0;
+      
+      // Temperature Delta is too high
+      if(abs(ceraValues.General.OutsideTemperature - temp) > 30 && ceraValues.General.HasReceivedOT)
+      {
+        Log.printf("Detected a massive spike in Outside Temperature readings. Was %.2f is now %.2f. Check if the cabling is correct of both CAN Bus and Temperature Sensor!", ceraValues.General.OutsideTemperature, temp);
+        return;
+      }
+
       // Temperatures above 200 are considered invalid.
       if (temp > 200.0)
       {
         WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         return;
       };
+
+      if (!ceraValues.General.HasReceivedOT)
+      {
+        ceraValues.General.HasReceivedOT = true;
+      }
+
       ceraValues.General.OutsideTemperature = temp;
     }
 
