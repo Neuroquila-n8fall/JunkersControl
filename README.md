@@ -3,6 +3,7 @@
 ## Table of contents
 - [JunkersControl](#junkerscontrol)
   - [Table of contents](#table-of-contents)
+  - [Community](#community)
   - [Purpose and Aim](#purpose-and-aim)
     - [Cerasmart-er](#cerasmart-er)
   - [Contribution](#contribution)
@@ -13,6 +14,7 @@
   - [Features](#features)
     - [MQTT](#mqtt)
       - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
+      - [Examples & Detailed Explanation](#examples--detailed-explanation)
     - [Heating Parameters](#heating-parameters)
     - [Night/Economy Mode](#nighteconomy-mode)
       - [Option #1 (MQTT):](#option-1-mqtt)
@@ -29,14 +31,18 @@
     - [Valve-based control](#valve-based-control)
     - [OTA Updates and Console](#ota-updates-and-console)
   - [Hints](#hints)
-  - [Configuration / Setup](#configuration--setup)
+  - [Getting Started](#getting-started)
+    - [Configuration](#configuration-1)
   - [Dedicated PCB](#dedicated-pcb)
   - [Todo](#todo)
   - [Special Thanks](#special-thanks)
 
 ![Alt_Text](/assets/example_ha_dashboard.jpg)
 
-#NOTE: Documentation is being updated for recent changes.
+#NOTE: Documentation is still being updated for recent changes but the important bits are sorted.
+
+## Community
+You can reach out to us on [Discord](https://discord.gg/9Wrndbqu7t) where we can discuss and help eachother.
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -61,8 +67,14 @@ Just a few examples:
 - Bugs, of course
 
 ## Intended Audience
-Since every setup is different you have to customize the data processing for yourself. I have sourced the message ids from https://www.mikrocontroller.net/topic/81265 but only process those that are relevant to me.
-This means you should bring a little bit of coding experience with you.
+You might have to change things around so a little bit of coding experience will benefit you. Since the upgrade to a flexible configuration format, you will be able to tune the system to your needs without knowing much about software development.
+But you might find yourself in a situation where things don't work as expected. Feel free to open an issue so we can adapt things to your needs.
+
+Disclaimer:
+I have sourced the message ids from https://www.mikrocontroller.net/topic/81265 but only process those that are relevant to me.
+This means you should bring a little bit of patience and basic knowledge about your heating with you so you can actually make decisions about what IDs might be relevant to you or not.
+
+Also you should have Visual Studio Code ready and the extension [Platformio](https://platformio.org/) installed. We'll talk about that in detail in [Prerequisites](#prerequisites)
 
 
 ## A word of warning
@@ -82,9 +94,9 @@ Again, when in doubt, ask a technician.
 4) Direct access to the heating itself in case of problems.
 5) No, really, you shouldn't mess with things that aren't **yours**
 6) Ideally an ESP32 Kit but if you are just interested in the CAN-Stuff you can of course throw away all the MQTT and WiFi and just use a bog standard arduino.
-7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen")
+7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen"). Other boards with different controllers and transceivers may work too.
 8) A MQTT broker (i.e. Mosquitto)
-9) Visual Studio Code & Platform.IO Add-On are recommended!
+9) Visual Studio Code & [Platform.IO](https://platformio.org/) Add-On are recommended!
 10) Optional: DS18B20 Sensors
 
 ## Features
@@ -366,6 +378,8 @@ See the [Configuration](assets/Configuration.md) guide for details.
 
 WIP
 
+**Update 09-2022**: The bus is very picky about the choice of hardware. Multiple prototypes have been built and tested and further investigation is in progress. Another limitation is the amount of current the built-in power supply can deliver. This is slowing down hardware development even more.
+
 ## Todo
 - [x] Find a suitable CAN module and library that is able to handle 10kbit/s using the ESP32
 - [x] Debug output over Telnet
@@ -381,6 +395,10 @@ WIP
 - [x] Testing as a standalone solution
 - [x] Example Configuration for Home Assistant
 - [ ] Dedicated PCB with all components in place and power supply through the controller
+- [ ] Take more intelligent decisions for feed temperatures
+- [ ] Revamp fallback mode to make use of eztime
+- [ ] Make fallback mode more flexible and configurable
+- [ ] Restructure code into reusable classes
 
 ## Special Thanks
 - The people at the mikrocontroller.net forums
