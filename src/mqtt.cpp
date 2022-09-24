@@ -76,7 +76,7 @@ void setupMqttClient()
   client.setKeepAlive(10);
 }
 
-String boolToJsonValue(bool src)
+String boolToString(bool src)
 {
   return (src) ? "true" : "false";
 }
@@ -262,7 +262,7 @@ void PublishStatus()
     jsonObj = doc.createNestedObject("General");
   }
 
-  jsonObj["GasBurner"] = boolToJsonValue(ceraValues.General.FlameLit);
+  jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
 
   if (Debug)
@@ -316,11 +316,11 @@ void PublishHeatingTemperatures()
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
   jsonObj["FeedSetpoint"] = (Override) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
-  jsonObj["Pump"] = boolToJsonValue(ceraValues.Heating.PumpActive);
-  jsonObj["Season"] = boolToJsonValue(ceraValues.Heating.Season);
-  jsonObj["Working"] = boolToJsonValue(ceraValues.Heating.Active);
-  jsonObj["Boost"] = boolToJsonValue(commandedValues.Heating.Boost);
-  jsonObj["FastHeatup"] = boolToJsonValue(commandedValues.Heating.FastHeatup);
+  jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
+  jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
+  jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
+  jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
 
   if (Debug)
   {
@@ -376,8 +376,8 @@ void PublishWaterTemperatures()
   jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
   jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
   jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
-  jsonObj["Now"] = boolToJsonValue(ceraValues.Hotwater.Now);
-  jsonObj["Buffer"] = boolToJsonValue(ceraValues.Hotwater.BufferMode);
+  jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
+  jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
 
   if (Debug)
   {
@@ -430,7 +430,9 @@ void PublishAuxilaryTemperatures()
   for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
   {
     Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
-    jsonObj[curSensor.Label] = ceraValues.Auxilary.Temperatures[i];
+    JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
+    sensorVal["Temperature"] = ceraValues.Auxilary.Temperatures[i];
+    sensorVal["Reachable"] = boolToString(curSensor.reachable);
   }
 
   if (Debug)

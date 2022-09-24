@@ -80,6 +80,6 @@ extern void PublishStatus();
 extern void PublishHeatingTemperatures();
 extern void PublishWaterTemperatures();
 extern void PublishAuxilaryTemperatures();
-extern String boolToJsonValue(bool src);
+extern String boolToString(bool src);
 
 #endif
