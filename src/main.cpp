@@ -58,10 +58,6 @@ int currentStep = 0;
 
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 int dateTimeSendDelay = 30;
-// LED Helper Variables
-bool statusLed = false;
-bool wifiLed = false;
-bool mqttLed = false;
 
 void setup()
 {
@@ -93,16 +89,22 @@ void setup()
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
   pinMode(configuration.LEDs.WifiLed, OUTPUT);
   pinMode(configuration.LEDs.MqttLed, OUTPUT);
+  pinMode(configuration.LEDs.HeatingLed, OUTPUT);
+
+  //Test Leds
   digitalWrite(configuration.LEDs.StatusLed, HIGH);
-  statusLed = true;
   delay(1000);
   digitalWrite(configuration.LEDs.WifiLed, HIGH);
   delay(1000);
   digitalWrite(configuration.LEDs.MqttLed, HIGH);
+  delay(1000);
+  digitalWrite(configuration.LEDs.HeatingLed, HIGH);
   delay(100);
   digitalWrite(configuration.LEDs.WifiLed, LOW);
   delay(100);
   digitalWrite(configuration.LEDs.MqttLed, LOW);
+  delay(100);
+  digitalWrite(configuration.LEDs.HeatingLed, LOW);
 
   setupMqttClient();
 
@@ -171,27 +173,24 @@ void loop()
     // Blink Wifi LED
     if (!WiFi.isConnected())
     {
-      digitalWrite(configuration.LEDs.WifiLed, wifiLed ? HIGH : LOW);
-      wifiLed = !wifiLed;
+      digitalWrite(configuration.LEDs.WifiLed, !digitalRead(configuration.LEDs.WifiLed));
     }
     else
     {
       digitalWrite(configuration.LEDs.WifiLed, HIGH);
-      wifiLed = true;
     }
 
     // Blink MQTT LED
     if (!client.connected())
     {
-      digitalWrite(configuration.LEDs.MqttLed, mqttLed ? HIGH : LOW);
-      mqttLed = !mqttLed;
+      digitalWrite(configuration.LEDs.MqttLed, !digitalRead(configuration.LEDs.MqttLed));
     }
     else
     {
       digitalWrite(configuration.LEDs.MqttLed, HIGH);
-      mqttLed = true;
     }
 
+    // BLink LED if Pump is active but heating isn't. This means the heating is about to go off.
     if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
       digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
@@ -199,7 +198,12 @@ void loop()
 
     if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
     {
-      digitalWrite(configuration.LEDs.HeatingLed, 0);
+      digitalWrite(configuration.LEDs.HeatingLed, LOW);
+    }
+
+    if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
+    {
+      digitalWrite(configuration.LEDs.HeatingLed, HIGH);
     }
 
     // Boost Function
