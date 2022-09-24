@@ -22,6 +22,7 @@ struct Sensor
     char Label[255];
     bool UseAsReturnValueReference;
     DeviceAddress Address;
+    bool reachable;
 };
 
 struct Configuration
