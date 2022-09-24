@@ -82,6 +82,12 @@ void setup()
 
   // Resize the Temperature array
   ceraValues.Auxilary.Temperatures = (double *)malloc(configuration.TemperatureSensors.SensorCount * sizeof(double));
+  // Set initial values to zero.
+  for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+  {
+    ceraValues.Auxilary.Temperatures[i] = 0.0F;
+  }
+  
 
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
