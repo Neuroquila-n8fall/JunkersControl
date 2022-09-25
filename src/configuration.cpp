@@ -144,13 +144,30 @@ bool ReadConfiguration()
     configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char*>());   // "0x440"
     configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char*>());           // "0x407"
 
-    int AuxilarySensors_Count = doc["AuxilarySensors"]["Count"]; // 4
-    // This might cause trouble if too many sensors are added... we'll have to see where this is going.
-    configuration.TemperatureSensors.Sensors = (Sensor *)malloc(AuxilarySensors_Count * sizeof(Sensor));
 
     int curSensor = 0;
     bool tempReferenceSensorSet = false;
-    for (JsonObject AuxilarySensors_Sensor : doc["AuxilarySensors"]["Sensors"].as<JsonArray>())
+    
+    JsonArray sensors = doc["AuxilarySensors"]["Sensors"].as<JsonArray>();
+
+    const int sensorCount = sensors.size();
+
+    // Resize the Temperature array
+    ceraValues.Auxilary.Temperatures = (double *)malloc(sensorCount * sizeof(double));
+
+    // Set initial values to zero.
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    {
+        ceraValues.Auxilary.Temperatures[i] = 0.0F;
+    }
+
+    // Init Sensors: This might cause trouble if too many sensors are added... we'll have to see where this is going.
+    configuration.TemperatureSensors.Sensors = (Sensor *)malloc(sensorCount * sizeof(Sensor));
+
+    // Set the amount of sensors
+    configuration.TemperatureSensors.SensorCount = sensorCount;
+
+    for (JsonObject AuxilarySensors_Sensor : sensors)
     {
         Sensor newSensor;
         strlcpy(newSensor.Label, AuxilarySensors_Sensor["Label"], sizeof(newSensor.Label)); // true
@@ -177,8 +194,7 @@ bool ReadConfiguration()
             Log.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
         }
     }
-    // Set the amount of sensors
-    configuration.TemperatureSensors.SensorCount = AuxilarySensors_Count;
+
 
     // We don't need to keep it open at this point.
     SPIFFS.end();

@@ -3,6 +3,24 @@
 
 #include <Arduino.h>
 #include <ACAN2515.h>
+// General Configuration
+#include <configuration.h>
+// Include MQTT Topics
+#include <mqtt.h>
+// CAN Module Settings
+#include <can_processor.h>
+// Telnet
+#include <telnet.h>
+// Heating Parameters
+#include <heating.h>
+// WiFi
+#include <wifi_config.h>
+// OTA
+#include <ota.h>
+// Temperature Sensors
+#include <t_sensors.h>
+// NTP Timesync
+#include <timesync.h>
 
 // Mute MQTT Flag
 #ifndef MUTE_MQTT

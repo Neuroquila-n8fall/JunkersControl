@@ -3,24 +3,6 @@
 
 // Main Header
 #include <main.h>
-// General Configuration
-#include <configuration.h>
-// Include MQTT Topics
-#include <mqtt.h>
-// CAN Module Settings
-#include <can_processor.h>
-// Telnet
-#include <telnet.h>
-// Heating Parameters
-#include <heating.h>
-// WiFi
-#include <wifi_config.h>
-// OTA
-#include <ota.h>
-// Temperature Sensors
-#include <t_sensors.h>
-// NTP Timesync
-#include <timesync.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -76,14 +58,7 @@ void setup()
   Debug = configuration.General.Debug;
   controllerMessageTimeout = configuration.General.BusMessageTimeout;
 
-  // Resize the Temperature array
-  ceraValues.Auxilary.Temperatures = (double *)malloc(configuration.TemperatureSensors.SensorCount * sizeof(double));
-  // Set initial values to zero.
-  for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
-  {
-    ceraValues.Auxilary.Temperatures[i] = 0.0F;
-  }
-  
+
 
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);

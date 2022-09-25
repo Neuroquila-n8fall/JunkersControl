@@ -80,7 +80,6 @@
     },
     "AuxilarySensors":
     {
-        "Count": 4,
         "Sensors":
         [
             {
