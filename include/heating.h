@@ -147,6 +147,5 @@ extern CeraValues ceraValues;
 
 extern double CalculateFeedTemperature();
 extern int ConvertFeedTemperature(double temperature);
-extern void SetFeedTemperature();
 
 #endif
