@@ -97,7 +97,7 @@ void setup()
   lastSentMessageTime = millis();
 
   xTaskCreate(ReadTemperatures,"Read Aux Temp", 5000, NULL, 5, NULL);
-  
+
   xTaskCreate(ShowHeartbeat,"Heartbeat LED", 1000, NULL, 5, NULL);
 }
 
@@ -418,15 +418,14 @@ void SendMessage(CANMessage msg)
 
 void WriteMessage(CANMessage msg)
 {
-  char printbuf[255];
   // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
-  char dataBuf[12];
+  char dataBuf[32];
   String data;
 
   for (int x = 0; x < msg.len; x++)
   {
     // A little bit of trickery to assemble the data bytes into a nicely formatted string
-    sprintf(dataBuf, "0x%.2X (%i)", msg.data[x], msg.data[x]);
+    sprintf(dataBuf, "\e[1;35m0x%.2X \e[0m(\e[1;36m%i\e[0m)", msg.data[x], msg.data[x]);
     // Convert char array to string
     String temp(dataBuf);
     // Get rid of trailing spaces
@@ -440,12 +439,7 @@ void WriteMessage(CANMessage msg)
     }
   }
 
-  // Print string
-  sprintf(printbuf, "CAN: [0x%.3X] Data:\t", msg.id);
-  String consoleMessage(printbuf);
-  consoleMessage = myTZ.dateTime("[d-M-y H:i:s.v] - ") + consoleMessage;
-  consoleMessage += data;
-  Log.println(consoleMessage);
+  Log.printf("[%s]\t\e[0mCAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, data.c_str());
 }
 
 void SetDateTime()
