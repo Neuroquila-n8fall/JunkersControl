@@ -95,7 +95,10 @@ void setup()
   initSensors();
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
+
   xTaskCreate(ReadTemperatures,"Read Aux Temp", 5000, NULL, 5, NULL);
+  
+  xTaskCreate(ShowHeartbeat,"Heartbeat LED", 1000, NULL, 5, NULL);
 }
 
 void loop()
@@ -312,7 +315,6 @@ void loop()
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
     if (configuration.Features.Features_AuxilaryParameters)
     {
-      ReadTemperatures();
       PublishAuxilaryTemperatures();
     }
 
@@ -497,4 +499,19 @@ bool SafeToSendMessage(bool dontWaitForController /*= true*/)
     return (lastSentMessageTime - millis() >= 1000);
 
   return (lastHeatingMessageTime - millis() >= 1000 && lastSentMessageTime - millis() >= 1000);
+}
+
+void ShowHeartbeat(void *pvParameter)
+{
+  while(true)
+  {
+    digitalWrite(configuration.LEDs.StatusLed, HIGH);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    digitalWrite(configuration.LEDs.StatusLed, LOW);
+    vTaskDelay(250 / portTICK_PERIOD_MS);
+    digitalWrite(configuration.LEDs.StatusLed, HIGH);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    digitalWrite(configuration.LEDs.StatusLed, LOW);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
 }

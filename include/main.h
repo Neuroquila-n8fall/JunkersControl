@@ -34,6 +34,8 @@ extern CANMessage PrepareMessage(uint32_t id, int length = 8);
 extern void WriteMessage(CANMessage msg);
 extern bool SafeToSendMessage(bool dontWaitForController = true);
 
+extern void ShowHeartbeat(void *pvParameter);
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
