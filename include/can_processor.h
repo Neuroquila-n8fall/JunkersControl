@@ -16,6 +16,6 @@ extern ACAN2515 can;
 
 extern void setupCan();
 extern void processCan();
-extern void SetFeedTemperature(void *parameter);
+extern void SetFeedTemperature();
 
 #endif

@@ -95,6 +95,7 @@ void setup()
   initSensors();
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
+  xTaskCreate(ReadTemperatures,"Read Aux Temp", 5000, NULL, 5, NULL);
 }
 
 void loop()

@@ -31,35 +31,38 @@ void initSensors()
 }
 
 //Reads the attached temperature sensors and puts them into ceraValues.Auxilary
-void ReadTemperatures()
+void ReadTemperatures(void *pvParameters)
 {
-    char printBuf[255];
-    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    while (true)
     {
-        sensors.requestTemperatures();
-        float value = sensors.getTempC(configuration.TemperatureSensors.Sensors[i].Address);
-        if (value != DEVICE_DISCONNECTED_C)
+        for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
         {
-            configuration.TemperatureSensors.Sensors[i].reachable = true;
-            //Set Return Feed Reference
-            if (configuration.TemperatureSensors.Sensors[i].UseAsReturnValueReference)
+            sensors.requestTemperatures();
+            float value = sensors.getTempC(configuration.TemperatureSensors.Sensors[i].Address);
+            if (value != DEVICE_DISCONNECTED_C)
             {
-                ceraValues.Auxilary.FeedReturnTemperatureReference = value;
+                configuration.TemperatureSensors.Sensors[i].reachable = true;
+                // Set Return Feed Reference
+                if (configuration.TemperatureSensors.Sensors[i].UseAsReturnValueReference)
+                {
+                    ceraValues.Auxilary.FeedReturnTemperatureReference = value;
+                }
+
+                if (Debug)
+                {
+                    Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
+                }
             }
-            
-            if (Debug)
+            else
             {
-                Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
+                ceraValues.Auxilary.Temperatures[i] = 0.0F;
+                configuration.TemperatureSensors.Sensors[i].reachable = false;
+                if (Debug)
+                {
+                    Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
+                }
             }
         }
-        else
-        {
-            ceraValues.Auxilary.Temperatures[i] = 0.0F;
-            configuration.TemperatureSensors.Sensors[i].reachable = false;
-            if (Debug)
-            {
-                Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
-            }
-        }
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
