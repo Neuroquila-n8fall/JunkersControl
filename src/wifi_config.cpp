@@ -20,15 +20,15 @@ void connectWifi()
     //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
     //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
     WiFi.setHostname(configuration.Wifi.Hostname);
-    Serial.println("WiFi not connected. Reconnecting...");
+    log_w("WiFi not connected. Reconnecting...");
 
     if(Debug)
-    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
+    log_v("Connecting to %s using password %s and hostname %s", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
 
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
-      Serial.println("Connection Failed! Rebooting...");
+      log_e("Connection Failed! Rebooting...");
       delay(5000);
       ESP.restart();
     }
@@ -37,9 +37,6 @@ void connectWifi()
     printWifiStatus();
 
   }
-
-  //Sync time
-  SyncTimeIfRequired();
 
   unsigned long currentMillis = millis();
   //Print out WiFi Status
@@ -52,22 +49,18 @@ void connectWifi()
 
 void printWifiStatus()
 {
-  if (WiFi.isConnected() && Debug)
+  if (WiFi.isConnected())
     {
-      Serial.println("-------------------------------");
-      Serial.println("Wifi Connected");
-      Serial.print("SSID:\t");
-      Serial.println(WiFi.SSID());
-      Serial.print("IP Address:\t");
-      Serial.println(WiFi.localIP());
-      Serial.print("Mask:\t\t");
-      Serial.println(WiFi.subnetMask());
-      Serial.print("Gateway:\t");
-      Serial.println(WiFi.gatewayIP());
-      Serial.print("RSSI:\t\t");
-      Serial.println(WiFi.RSSI());
+      log_i("-------------------------------");
+      log_i("Wifi Connected");
+      log_i("SSID:\t%s",WiFi.SSID().c_str());
+      log_i("IP Address:\t%s",WiFi.localIP().toString());
+      log_i("Mask:\t%s", WiFi.subnetMask().toString());
+      log_i("Gateway:\t%s", WiFi.gatewayIP().toString());
+      log_i("RSSI:\t%idb", WiFi.RSSI());
 
       myTZ.setLocation(F("Europe/Berlin"));
-      Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
+      log_i("Time: [%s]", myTZ.dateTime().c_str());
+      log_i("-------------------------------");
     }
 }

@@ -14,7 +14,7 @@ extern bool AlarmIsSet;
 //  Functions
 //——————————————————————————————————————————————————————————————————————————————
 
-extern void SyncTimeIfRequired();
+extern void SyncTimeIfRequired(void *pvParameter);
 extern bool TimeIsSynced();
 extern void printWifiStatus();
 

@@ -72,14 +72,14 @@ extern CommandedValues commandedValues;
 //  Functions
 //——————————————————————————————————————————————————————————————————————————————
 
-extern void reconnectMqtt();
+extern void reconnectMqtt(void *parameter);
 extern String generateClientId();
 extern void setupMqttClient();
-extern void callback(char *topic, byte *payload, unsigned int length);
-extern void PublishStatus();
-extern void PublishHeatingTemperatures();
-extern void PublishWaterTemperatures();
-extern void PublishAuxilaryTemperatures();
+extern void MqttCallback(char *topic, byte *payload, unsigned int length);
+extern void PublishStatus(void *parameter);
+extern void PublishHeatingTemperatures(void *parameter);
+extern void PublishWaterTemperatures(void *parameter);
+extern void PublishAuxilaryTemperatures(void *parameter);
 extern String boolToString(bool src);
 
 #endif

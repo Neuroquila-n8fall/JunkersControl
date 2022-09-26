@@ -29,7 +29,7 @@ bool ReadConfiguration()
 
     if (!SPIFFS.exists(configFileName))
     {
-        Log.println("Configuration file could not be found. Please upload it first.");
+        log_e("Configuration file could not be found. Please upload it first.");
         return false;
     }
 
@@ -37,7 +37,7 @@ bool ReadConfiguration()
 
     if (!file)
     {
-        Log.println("Configuration file could not be loaded. Consider checking and reuploading it.");
+        log_e("Configuration file could not be loaded. Consider checking and reuploading it.");
         return false;
     }
 
@@ -48,13 +48,8 @@ bool ReadConfiguration()
 
     if (error)
     {
-        Log.printf("Error processing configuration: %s\r\n", error.c_str());
+        log_e("Error processing configuration: %s", error.c_str());
         return false;
-    }
-
-    if (Debug)
-    {
-        serializeJsonPretty(doc, Log);
     }
 
     strlcpy(configuration.Wifi.SSID, doc["Wifi"]["SSID"], sizeof(configuration.Wifi.SSID));             // "ssid"
@@ -147,7 +142,7 @@ bool ReadConfiguration()
 
     int curSensor = 0;
     bool tempReferenceSensorSet = false;
-    
+
     JsonArray sensors = doc["AuxilarySensors"]["Sensors"].as<JsonArray>();
 
     const int sensorCount = sensors.size();
@@ -184,14 +179,14 @@ bool ReadConfiguration()
         {
             if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
             {
-                Log.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.");
+                log_w("Sensor #%i is set as temperature reference but another sensor has been already set.");
             }            
             if(newSensor.UseAsReturnValueReference)
             {
-                Log.println("INFO: The following sensor will be used as a return temperature reference.");
+                log_i("The following sensor will be used as a return temperature reference.");
                 tempReferenceSensorSet = true;
             }
-            Log.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
+            log_i("Added Sensor #%i with Label '%s'", curSensor, newSensor.Label);
         }
     }
 
