@@ -28,46 +28,11 @@
 #endif
 
 extern void SendMessage(CANMessage msg);
-extern void SetEconomyMode(void *parameter);
-extern void SetGuidance(void *parameter);
-extern void SetFeedTemperatureTask(void *parameter);
-extern void SetDhwNow(void *parameter);
+extern void SetDateTime();
 extern void Reboot();
 extern CANMessage PrepareMessage(uint32_t id, int length = 8);
 extern void WriteMessage(CANMessage msg);
 extern bool SafeToSendMessage(bool dontWaitForController = true);
-extern void UpdateLeds(void *parameter);
-extern void HeatingHousekeeping(void *parameter);
-extern void PublishValues(void *parameter);
-extern void SetDateTime(void *parameter);
-extern void WriteMessage(CANMessage msg);
-extern void KeepAlive(void *parameter);
-extern void SetDhwSetpoint(void *parameter);
-extern void ShowHeartbeat(void *pvParameter);
-extern int _log_vprintf(const char *fmt, va_list args);
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Task Handles
-//——————————————————————————————————————————————————————————————————————————————
-
-extern TaskHandle_t HeatingHousekeepingHandle;
-extern TaskHandle_t UpdateLedsHandle;
-extern TaskHandle_t ReadTemperaturesHandle;
-extern TaskHandle_t PublishTemperaturesHandle;
-extern TaskHandle_t PublishHeatingHandle;
-extern TaskHandle_t PublishWaterHandle;
-extern TaskHandle_t PublishStatusHandle;
-extern TaskHandle_t RegularMqttHandle;
-extern TaskHandle_t ReconnectMqttHandle;
-
-extern TaskHandle_t SetEconomyModeHandle;
-extern TaskHandle_t SetGuidanceHandle;
-extern TaskHandle_t SetFeedTemperatureTaskHandle;
-extern TaskHandle_t SetDhwNowHandle;
-extern TaskHandle_t SetDateTimeHandle;
-extern TaskHandle_t KeepAliveHandle;
-extern TaskHandle_t SetDhwSetpointHandle;
-extern TaskHandle_t SyncTimeTaskHandle;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -88,13 +53,14 @@ extern bool Debug;
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
 
-static bool writingToConsoles = false;
-
 //-- WiFi Status Timer Variable
 extern unsigned long wifiConnectMillis;
 
 //-- Last Controller Message timer
 extern unsigned long controllerMessageTimer;
+
+//-- Step-Counter
+extern int currentStep;
 
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 extern int dateTimeSendDelay;
@@ -123,5 +89,7 @@ extern unsigned long lastSentMessageTime;
 #define runEverySeconds(t) for (static uint32_t _lasttime;\
     (uint32_t)((uint32_t)millis() - _lasttime) >= (t) * 1000;\
     _lasttime += (t) * 1000)
+
+
 
 #endif

@@ -63,13 +63,13 @@ void SetupAutodiscovery(const char *fileName)
     // Init SPIFFS
     if (!SPIFFS.begin())
     {
-        log_d("SPIFFS Filesystem not ready.");
+        Log.println("SPIFFS Filesystem not ready.");
         return;
     }
 
     if (!SPIFFS.exists(fileName))
     {
-        log_d("HA Autodiscovery file could not be found. Please upload it first.");
+        Log.println("HA Autodiscovery file could not be found. Please upload it first.");
         return;
     }
 
@@ -77,7 +77,7 @@ void SetupAutodiscovery(const char *fileName)
 
     if (!file)
     {
-        log_d("HA Autodiscovery file could not be loaded. Consider checking and reuploading it.");
+        Log.println("HA Autodiscovery file could not be loaded. Consider checking and reuploading it.");
         return;
     }
 
@@ -89,23 +89,24 @@ void SetupAutodiscovery(const char *fileName)
 
     if (error)
     {
-        log_e("deserializeJson() failed: %s", error.c_str());
+        Log.print("deserializeJson() failed: ");
+        Log.println(error.c_str());
         return;
     }
     if (Debug)
-        log_d("///----- Reading HA AD Config -----");
+        Log.println("///----- Reading HA AD Config -----");
     // Sensor Type Category Block: Sensor, Binary Sensor, ...
     for (JsonPair SensorCategory : sensors)
     {
         if (Debug)
-            log_d("%s", SensorCategory.key().c_str());
+            Log.println(SensorCategory.key().c_str());
         // Sensor Device Specific Category like Heating, Water, ...
         JsonObject CurCategoryObj = doc[SensorCategory.key().c_str()].as<JsonObject>();
 
         for (JsonPair InternalDevCategory : CurCategoryObj)
         {
             if (Debug)
-                log_d("\t%s", InternalDevCategory.key().c_str());
+                Log.printf("\t%s\r\n", InternalDevCategory.key().c_str());
             // Specific Internal Device Category Config
             JsonArray CurSensorObject = CurCategoryObj[InternalDevCategory.key().c_str()].as<JsonArray>();
 
@@ -118,7 +119,7 @@ void SetupAutodiscovery(const char *fileName)
                     break;
                 }
                 if (Debug)
-                    log_d("\t\t%s", curKey);
+                    Log.printf("\t\t%s\r\n", curKey);
 
                 JsonObject CurrentSensor = SensorConfig[curKey];
                 String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + SensorCategory.key().c_str() + "/" + configuration.HomeAssistant.DeviceId + "/" + curKey + "/config";
@@ -143,7 +144,7 @@ void SetupAutodiscovery(const char *fileName)
                 size_t n = serializeJson(CurrentSensor, buffer);
                 if (Debug)
                 {
-                    log_d("%s", discoveryTopic.c_str());
+                    Log.println(discoveryTopic);
                     serializeJsonPretty(CurrentSensor, Serial);
                 };
                 client.publish(discoveryTopic.c_str(), buffer, n);
@@ -152,7 +153,7 @@ void SetupAutodiscovery(const char *fileName)
     }
 
     if (Debug)
-        log_d("----- HA AD Config END -----///");
+        Log.println("----- HA AD Config END -----///");
 
     // Close SPIFFS.
     SPIFFS.end();

@@ -18,6 +18,4 @@ extern void setupCan();
 extern void processCan();
 extern void SetFeedTemperature(void *parameter);
 
-static int CanTransmitErrors = 0;
-
 #endif

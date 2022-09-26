@@ -73,7 +73,7 @@ double CalculateFeedTemperature()
             scaledTemp = map_Generic(commandedValues.Heating.ValveOpening, 0, commandedValues.Heating.MaxValveOpening, commandedValues.Heating.MinimumFeedTemperature + dynamicAdaption, ceraValues.Heating.FeedMaximum);
             if (Debug)
             {
-                log_d("Valve Scaled + Dyn. Adapt.: %.2f (Including %.2f Adaption)", scaledTemp, dynamicAdaption);
+                Log.printf("DEBUG SET TEMP: Valve Scaled + Dyn. Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, dynamicAdaption);
             }
         }
         // Otherwise calculate the temperature based upon the fixed adaption value
@@ -83,7 +83,7 @@ double CalculateFeedTemperature()
             scaledTemp = map_Generic(commandedValues.Heating.ValveOpening, 0, commandedValues.Heating.MaxValveOpening, commandedValues.Heating.MinimumFeedTemperature + commandedValues.Heating.FeedAdaption, ceraValues.Heating.FeedMaximum);
             if (Debug)
             {
-                log_d("DEBUG SET TEMP: Valve Scaled + Static Adapt.: %.2f (Including %.2f Adaption)", scaledTemp, commandedValues.Heating.FeedAdaption);
+                Log.printf("DEBUG SET TEMP: Valve Scaled + Static Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, commandedValues.Heating.FeedAdaption);
             }
         }
 
@@ -161,7 +161,7 @@ double CalculateFeedTemperature()
 
             if (Debug)
             {
-                log_d("DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f", commandedValues.Heating.AmbientTemperature, commandedValues.Heating.TargetAmbientTemperature, fhTemp);
+                Log.printf("DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f \r\n", commandedValues.Heating.AmbientTemperature, commandedValues.Heating.TargetAmbientTemperature, fhTemp);
             }
 
             // Check if the calculated temperature is higher than the reported maximum feed temperature.
@@ -169,7 +169,7 @@ double CalculateFeedTemperature()
             {
                 if (Debug)
                 {
-                    log_d("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible!");
+                    Log.println("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible!");
                 }
                 // Something went wrong. We should play it safe and return the default value instead.
                 return linearTemp;
@@ -187,7 +187,7 @@ double CalculateFeedTemperature()
 
     if (Debug)
     {
-        log_i("%.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f", ceraValues.General.OutsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
+        Log.printf("DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f\r\n", ceraValues.General.OutsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
     }
     return halfRounded;
 }

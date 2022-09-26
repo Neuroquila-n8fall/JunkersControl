@@ -30,60 +30,63 @@ ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 double temp = 0.00F;
 
 // Simply takes all current states into account and dispatches the setpoint message immediately.
-void SetFeedTemperature(void *parameter)
+void SetFeedTemperature()
 {
-  log_v("Begin Task");
-  while (true)
+  CANMessage msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint,1);
+  char printbuf[255];
+  int feedSetpoint = 0;
+
+  // Get raw Setpoint
+  commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
+
+  // Transform it into the int representation
+  feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
+
+  if (Debug)
   {
-
-    CANMessage msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint, 1);
-    char printbuf[255];
-    int feedSetpoint = 0;
-
-    // Get raw Setpoint
-    commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
-
-    // Transform it into the int representation
-    feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
-
-    if (Debug)
-    {
-      log_i("Feed Setpoint is %.2f, INT representation (half steps) is %i", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
-    }
-
-    msg.data[0] = feedSetpoint;
-    // Wait before sending anything
-    while (!SafeToSendMessage)
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-    SendMessage(msg);
-
-    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
   }
+
+  msg.data[0] = feedSetpoint;
+
+  SendMessage(msg);
 }
 
 void setupCan()
 {
-  log_v("Setting up Can Interface");
   SPI.begin(MCP2515_SCK, MCP2515_MISO, MCP2515_MOSI);
-  uint32_t frequency = configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL;
+  uint32_t frequency = configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL; // 16 MHz
   ACAN2515Settings settings(frequency, 10UL * 1000UL); // CAN bit rate 10 kb/s
+
   const uint16_t errorCode = can.begin(settings, []
                                        { can.isr(); });
   if (errorCode == 0 && Debug)
   {
-    log_i("Bit Rate prescaler: %i", settings.mBitRatePrescaler);
-    log_i("Propagation Segment: %i", settings.mPropagationSegment);
-    log_i("Phase segment 1: %i", settings.mPhaseSegment1);
-    log_i("Phase segment 2: %i", settings.mPhaseSegment2);
-    log_i("SJW: %i", settings.mSJW);
-    log_i("Triple Sampling: %s", settings.mTripleSampling ? "yes" : "no");
-    log_i("Actual bit rate: %ibit/s", settings.actualBitRate());
-    log_i("Exact bit rate ? %s", settings.exactBitRate() ? "yes" : "no");
-    log_i("Sample point: %i%", settings.samplePointFromBitStart());
+    Log.print("Bit Rate prescaler: ");
+    Log.println(settings.mBitRatePrescaler);
+    Log.print("Propagation Segment: ");
+    Log.println(settings.mPropagationSegment);
+    Log.print("Phase segment 1: ");
+    Log.println(settings.mPhaseSegment1);
+    Log.print("Phase segment 2: ");
+    Log.println(settings.mPhaseSegment2);
+    Log.print("SJW: ");
+    Log.println(settings.mSJW);
+    Log.print("Triple Sampling: ");
+    Log.println(settings.mTripleSampling ? "yes" : "no");
+    Log.print("Actual bit rate: ");
+    Log.print(settings.actualBitRate());
+    Log.println(" bit/s");
+    Log.print("Exact bit rate ? ");
+    Log.println(settings.exactBitRate() ? "yes" : "no");
+    Log.print("Sample point: ");
+    Log.print(settings.samplePointFromBitStart());
+    Log.println("%");
   }
   if (errorCode != 0)
   {
-    log_e("Configuration error 0x%02x", errorCode);
+    Log.print("Configuration error 0x");
+    Log.println(errorCode, HEX);
   }
 }
 
@@ -100,6 +103,10 @@ void processCan()
       WriteMessage(Message);
     }
 
+    // Buffer for sending console output. 100 chars should be enough for now:
+    //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
+    char printBuf[100];
+
     // Check for other controllers on the network by watching out for messages that are greater than 0x250
     if (Message.id > 0x250 && Message.id < 0x260)
     {
@@ -112,7 +119,7 @@ void processCan()
       // Switch off override if another controller sends messages on the network.
       Override = false;
 
-      log_i("[%s]\t Detected another controller on the network. Disabling Override", myTZ.dateTime("d-M-y H:i:s.v").c_str());
+      Log.println("Detected another controller on the network. Disabling Override");
     }
 
     /*************************************
@@ -211,14 +218,14 @@ void processCan()
       // Temperature Delta is too high
       if(abs(ceraValues.General.OutsideTemperature - temp) > 30 && ceraValues.General.HasReceivedOT)
       {
-        log_w("[%s]\t Detected a massive spike in Outside Temperature readings. Was %.2f is now %.2f. Check if the cabling is correct of both CAN Bus and Temperature Sensor!", myTZ.dateTime("d-M-y H:i:s.v").c_str(), ceraValues.General.OutsideTemperature, temp);
+        Log.printf("Detected a massive spike in Outside Temperature readings. Was %.2f is now %.2f. Check if the cabling is correct of both CAN Bus and Temperature Sensor!", ceraValues.General.OutsideTemperature, temp);
         return;
       }
 
       // Temperatures above 200 are considered invalid.
       if (temp > 200.0)
       {
-        log_w("[%s]\t Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.", myTZ.dateTime("d-M-y H:i:s.v").c_str());
+        Log.println("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         return;
       };
 

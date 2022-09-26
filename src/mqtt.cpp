@@ -14,50 +14,45 @@ PubSubClient client(espClient);
 
 CommandedValues commandedValues;
 
-// (Re)connect to MQTT broker
-void reconnectMqtt(void *parameter)
+// \brief (Re)connect to MQTT broker
+void reconnectMqtt()
 {
-  log_v("[%s]\t Begin Task", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-  // Task runs in infinite loop.
-  while (true)
+  if (!WiFi.isConnected())
   {
-    if (!WiFi.isConnected())
+    Serial.println("Can't connect to MQTT broker. [No Network]");
+    return;
+  }
+
+  // Loop until we're reconnected
+  while (!client.connected())
+  {
+
+    Serial.print("Attempting MQTT connection...");
+
+    String clientId = generateClientId();
+    // Attempt to connect
+    if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
     {
-      log_e("[%s]\t Can't connect to MQTT broker. [No Network]", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-      return;
-    }
+      Serial.println("connected");
 
-    // Loop until we're reconnected
-    while (!client.connected())
-    {
-
-      log_i("[%s]\t Attempting MQTT connection...", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-
-      String clientId = generateClientId();
-      // Attempt to connect
-      if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
+      // Subscribe to parameters.
+      client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
+      client.subscribe(configuration.Mqtt.Topics.WaterParameters);
+      client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+      if (configuration.HomeAssistant.Enabled)
       {
-        log_i("[%s]\t MQTT connected", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-
-        // Subscribe to parameters.
-        client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
-        client.subscribe(configuration.Mqtt.Topics.WaterParameters);
-        client.subscribe(configuration.Mqtt.Topics.StatusRequest);
-        if (configuration.HomeAssistant.Enabled)
-        {
-          SetupAutodiscovery(HaSensorsFileName);
-          SetupAutodiscovery(HaBinarySensorsFileName);
-        }
-      }
-      else
-      {
-        log_e("[%s]\t MQTT connection failed, rc=%i. Trying again in 5 Seconds.", myTZ.dateTime("d-M-y H:i:s.v").c_str(), client.state());
-        // Wait 5 seconds before retrying
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        SetupAutodiscovery(HaSensorsFileName);
+        SetupAutodiscovery(HaBinarySensorsFileName);
       }
     }
-    log_v("Stack Diff: %i", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    else
+    {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
   }
 }
 
@@ -75,10 +70,9 @@ String generateClientId()
 
 void setupMqttClient()
 {
-  log_v("Setting up MQTT");
   // Setup MQTT client
   client.setServer(configuration.Mqtt.Server, configuration.Mqtt.Port);
-  client.setCallback(MqttCallback);
+  client.setCallback(callback);
   client.setKeepAlive(10);
 }
 
@@ -88,7 +82,7 @@ String boolToString(bool src)
 }
 
 // Callback for MQTT subscribed topics
-void MqttCallback(char *topic, byte *payload, unsigned int length)
+void callback(char *topic, byte *payload, unsigned int length)
 {
   payload[length] = '\0';
   String s = String((char *)payload);
@@ -106,7 +100,7 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      log_e("[%s]\t [Status Request] Error Processing JSON: %s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), error.c_str());
+      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
     /* Example JSON:
@@ -122,24 +116,24 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
     bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
     bool Status = doc["Status"];                             // false
 
-    if (HeatingTemperatures && PublishHeatingHandle == NULL)
+    if (HeatingTemperatures)
     {
-      xTaskCreate(PublishHeatingTemperatures, "Pub Heat Temp", 5000, NULL, 1, &PublishHeatingHandle);
+      PublishHeatingTemperatures();
     }
 
-    if (WaterTemperatures && PublishWaterHandle == NULL)
+    if (WaterTemperatures)
     {
-      xTaskCreate(PublishWaterTemperatures, "Pub HW Temp", 5000, NULL, 1, &PublishWaterHandle);
+      PublishWaterTemperatures();
     }
 
-    if (AuxilaryTemperatures && PublishTemperaturesHandle == NULL)
+    if (AuxilaryTemperatures)
     {
-      xTaskCreate(PublishAuxilaryTemperatures, "Pub AUX Temp", 5000, NULL, 1, &PublishTemperaturesHandle);
+      PublishAuxilaryTemperatures();
     }
 
-    if (Status && PublishStatusHandle == NULL)
+    if (Status)
     {
-      xTaskCreate(PublishStatus, "Pub Status", 5000, NULL, 1, &PublishStatusHandle);
+      PublishStatus();
     }
   }
 
@@ -177,7 +171,7 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      log_e("[%s]\t [Heating Parameters] Error Processing JSON: %s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), error.c_str());
+      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
 
@@ -217,10 +211,7 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
 
     // Dispatch Feed Setpoint immediately
     if (setFeedImmediately)
-    {
-      vTaskDelete(SetFeedTemperatureTaskHandle);
-      xTaskCreate(SetFeedTemperature, "Set Feed Temp", 3000, NULL, 1, &SetFeedTemperatureTaskHandle);
-    }
+      SetFeedTemperature();
 
     // Receiving Water Parameters
     if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
@@ -239,7 +230,7 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
 
       if (error)
       {
-        log_e("[%s]\t [Water Parameters] Error Processing JSON: %s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), error.c_str());
+        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
         return;
       }
 
@@ -249,214 +240,183 @@ void MqttCallback(char *topic, byte *payload, unsigned int length)
   }
 }
 
-void PublishStatus(void *parameter)
+void PublishStatus()
 {
-  log_v("[%s]\t Begin Task", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-  while (true)
+  /* Example JSON
   {
-    /* Example JSON
-    {
-        "GasBurner": true,
-        "Pump": true,
-        "Error": 0..255,
-        "Season": true,
-        "Working": true,
-        "Boost": true,
-        "FastHeatup": true
-    }
-    */
-    StaticJsonDocument<384> doc;
-    JsonObject jsonObj = doc.to<JsonObject>();
+      "GasBurner": true,
+      "Pump": true,
+      "Error": 0..255,
+      "Season": true,
+      "Working": true,
+      "Boost": true,
+      "FastHeatup": true
+  }
+  */
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
 
-    // Create a parent block for HA
-    if (configuration.HomeAssistant.Enabled)
-    {
-      jsonObj = doc.createNestedObject("General");
-    }
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("General");
+  }
 
-    jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
-    jsonObj["Error"] = ceraValues.General.Error;
+  jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
+  jsonObj["Error"] = ceraValues.General.Error;
 
-    if (Debug)
-    {
-      char buf[384];
-      serializeJsonPretty(doc, buf);
-      log_i("[%s]\t [MQTT - SEND Status]\r\n%s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), buf);
-    }
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND STATUS]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
 
-    // Mute Flag Set. Don't send message.
-    if (MUTE_MQTT == 1)
-      return;
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
-    // Publish Data on MQTT
-    char buffer[768];
-    size_t n = serializeJson(doc, buffer);
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
 
-    // Send to HA state topic or the configured topic, when HA is disabled.
-    if (configuration.HomeAssistant.Enabled)
-    {
-      String topic = configuration.HomeAssistant.StateTopic + "General/state";
-      client.publish(topic.c_str(), buffer, n);
-    }
-    else
-    {
-      client.publish(configuration.Mqtt.Topics.Status, buffer, n);
-    }
-    log_v("Stack Diff: %i", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    String topic = configuration.HomeAssistant.StateTopic + "General/state";
+    client.publish(topic.c_str(), buffer, n);
+  }
+  else
+  {
+    client.publish(configuration.Mqtt.Topics.Status, buffer, n);
   }
 }
 
-void PublishHeatingTemperatures(void *parameters)
+void PublishHeatingTemperatures()
 {
-  log_v("[%s]\t Begin Task", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-  while (true)
+  /* Example JSON
   {
-    /* Example JSON
-      {
-          "FeedMaximum": 75.10,
-          "FeedCurrent": 30.10,
-          "FeedSetpoint": 10.10,
-          "Outside": 15.10
-      }
-      */
+      "FeedMaximum": 75.10,
+      "FeedCurrent": 30.10,
+      "FeedSetpoint": 10.10,
+      "Outside": 15.10
+  }
+  */
 
-    StaticJsonDocument<384> doc;
-    JsonObject jsonObj = doc.to<JsonObject>();
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
 
-    // Create a parent block for HA
-    if (configuration.HomeAssistant.Enabled)
-    {
-      jsonObj = doc.createNestedObject("Heating");
-    }
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("Heating");
+  }
 
-    jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
-    jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
-    jsonObj["FeedSetpoint"] = (Override) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
-    jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
-    jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
-    jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
-    jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
-    jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
-    jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
+  jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+  jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
+  jsonObj["FeedSetpoint"] = (Override) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
+  jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
+  jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
+  jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
+  jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
+  jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
 
-    if (Debug)
-    {
-      char buf[384];
-      serializeJsonPretty(doc, buf);
-      log_i("[%s]\t [MQTT - SEND Heating]\r\n%s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), buf);
-    }
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND HEATING]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
 
-    // Mute Flag Set. Don't send message.
-    if (MUTE_MQTT == 1)
-      return;
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
-    // Publish Data on MQTT
-    char buffer[768];
-    size_t n = serializeJson(doc, buffer);
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
 
-    // Send to HA state topic or the configured topic, when HA is disabled.
-    if (configuration.HomeAssistant.Enabled)
-    {
-      String topic = configuration.HomeAssistant.StateTopic + "Heating/state";
-      client.publish(topic.c_str(), buffer, n);
-    }
-    else
-    {
-      client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
-    }
-    // Run only once if this feature has been disabled.
-    if (!configuration.Features.Features_HeatingParameters)
-    {
-      vTaskDelete(PublishHeatingHandle);
-      return;
-    }
-    log_v("Stack Diff: %i", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    String topic = configuration.HomeAssistant.StateTopic + "Heating/state";
+    client.publish(topic.c_str(), buffer, n);
+  }
+  else
+  {
+    client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
   }
 }
 
-void PublishWaterTemperatures(void *parameter)
+void PublishWaterTemperatures()
 {
-  log_v("[%s]\t Begin Task", myTZ.dateTime("d-M-y H:i:s.v").c_str());
-  while (true)
+  // TODO: Gather HW temperatures
+  /* Example JSON
+    {
+      "Maximum": 75.10,
+      "Current": 30.10,
+      "Setpoint": 10.10,
+      "CFSetpoint": 20.00,
+      "Now": true,
+      "Buffer": false
+    }
+  */
+
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
   {
-    // TODO: Gather HW temperatures
-    /* Example JSON
-      {
-        "Maximum": 75.10,
-        "Current": 30.10,
-        "Setpoint": 10.10,
-        "CFSetpoint": 20.00,
-        "Now": true,
-        "Buffer": false
-      }
-    */
+    jsonObj = doc.createNestedObject("Water");
+  }
 
-    StaticJsonDocument<384> doc;
-    JsonObject jsonObj = doc.to<JsonObject>();
+  jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
+  jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
+  jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
+  jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+  jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
+  jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
 
-    // Create a parent block for HA
-    if (configuration.HomeAssistant.Enabled)
-    {
-      jsonObj = doc.createNestedObject("Water");
-    }
+  if (Debug)
+  {
+    Log.println("//START\r\n[MQTT - SEND WATER]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
+  }
 
-    jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
-    jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
-    jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
-    jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
-    jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
-    jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
-    if (Debug)
-    {
-      char buf[384];
-      serializeJsonPretty(doc, buf);
-      log_i("[%s]\t [MQTT - SEND Water]\r\n%s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), buf);
-    }
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
 
-    // Mute Flag Set. Don't send message.
-    if (MUTE_MQTT == 1)
-      return;
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    String topic = configuration.HomeAssistant.StateTopic + "Water/state";
+    client.publish(topic.c_str(), buffer, n);
+  }
+  else
+  {
 
-    // Publish Data on MQTT
-    char buffer[768];
-    size_t n = serializeJson(doc, buffer);
-
-    // Send to HA state topic or the configured topic, when HA is disabled.
-    if (configuration.HomeAssistant.Enabled)
-    {
-      String topic = configuration.HomeAssistant.StateTopic + "Water/state";
-      client.publish(topic.c_str(), buffer, n);
-    }
-    else
-    {
-
-      client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
-    }
-    // Run only once if this feature has been disabled.
-    if (!configuration.Features.Features_WaterParameters)
-    {
-      vTaskDelete(PublishWaterHandle);
-      return;
-    }
-    log_v("Stack Diff: %i", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
   }
 }
 
-void PublishAuxilaryTemperatures(void *parameter)
+void PublishAuxilaryTemperatures()
 {
-  log_v("[%s]\t Begin Task", myTZ.dateTime("d-M-y H:i:s.v").c_str());
   /*
-   {
-       "Feed": 30.10,
-       "Return": 30.10,
-       "Exhaust": 50.10,
-       "Ambient": 17.10
-   }
-   */
+  {
+      "Feed": 30.10,
+      "Return": 30.10,
+      "Exhaust": 50.10,
+      "Ambient": 17.10
+  }
+  */
 
   StaticJsonDocument<384> doc;
   JsonObject jsonObj = doc.to<JsonObject>();
@@ -477,9 +437,9 @@ void PublishAuxilaryTemperatures(void *parameter)
 
   if (Debug)
   {
-    char buf[384];
-    serializeJsonPretty(doc, buf);
-    log_i("[%s]\t [MQTT - SEND Aux]\r\n%s", myTZ.dateTime("d-M-y H:i:s.v").c_str(), buf);
+    Log.println("//START\r\n[MQTT - SEND AUX]");
+    serializeJsonPretty(doc, Log);
+    Log.println("//END");
   }
 
   // Mute Flag Set. Don't send message.
@@ -500,12 +460,4 @@ void PublishAuxilaryTemperatures(void *parameter)
   {
     client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
   }
-  // Run only once if this feature has been disabled.
-  if (!configuration.Features.Features_AuxilaryParameters)
-  {
-    vTaskDelete(PublishTemperaturesHandle);
-    return;
-  }
-  log_v("Stack Diff: %i", uxTaskGetStackHighWaterMark(NULL));
-  vTaskDelete(NULL);
 }
