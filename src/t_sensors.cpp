@@ -42,6 +42,7 @@ void ReadTemperatures(void *pvParameters)
             float value = sensors.getTempC(configuration.TemperatureSensors.Sensors[i].Address);
             if (value != DEVICE_DISCONNECTED_C)
             {
+                ceraValues.Auxilary.Temperatures[i] = value;
                 configuration.TemperatureSensors.Sensors[i].reachable = true;
                 // Set Return Feed Reference
                 if (configuration.TemperatureSensors.Sensors[i].UseAsReturnValueReference)

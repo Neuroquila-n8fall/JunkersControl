@@ -134,7 +134,7 @@ struct CeraValues
 
   struct Auxilary_
   {
-    double *Temperatures;
+    float *Temperatures;
     double FeedReturnTemperatureReference;
   } Auxilary;
 };

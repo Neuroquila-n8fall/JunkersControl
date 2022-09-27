@@ -153,7 +153,7 @@ bool ReadConfiguration()
     const int sensorCount = sensors.size();
 
     // Resize the Temperature array
-    ceraValues.Auxilary.Temperatures = (double *)malloc(sensorCount * sizeof(double));
+    ceraValues.Auxilary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
 
     // Set initial values to zero.
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
