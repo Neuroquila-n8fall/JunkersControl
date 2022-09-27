@@ -68,6 +68,15 @@ struct CommandedValues
 
 extern CommandedValues commandedValues;
 
+enum LogLevel
+{
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Verbose
+};
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
 //——————————————————————————————————————————————————————————————————————————————
@@ -80,6 +89,8 @@ extern void PublishStatus();
 extern void PublishHeatingTemperatures();
 extern void PublishWaterTemperatures();
 extern void PublishAuxilaryTemperatures();
+extern void ShowActivityLed();
 extern String boolToString(bool src);
+extern void PublishLog(const char *msg, const char *func, LogLevel level);
 
 #endif

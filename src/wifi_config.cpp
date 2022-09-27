@@ -22,7 +22,7 @@ void connectWifi()
     WiFi.setHostname(configuration.Wifi.Hostname);
     Serial.println("WiFi not connected. Reconnecting...");
 
-    if(Debug)
+    if(DebugMode)
     Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
 
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
@@ -33,7 +33,7 @@ void connectWifi()
       ESP.restart();
     }
 
-    if(Debug)
+    if(DebugMode)
     printWifiStatus();
 
   }
@@ -52,7 +52,7 @@ void connectWifi()
 
 void printWifiStatus()
 {
-  if (WiFi.isConnected() && Debug)
+  if (WiFi.isConnected() && DebugMode)
     {
       Serial.println("-------------------------------");
       Serial.println("Wifi Connected");

@@ -35,9 +35,10 @@ void ReadTemperatures(void *pvParameters)
 {
     while (true)
     {
+        sensors.requestTemperatures();
         for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
         {
-            sensors.requestTemperatures();
+            
             float value = sensors.getTempC(configuration.TemperatureSensors.Sensors[i].Address);
             if (value != DEVICE_DISCONNECTED_C)
             {
@@ -48,7 +49,7 @@ void ReadTemperatures(void *pvParameters)
                     ceraValues.Auxilary.FeedReturnTemperatureReference = value;
                 }
 
-                if (Debug)
+                if (DebugMode)
                 {
                     Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
                 }
@@ -57,7 +58,7 @@ void ReadTemperatures(void *pvParameters)
             {
                 ceraValues.Auxilary.Temperatures[i] = 0.0F;
                 configuration.TemperatureSensors.Sensors[i].reachable = false;
-                if (Debug)
+                if (DebugMode)
                 {
                     Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
                 }

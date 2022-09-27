@@ -84,6 +84,7 @@ String boolToString(bool src)
 // Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
+  ShowActivityLed();
   payload[length] = '\0';
   String s = String((char *)payload);
   if (!s)
@@ -140,7 +141,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Receiving Heating Parameters
   if (strcmp(topic, configuration.Mqtt.Topics.HeatingParameters) == 0)
   {
-
     /*
     Example Json:
     {
@@ -242,6 +242,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
 void PublishStatus()
 {
+  ShowActivityLed();
   /* Example JSON
   {
       "GasBurner": true,
@@ -265,7 +266,7 @@ void PublishStatus()
   jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
 
-  if (Debug)
+  if (DebugMode)
   {
     Log.println("//START\r\n[MQTT - SEND STATUS]");
     serializeJsonPretty(doc, Log);
@@ -290,10 +291,13 @@ void PublishStatus()
   {
     client.publish(configuration.Mqtt.Topics.Status, buffer, n);
   }
+
+
 }
 
 void PublishHeatingTemperatures()
 {
+  ShowActivityLed();
   /* Example JSON
   {
       "FeedMaximum": 75.10,
@@ -314,7 +318,7 @@ void PublishHeatingTemperatures()
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
-  jsonObj["FeedSetpoint"] = (Override) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
+  jsonObj["FeedSetpoint"] = (OverrideControl) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
   jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
   jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
@@ -322,7 +326,7 @@ void PublishHeatingTemperatures()
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
 
-  if (Debug)
+  if (DebugMode)
   {
     Log.println("//START\r\n[MQTT - SEND HEATING]");
     serializeJsonPretty(doc, Log);
@@ -351,6 +355,7 @@ void PublishHeatingTemperatures()
 
 void PublishWaterTemperatures()
 {
+  ShowActivityLed();
   // TODO: Gather HW temperatures
   /* Example JSON
     {
@@ -379,7 +384,7 @@ void PublishWaterTemperatures()
   jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
   jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
 
-  if (Debug)
+  if (DebugMode)
   {
     Log.println("//START\r\n[MQTT - SEND WATER]");
     serializeJsonPretty(doc, Log);
@@ -409,6 +414,7 @@ void PublishWaterTemperatures()
 
 void PublishAuxilaryTemperatures()
 {
+  ShowActivityLed();
   /*
   {
       "Feed": 30.10,
@@ -435,7 +441,7 @@ void PublishAuxilaryTemperatures()
     sensorVal["Reachable"] = boolToString(curSensor.reachable);
   }
 
-  if (Debug)
+  if (DebugMode)
   {
     Log.println("//START\r\n[MQTT - SEND AUX]");
     serializeJsonPretty(doc, Log);
@@ -459,5 +465,28 @@ void PublishAuxilaryTemperatures()
   else
   {
     client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
+  }
+}
+
+void PublishLog(const char *msg, const char *func, LogLevel level)
+{
+  const size_t size = 1024;
+  StaticJsonDocument<size> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["lvl"] = level;
+  root["fnc"] = func;
+  root["msg"] = msg;
+  char buf[size];
+
+  size_t n = serializeJson(doc, buf);
+
+  client.publish("cerasmarter/log", buf, n);
+}
+
+void ShowActivityLed()
+{
+  if (MqttActivityHandle == NULL)
+  {
+    xTaskCreate(ShowMqttActivity, "MQTT Activity", 2000, NULL, 1, &MqttActivityHandle);
   }
 }

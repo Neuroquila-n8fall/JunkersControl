@@ -10,18 +10,21 @@
 
 // This flag enables the control of the heating. It will be automatically reset to FALSE if another controller sends messages
 //   It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
-bool Override = true;
+bool OverrideControl = true;
 
 // Controller Message Timeout
 //   After this timeout this controller will take over control.
 int controllerMessageTimeout = 30000;
 
 // Set this to true to view debug info
-bool Debug = true;
+bool DebugMode = true;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
+
+TaskHandle_t MqttActivityHandle;
+TaskHandle_t CanErrorActivityHandle;
 
 //-- WiFi Status Timer Variable
 unsigned long wifiConnectMillis = 0L;
@@ -55,7 +58,7 @@ void setup()
     return;
   }
 
-  Debug = configuration.General.Debug;
+  DebugMode = configuration.General.Debug;
   controllerMessageTimeout = configuration.General.BusMessageTimeout;
 
 
@@ -96,9 +99,15 @@ void setup()
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
 
-  xTaskCreate(ReadTemperatures,"Read Aux Temp", 5000, NULL, 5, NULL);
+  xTaskCreate(ReadTemperatures,"Read Aux Temp", 4096, NULL, 5, NULL);
 
-  xTaskCreate(ShowHeartbeat,"Heartbeat LED", 1000, NULL, 5, NULL);
+  xTaskCreate(ShowHeartbeat,"Heartbeat LED", 1024, NULL, 5, NULL);
+
+  xTaskCreate(ShowMqttActivity, "MQTT Activity", 2048, NULL, 5, &MqttActivityHandle);
+
+  xTaskCreate(UpdateLeds, "Update LEDs", 2048, NULL, 5, NULL);
+
+  xTaskCreate(TrackBoostFunction, "Track Boost", 2048, NULL, 1, NULL);
 }
 
 void loop()
@@ -131,86 +140,22 @@ void loop()
   // Set Date & Time
   SetDateTime();
 
-  //
-  runEveryMilliseconds(500)
-  {
-    if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
-    {
-      digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
-    }
-  }
-
   //——————————————————————————————————————————————————————————————————————————————
   // Actions performed every second
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(1)
   {
-    char printbuf[255];
     // Ensure that we are connected to MQTT
     reconnectMqtt();
-
-    // Blink Wifi LED
-    if (!WiFi.isConnected())
-    {
-      digitalWrite(configuration.LEDs.WifiLed, !digitalRead(configuration.LEDs.WifiLed));
-    }
-    else
-    {
-      digitalWrite(configuration.LEDs.WifiLed, HIGH);
-    }
-
-    // Blink MQTT LED
-    if (!client.connected())
-    {
-      digitalWrite(configuration.LEDs.MqttLed, !digitalRead(configuration.LEDs.MqttLed));
-    }
-    else
-    {
-      digitalWrite(configuration.LEDs.MqttLed, HIGH);
-    }
-
-    // BLink LED if Pump is active but heating isn't. This means the heating is about to go off.
-    if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
-    {
-      digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
-    }
-
-    if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
-    {
-      digitalWrite(configuration.LEDs.HeatingLed, LOW);
-    }
-
-    if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
-    {
-      digitalWrite(configuration.LEDs.HeatingLed, HIGH);
-    }
-
-    // Boost Function
-    if (commandedValues.Heating.Boost)
-    {
-      // Countdown to zero and switch off boost if 0
-      if (commandedValues.Heating.BoostTimeCountdown > 0)
-      {
-        commandedValues.Heating.BoostTimeCountdown--;
-        if (Debug)
-        {
-          Log.printf("DEBUG BOOST: Time: %i Left: %i \r\n", commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
-        }
-      }
-      else
-      {
-        commandedValues.Heating.Boost = false;
-      }
-    }
 
     // If we didn't spot a controller message on the network for x seconds we will take over control.
     // As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
     if (currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
     {
       // Bail out if we already set this...
-      if (!Override)
+      if (!OverrideControl)
       {
-        Override = true;
+        OverrideControl = true;
         Log.println("No other controller on the network. Enabling Override.");
       }
     }
@@ -223,8 +168,6 @@ void loop()
   // TODO: Seek for a more elegant solution to send each message every 30 seconds. Right now it's 5 because we have 6 Steps and we want an interval of 30 seconds so 30/6 = 5 seconds delay.
   runEverySeconds(5)
   {
-    char printbuf[255];
-
     // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
     if (SafeToSendMessage)
     {
@@ -249,7 +192,7 @@ void loop()
         // Switch economy mode. This is always the opposite of the desired operational state
         msg = PrepareMessage(configuration.CanAddresses.Heating.Economy, 1);
         msg.data[0] = !commandedValues.Heating.Active;
-        if (Debug)
+        if (DebugMode)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Heating Economy: %d\r\n", currentStep, !commandedValues.Heating.Active);
         }
@@ -265,7 +208,7 @@ void loop()
       case 2:
         SetFeedTemperature();
         
-        if (Debug)
+        if (DebugMode)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
         }
@@ -276,17 +219,29 @@ void loop()
       case 3:
         msg = PrepareMessage(configuration.CanAddresses.HotWater.Now, 1);
         msg.data[0] = 0x01;
+        if (DebugMode)
+        {
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Now to %s\r\n", currentStep, ceraValues.Hotwater.Now ? "ON" : "OFF");
+        }
         break;
 
       // DHW Temperature Setpoint
       case 4:
         msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
         msg.data[0] = 20;
+        if (DebugMode)
+        {
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, configuration.CanAddresses.HotWater.SetpointTemperature);
+        }
         break;
 
       case 5:
         // Request? Data
         msg = PrepareMessage(0xF9, 0);
+        if (DebugMode)
+        {
+          Log.printf("DEBUG STEP CHAIN #%i: Sending KeepAlive\r\n", currentStep);
+        }
         break;
 
       default:
@@ -402,16 +357,39 @@ void Reboot()
 
 void SendMessage(CANMessage msg)
 {
-  char printbuf[255];
+  static int CanSendErrorCount;
   // Send message if not empty and override is true.
-  if (msg.id != 0 && Override)
+  if (msg.id != 0 && OverrideControl)
   {
-    if (Debug)
+    if (DebugMode)
     {
       Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
       WriteMessage(msg);
     }
-    can.tryToSend(msg);
+    if(!can.tryToSend(msg))
+    {
+      if(CanErrorActivityHandle == NULL)
+      {
+        xTaskCreate(ShowCanError,"Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
+      }
+      Log.printf("[%s] Failed to send message [0x%.3X] over CAN. This has happened %i times before in a row.\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, CanSendErrorCount++);
+      char logMsg[64];
+      sprintf(logMsg,"CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount++);
+      PublishLog(logMsg, __func__, LogLevel::Error);
+    }
+    else
+    {
+      CanSendErrorCount = 0;
+      if (CanErrorActivityHandle != NULL)
+      {
+        vTaskDelete(CanErrorActivityHandle);
+        CanErrorActivityHandle = NULL;
+
+      char logMsg[50];
+      sprintf(logMsg,"CAN send error CLEARED", msg.id, CanSendErrorCount++);
+      PublishLog(logMsg, __func__, LogLevel::Info);
+      }
+    }
     lastSentMessageTime = millis();
   }
 }
@@ -419,7 +397,7 @@ void SendMessage(CANMessage msg)
 void WriteMessage(CANMessage msg)
 {
   // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
-  char dataBuf[32];
+  char dataBuf[255];
   String data;
 
   for (int x = 0; x < msg.len; x++)
@@ -460,7 +438,7 @@ void SetDateTime()
       msg.data[2] = myTZ.minute();
       // As of now we don't know what this value is for but it seems mandatory.
       msg.data[3] = 4;
-      if (Debug)
+      if (DebugMode)
       {
         Log.printf("DEBUG: Date and Time DOW:%i H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
       }
@@ -506,6 +484,102 @@ void ShowHeartbeat(void *pvParameter)
     digitalWrite(configuration.LEDs.StatusLed, HIGH);
     vTaskDelay(500 / portTICK_PERIOD_MS);
     digitalWrite(configuration.LEDs.StatusLed, LOW);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
+void ShowMqttActivity(void *pvParameter)
+{
+  digitalWrite(configuration.LEDs.MqttLed,LOW);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(configuration.LEDs.MqttLed,HIGH);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(configuration.LEDs.MqttLed,LOW);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(configuration.LEDs.MqttLed,HIGH);
+  MqttActivityHandle = NULL;
+  vTaskDelete(NULL);  
+}
+
+void ShowCanError(void *pvParameter)
+{
+  while(true)
+  {
+    digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
+    vTaskDelay(500);
+  }
+}
+
+void UpdateLeds(void *pvParameter)
+{
+  while (true)
+  {
+    // Blink Wifi LED
+    if (!WiFi.isConnected())
+    {
+      digitalWrite(configuration.LEDs.WifiLed, !digitalRead(configuration.LEDs.WifiLed));
+    }
+    else
+    {
+      digitalWrite(configuration.LEDs.WifiLed, HIGH);
+    }
+
+    if (MqttActivityHandle == NULL)
+    {
+      // Blink MQTT LED
+      if (!client.connected())
+      {
+        digitalWrite(configuration.LEDs.MqttLed, !digitalRead(configuration.LEDs.MqttLed));
+      }
+      else
+      {
+        digitalWrite(configuration.LEDs.MqttLed, HIGH);
+      }
+    }
+
+    if (CanErrorActivityHandle == NULL)
+    {
+      // BLink LED if Pump is active but heating isn't. This means the heating is about to go off.
+      if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
+      {
+        digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
+      }
+
+      if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
+      {
+        digitalWrite(configuration.LEDs.HeatingLed, LOW);
+      }
+
+      if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
+      {
+        digitalWrite(configuration.LEDs.HeatingLed, HIGH);
+      }
+    }
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
+void TrackBoostFunction(void *pvParameter)
+{
+  while (true)
+  {
+    // Boost Function
+    if (commandedValues.Heating.Boost)
+    {
+      // Countdown to zero and switch off boost if 0
+      if (commandedValues.Heating.BoostTimeCountdown > 0)
+      {
+        commandedValues.Heating.BoostTimeCountdown--;
+        if (DebugMode)
+        {
+          Log.printf("[%s][%s] Time: %i Left: %i \r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), __func__ , commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
+        }
+      }
+      else
+      {
+        commandedValues.Heating.Boost = false;
+      }
+    }
     vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
 }

@@ -35,6 +35,12 @@ extern void WriteMessage(CANMessage msg);
 extern bool SafeToSendMessage(bool dontWaitForController = true);
 
 extern void ShowHeartbeat(void *pvParameter);
+extern TaskHandle_t MqttActivityHandle;
+extern void ShowMqttActivity(void *pvParameter);
+extern TaskHandle_t CanErrorActivityHandle;
+extern void ShowCanError(void *pvParameter);
+extern void UpdateLeds(void *pvParameter);
+extern void TrackBoostFunction(void *pvParameter);
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -42,14 +48,14 @@ extern void ShowHeartbeat(void *pvParameter);
 
 //This flag enables the control of the heating. It will be automatically reset to FALSE if another controller sends messages
 //  It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
-extern bool Override;
+extern bool OverrideControl;
 
 //Controller Message Timeout
 //  After this timeout this controller will take over control.
 extern int controllerMessageTimeout;
 
 //Set this to true to view debug info
-extern bool Debug;
+extern bool DebugMode;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables

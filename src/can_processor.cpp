@@ -42,7 +42,7 @@ void SetFeedTemperature()
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
-  if (Debug)
+  if (DebugMode)
   {
     Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
   }
@@ -60,7 +60,7 @@ void setupCan()
 
   const uint16_t errorCode = can.begin(settings, []
                                        { can.isr(); });
-  if (errorCode == 0 && Debug)
+  if (errorCode == 0 && DebugMode)
   {
     Log.print("Bit Rate prescaler: ");
     Log.println(settings.mBitRatePrescaler);
@@ -98,14 +98,10 @@ void processCan()
   {
     unsigned long curMillis = millis();
 
-    if (Debug || configuration.General.Sniffing)
+    if (DebugMode || configuration.General.Sniffing)
     {
       WriteMessage(Message);
     }
-
-    // Buffer for sending console output. 100 chars should be enough for now:
-    //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
-    char printBuf[100];
 
     // Check for other controllers on the network by watching out for messages that are greater than 0x250
     if (Message.id > 0x250 && Message.id < 0x260)
@@ -113,11 +109,11 @@ void processCan()
       controllerMessageTimer = curMillis;
 
       // Bail out if we're already disabled.
-      if (!Override)
+      if (!OverrideControl)
         return;
 
       // Switch off override if another controller sends messages on the network.
-      Override = false;
+      OverrideControl = false;
 
       Log.println("Detected another controller on the network. Disabling Override");
     }
