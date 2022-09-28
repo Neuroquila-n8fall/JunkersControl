@@ -8,9 +8,7 @@
 #include <timesync.h>
 #include <configuration.h>
 
-//-- Preprocessor 
-#define ST(A) #A
-#define STR(A) ST(A)
+
 //-- Set CS Pin via Build Flag
 #ifndef MCP2515_CS
 #define MCP2515_CS 5

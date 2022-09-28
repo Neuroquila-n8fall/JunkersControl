@@ -22,10 +22,22 @@
 // NTP Timesync
 #include <timesync.h>
 
+#include <ESPmDNS.h>
+
 // Mute MQTT Flag
 #ifndef MUTE_MQTT
 #define MUTE_MQTT 0
 #endif
+
+// Environment
+#ifndef ENV
+#define ENV "NOT_SET"
+#endif
+
+//-- Preprocessor 
+#define ST(A) #A
+#define STR(A) ST(A)
+
 
 extern void SendMessage(CANMessage msg);
 extern void SetDateTime();

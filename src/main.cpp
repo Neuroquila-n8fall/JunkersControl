@@ -44,10 +44,12 @@ int currentStep = 0;
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 int dateTimeSendDelay = 30;
 
+
 void setup()
 {
   // Setup Serial
   Serial.begin(115200);
+  Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
 
   // Read configuration
   bool result = ReadConfiguration();
