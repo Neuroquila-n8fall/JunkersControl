@@ -178,7 +178,6 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     const int docSize = 384;
     StaticJsonDocument<docSize> doc;
-    bool setFeedImmediately = false;
     DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
@@ -218,10 +217,6 @@ void callback(char *topic, byte *payload, unsigned int length)
       commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
     if (!doc["OnDemandBoostDuration"].isNull())
       commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
-
-    // Dispatch Feed Setpoint immediately
-    if (setFeedImmediately)
-      SetFeedTemperature();
 
     // Receiving Water Parameters
     if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
