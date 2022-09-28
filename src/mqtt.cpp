@@ -19,7 +19,7 @@ void reconnectMqtt()
 {
   if (!WiFi.isConnected())
   {
-    Serial.println("Can't connect to MQTT broker. [No Network]");
+    Log.println("Can't connect to MQTT broker. [No Network]");
     return;
   }
 
@@ -27,13 +27,13 @@ void reconnectMqtt()
   while (!client.connected())
   {
 
-    Serial.print("Attempting MQTT connection...");
+    Log.print("Attempting MQTT connection...");
 
     String clientId = generateClientId();
     // Attempt to connect
     if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
     {
-      Serial.println("connected");
+      Log.println("connected");
 
       // Subscribe to parameters.
       client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
@@ -47,9 +47,9 @@ void reconnectMqtt()
     }
     else
     {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      Log.print("failed, rc=");
+      Log.print(client.state());
+      Log.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
