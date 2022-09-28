@@ -174,6 +174,7 @@ Because we are now looking at the environment temperature(s) and we know what th
 The base point now represents the outside temperature at which the heating should use the maximum possible feed temperature as dialed in by the heating circuit dial on the heating itself
 The end point is basically the temperature at which the heating should switch off.
 ![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
+
 *In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
 
 See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" temperature 
@@ -211,6 +212,7 @@ Due to the natural lag of a heating system you should fire this function before 
 ### Fast Heatup
 Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTemperature`) to a given target value (`commandedValues.Heating.TargetAmbientTemperature`) and sets the feed temperature to maximum (`ceraValues.Heating.FeedMaximum`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. 
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
+
 *This is how the fast heatup function works visually*
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
