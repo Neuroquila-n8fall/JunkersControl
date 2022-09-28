@@ -1,0 +1,6 @@
+{
+    "HeatingTemperatures": true,
+    "WaterTemperatures": true,
+    "AuxilaryTemperatures": true,
+    "Status": true
+}

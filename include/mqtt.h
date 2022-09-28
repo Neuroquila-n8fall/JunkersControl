@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
-#include <arduino_secrets.h>
 #include <wifi_config.h>
 
 //——————————————————————————————————————————————————————————————————————————————
@@ -11,167 +10,72 @@
 //——————————————————————————————————————————————————————————————————————————————
 extern PubSubClient client;
 
-//-- MQTT Endpoint
-extern const char *mqttServer;
-extern const char *mqttUsername;
-extern const char *mqttPassword;
+struct CommandedValues
+{
+    struct Heating_
+    {
+        //-- Feed Temperature Setpoint
+        double FeedSetpoint = 40.00F;
+        //-- Calculated Feed Temperature
+        double CalculatedFeedSetpoint = 40.0F;
+        //-- Minimum Feed Temperature
+        double FeedMinimum = 10.0F;
+        // Basepoint Temperature
+        double BasepointTemperature = -10.0F;
+        // Endpoint Temperature
+        double EndpointTemperature = 31.0F;
+        // Ambient Temperature
+        double AmbientTemperature = 17.0F;
+        // FastHeatup will keep the heating on maximum feed setpoint until this temperature has been reached.
+        double TargetAmbientTemperature = 21.5F;
+        // Feed Temperature Adaption Value. Increases or decreases the target feed temperature
+        double FeedAdaption = 0.00F;
+        // Minimum ("Anti Freeze") Temperature.
+        double MinimumFeedTemperature = 10.0F;
+        // Whether the heating should be off or not
+        bool Active = true;
+        // Auxilary Temperature
+        double AuxilaryTemperature = 0.00F;
+        // Boost will max the feed temperature for BoostTime seconds
+        bool Boost = false;
+        // Boost Duration (Seconds)
+        int BoostDuration = 300;
+        // Countdown variable for boost control.
+        int BoostTimeCountdown = BoostDuration;
+        // Fast Heatup. This will max out the feed temperature for a prolongued time until TargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
+        bool FastHeatup = false;
+        // Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
+        double ReferenceAmbientTemperature = 17.0F;
+        // Dynamic Adaption Flag
+        bool DynamicAdaption = false;
+        // Take the value from commandedValues.Heating.FeedSetpoint instead of doing built-in calculations.
+        bool OverrideSetpoint = false;
+        // Enable scaling based upon valve opening
+        bool ValveScaling = false;
+        // Maximum valve opening. 80% for Homematic eTRV-2
+        int MaxValveOpening = 80;
+        // The value of the valve that is most open
+        int ValveOpening = 0;
+    } Heating;
 
-//——————————————————————————————————————————————————————————————————————————————
-//  MQTT Topics
-//——————————————————————————————————————————————————————————————————————————————
+    struct HotWater_
+    {
+        //-- Setpoint (Target Temperature) for DHW
+        int SetPoint = 40.0F;
+    } HotWater;
 
-//-- Subscriptions
+};
 
-//Example Topic
-extern const char subTopic_Example[];
+extern CommandedValues commandedValues;
 
-//Heating ON|OFF Control
-extern const char subscription_OnOff[];
-
-//Heating Setpoint Feed
-extern const char subscription_FeedSetpoint[];
-
-//Heating Adaption: The Outside temperature at which hcMaxFeed should be reached
-extern const char subscription_FeedBaseSetpoint[];
-
-//Heating Adaption: The Outside temperature at which the minimum temperature should be set
-extern const char subscription_FeedCutOff[];
-
-//Heating Adaption: Minimum Temperature of Feed (Anti-Freeze)
-extern const char subscription_FeedMinimum[];
-
-//Secondary Outside Temperature Source
-extern const char subscription_AuxTemperature[];
-
-//Ambient Temperature Source
-extern const char subscription_AmbientTemperature[];
-
-//Ambient Temperature Target
-extern const char subscription_TargetAmbientTemperature[];
-
-//On-Demand Boost.
-extern const char subscription_OnDemandBoost[];
-
-//On-Demand Boost: Time in seconds
-extern const char subscription_OnDemandBoostDuration[];
-
-//Fast-Heatup
-extern const char subscription_FastHeatup[];
-
-//Adaption
-extern const char subscription_Adaption[];
-
-//Valve Scaling
-extern const char subscription_ValveScaling[];
-
-//Valve Scaling Max Opening
-extern const char subscription_ValveScalingMaxOpening[];
-
-//Valve Scaling Current Top Opening Value
-extern const char subscription_ValveScalingOpening[];
-
-//Dynamic Adaption based on return temperature sensor and desired target room temperature
-//  This enables a mode in which the feed temperature will be decreased when the return temperature is much higher than required
-//  This is useful when the heating is much more capable than required.
-//  Example: The return Temperature is 40°, the desired room temperature is 21°: The Adaption is -19° --> Feed setpoint is decreased by 19°
-//  Another one: The Return temperature is 20°, the desired room temperature is 21°: The Adaption is +1° --> Feed setpoint increased by 1°
-extern const char subscription_DynamicAdaption[];
-
-extern const char subscription_OverrideSetpoint[];
-
-//-- Published Topics
-
-//Maximum Feed Temperature
-extern const char pub_HcMaxFeedTemperature[];
-
-//Current Feed Temperature
-extern const char pub_CurFeedTemperature[];
-
-//Setpoint of feed Temperature
-extern const char pub_SetpointFeedTemperature[];
-
-//The Temperature on the Outside
-extern const char pub_OutsideTemperature[];
-
-//Flame status
-extern const char pub_GasBurner[];
-
-//Heating Circuit Pump Status
-extern const char pub_HcPump[];
-
-//General Error Flag
-extern const char pub_Error[];
-
-//Seasonal Operation Flag
-extern const char pub_Season[];
-
-//Heating Operating
-extern const char pub_HcOperation[];
-
-//Boost
-extern const char pub_Boost[];
-
-//Fast Heatup
-extern const char pub_Fastheatup[];
-
-//-- Topics for Temperature Sensor Readings
-
-//Feed Temperature Topic
-extern const char pub_SensorFeed[];
-
-//Return Temperature Topic
-extern const char pub_SensorReturn[];
-
-//Exhaust Temperature Topic
-extern const char pub_SensorExhaust[];
-
-//Ambient Temperature Topic
-extern const char pub_SensorAmbient[];
-
-//——————————————————————————————————————————————————————————————————————————————
-//  Variables
-//——————————————————————————————————————————————————————————————————————————————
-
-//-- Variables set by MQTT subscriptions with factory defaults at startup
-
-//Feed Temperature
-extern double mqttFeedTemperatureSetpoint;
-//Basepoint Temperature
-extern double mqttBasepointTemperature;
-//Endpoint Temperature
-extern double mqttEndpointTemperature;
-//Ambient Temperature
-extern double mqttAmbientTemperature;
-//Target Ambient Temperature to reach
-extern double mqttTargetAmbientTemperature;
-//Feed Temperature Adaption Value. Increases or decreases the target feed temperature
-extern double mqttFeedAdaption;
-//Minimum ("Anti Freeze") Temperature.
-extern double mqttMinimumFeedTemperature;
-//Whether the heating should be off or not
-extern bool mqttHeatingSwitch;
-//Auxilary Temperature
-extern double mqttAuxilaryTemperature;
-//Boost will max the feed temperature for mqttBoostTime seconds
-extern bool mqttBoost;
-//Boost Duration (Seconds)
-extern int mqttBoostDuration;
-//Countdown variable for boost control.
-extern int boostTimeCountdown;
-//Fast Heatup. This will max out the feed temperature for a prolongued time until mqttTargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
-extern bool mqttFastHeatup;
-//Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
-extern double mqttReferenceAmbientTemperature;
-//Dynamic Adaption Flag
-extern bool mqttDynamicAdaption;
-//Take the value from mqttFeedTemperatureSetpoint instead of doing built-in calculations.
-extern bool mqttOverrideSetpoint;
-//Enable scaling based upon valve opening
-extern bool mqttValveScaling;
-//Maximum valve opening. 80% for Homematic eTRV-2
-extern int mqttMaxValveOpening;
-//The value of the valve that is most open
-extern int mqttValveOpening;
+enum LogLevel
+{
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Verbose
+};
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
@@ -181,5 +85,12 @@ extern void reconnectMqtt();
 extern String generateClientId();
 extern void setupMqttClient();
 extern void callback(char *topic, byte *payload, unsigned int length);
+extern void PublishStatus();
+extern void PublishHeatingTemperaturesAndStatus();
+extern void PublishWaterTemperatures();
+extern void PublishAuxilaryTemperatures();
+extern void ShowActivityLed();
+extern String boolToString(bool src);
+extern void PublishLog(const char *msg, const char *func, LogLevel level);
 
 #endif

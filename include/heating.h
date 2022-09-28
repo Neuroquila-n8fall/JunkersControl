@@ -4,12 +4,11 @@
 #include <Arduino.h>
 #include <main.h>
 
-
 //——————————————————————————————————————————————————————————————————————————————
 //  Structs
 //——————————————————————————————————————————————————————————————————————————————
 
-//Represents a very basic structure of a time scheduler entry. It is used by the fallback mechanism.
+// Represents a very basic structure of a time scheduler entry. It is used by the fallback mechanism.
 typedef struct HeatingScheduleEntry_
 {
   int StartHour;
@@ -18,89 +17,129 @@ typedef struct HeatingScheduleEntry_
   bool heat;
 } HeatingScheduleEntry;
 
-//——————————————————————————————————————————————————————————————————————————————
-//  Constants for heating control
-//——————————————————————————————————————————————————————————————————————————————
+// @brief Holds the current temperatures and settings
+struct CeraValues
+{
 
-//Basepoint for linear temperature calculation
-extern const int calcHeatingBasepoint;
+  //-- Heating Circuit Values
+  struct Heating_
+  {
+    //-- Max. Feed Temperature
+    double FeedMaximum = 75.00F;
+    //-- Current Feed Temperature
+    double FeedCurrent = 0.00F;
+    //-- Feed Temperature Setpoint
+    double FeedSetpoint = 40.00F;
+    //-- Minimum Feed Temperature as reported by the boiler
+    double FeedMinimum = 10.0F;
+    //-- Max. possible water temperature -or- target temperature when running in heating Buffer mode
+    double BufferWaterTemperatureMaximum = 0.0F;
+    //-- Current Water Temperature (Buffer Mode)
+    double BufferWaterTemperatureCurrent = 0.0F;
+    //-- Circulation Pump Active
+    bool PumpActive = false;
+    //-- Seasonal Mode: True = Summer | False = Winter
+    bool Season = false;
+    //-- Heating active / operational
+    bool Active = true;
+    //-- Analog value of heating power
+    int HeatingPower = 0;
+    //-- Economy Setting
+    bool Economy = false;
+  } Heating;
+  //-- General Values, i.e. Flame, Error, ...
+  struct General_
+  {
+    //-- Flame status as reported by the gas burner
+    bool FlameLit = false;
+    //-- Readings of the temperature sensor on the outside
+    double OutsideTemperature = 0.00F;
+    //-- Received OutsideTemperature
+    bool HasReceivedOT = false;
+    //-- Errorcode, if any, defaults to 0x0 as "operational"
+    uint8_t Error = 0x000;
+  } General;
+  //-- Domestic Hot Water (DHW) Values
+  struct HotWater_
+  {
+    //-- Setpoint (Target Temperature) for DHW
+    int SetPoint = 40.0F;
+    //-- The currently reported temperature of the DHW circuit
+    double TemperatureCurrent = 0.00F;
+    //-- Whether this installation utilizes a buffer(or battery)
+    bool BufferMode = false;
+    //-- Hot Water "now" setting (means: Instant heatup but is referred to as "now" on TAxxx and the manual).
+    bool Now = false;
+    //-- Continous Flow Setpoint
+    double ContinousFlowSetpoint = 0.00F;
+    //-- Maximum Temperature
+    double MaximumTemperature =0.00F;
+  } Hotwater;
+  //-- Values for mixed circuit installations
+  struct MixedCircuit_
+  {
+    //-- Mixed-Circuit Pump Status
+    bool PumpActive = false;
+    //-- Mixed-Circuit Economy Setting
+    bool Economy = false;
+    //-- Feed Setpoint
+    double FeedSetpoint = 0.00F;
+    //-- Current Feed Temperature
+    double FeedCurrent = 0.00F;
+  } MixedCircuit;
 
-//Endpoint for linear temperature calculation
-extern const int calcHeatingEndpoint;
+  //-- Fallback Values
+  //TODO: Should be configurable using configuration.json
+  struct FallBack_
+  {
+    //-- Basepoint Temperature
+    double BasepointTemperature = -10.0F;
+    //-- Endpoint Temperature
+    double EndpointTemperature = 31.0F;
+    //-- Ambient Temperature
+    double AmbientTemperature = 17.0F;
+    //-- Minimum ("Anti Freeze") Temperature.
+    double MinimumFeedTemperature = 10.0F;
+    //-- Enforces the fallback values when set to TRUE
+    bool isOnFallback = false;
 
-//Minimum Feed Temperature. This is the base value for calculations. Setting this as the setpoint will trigger the economy mode.
-extern const int calcTriggerAntiFreeze;
+    //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
+    HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
+    HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
+  } Fallback;
 
-//-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
-extern HeatingScheduleEntry fallbackStartEntry;
-extern HeatingScheduleEntry fallbackEndEntry;
+  struct BaseValues_
+  {
+    //-- Basepoint for linear temperature calculation
+    int calcHeatingBasepoint = -15;
 
-//-- Temperature
-extern double temp;
+    //-- Endpoint for linear temperature calculation
+    int calcHeatingEndpoint = 21;
 
-//-- Heating Circuit: Max. Feed Temperature (From Controller)
-extern double hcMaxFeed;
+    //-- Minimum Feed Temperature. This is the base value for calculations. Defaults to 10° on most devices.
+    int calcTriggerAntiFreeze = 10;
+  } BaseValues;
 
-//-- Heating Circuit: Current Feed Temperature (From Controller)
-extern double HkAktVorlauf;
+  struct Time_
+  {
+    //-- Current Day of the week as configured by the CC
+    int DayOfWeek = 0;
 
-//-- Heating Circuit: Feed Temperature Setpoint (Control Value)
-extern double HkSollVorlauf;
+    //-- Current Hour component
+    int Hours = 0;
 
-//-- Heating Controller: Current Temperature on the Outside (From Controller)
-extern double OutsideTemperatureSensor;
+    //-- Current Minutes component
+    int Minutes = 0;
+  } Time;
 
-//-- Heating Controller: Flame lit (From Controller)
-extern bool flame;
+  struct Auxilary_
+  {
+    float *Temperatures;
+    double FeedReturnTemperatureReference;
+  } Auxilary;
+};
 
-//-- Heating Controller: Status. 0x0 = Operational. Error Flags vary between models!
-extern uint8_t status;
-
-//-- Heating Circuit: Circulation Pump on|off
-extern bool hcPump;
-
-//-- Hot Water Battery Mode Status
-extern bool hwBatteryMode;
-
-//-- Heating Seasonal Mode. True = Summer | False = Winter
-extern bool hcSeason;
-
-//-- Mixed-Circuit Pump Status
-extern bool mcPump;
-
-//-- Mixed-Circuit Economy Setting
-extern bool mcEconomy;
-
-//-- Current Day of the week as configured by the CC
-extern int curDayOfWeek;
-
-//-- Current Hour component
-extern int curHours;
-
-//-- Current Minutes component
-extern int curMinutes;
-
-//-- Heating active / operational
-extern bool hcActive;
-
-//-- Analog value of heating power
-extern int hcHeatingPower;
-
-//-- Hot Water "now" setting.
-extern bool hwNow;
-
-//-- Fallback Values
-
-//Basepoint Temperature
-extern double fallbackBasepointTemperature;
-//Endpoint Temperature
-extern double fallbackEndpointTemperature;
-//Ambient Temperature
-extern double fallbackAmbientTemperature;
-//Minimum ("Anti Freeze") Temperature.
-extern double fallbackMinimumFeedTemperature;
-//Enforces the fallback values when set to TRUE
-extern bool isOnFallback;
+extern CeraValues ceraValues;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
@@ -108,7 +147,5 @@ extern bool isOnFallback;
 
 extern double CalculateFeedTemperature();
 extern int ConvertFeedTemperature(double temperature);
-
-extern void SetFeedTemperature();
 
 #endif

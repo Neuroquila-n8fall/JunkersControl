@@ -2,10 +2,12 @@
 #include <telnet.h>
 #include <WiFi.h>
 #include <wifi_config.h>
+#include <configuration.h>
 
 const uint TelnetServerPort = 23;
 WiFiServer TelnetServer(TelnetServerPort);
 WiFiClient TelnetRemoteClient;
+ConsoleWriter Log;
 
 //Checks for new Telnet connections
 void CheckForConnections()
@@ -26,20 +28,9 @@ void CheckForConnections()
       //Accept
       TelnetRemoteClient = TelnetServer.available();
       TelnetRemoteClient.println("——————————————————————————");
-      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", hostName, WiFi.localIP().toString().c_str());
+      TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi.Hostname, WiFi.localIP().toString().c_str());
       TelnetRemoteClient.println("——————————————————————————");
     }
-  }
-}
-
-//Write messages to both Serial and Telnet Clients
-void WriteToConsoles(String message)
-{
-  Serial.print(message);
-  //Print Message only if a client is connected and there is no data in the receive buffer.
-  if (TelnetRemoteClient.connected() && TelnetRemoteClient.available() == 0)
-  {
-    TelnetRemoteClient.print(message);
   }
 }
 
@@ -68,3 +59,4 @@ void ReadFromTelnet()
     }
   }
 }
+

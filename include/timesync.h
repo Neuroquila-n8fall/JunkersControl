@@ -8,12 +8,15 @@
 //——————————————————————————————————————————————————————————————————————————————
 extern Timezone myTZ;
 
+extern bool AlarmIsSet;
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
 //——————————————————————————————————————————————————————————————————————————————
 
 extern void SyncTimeIfRequired();
 extern bool TimeIsSynced();
+extern void printWifiStatus();
 
 
 #endif

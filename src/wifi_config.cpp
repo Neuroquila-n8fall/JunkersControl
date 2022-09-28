@@ -1,15 +1,9 @@
 #include <Arduino.h>
 #include "wifi_config.h"
 #include "main.h"
-#include "arduino_secrets.h"
 #include "timesync.h"
+#include <configuration.h>
 
-//——————————————————————————————————————————————————————————————————————————————
-//  WiFi Settings
-//——————————————————————————————————————————————————————————————————————————————
-const char *ssid = SECRET_SSID;
-const char *pass = SECRET_PASS;
-const char hostName[] = "FXHEATCTRL01";
 //-- WiFi Check interval for status output
 const int wifiRetryInterval = 30000;
 //-- Wifi Client object
@@ -21,17 +15,27 @@ void connectWifi()
   //(re)connect WiFi
   if (!WiFi.isConnected())
   {
+    WiFi.disconnect();
     WiFi.mode(WIFI_STA);
-    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
-    WiFi.setHostname(hostName);
+    //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
+    //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
+    WiFi.setHostname(configuration.Wifi.Hostname);
     Serial.println("WiFi not connected. Reconnecting...");
-    WiFi.begin(ssid, pass);
+
+    if(DebugMode)
+    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
+
+    WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       Serial.println("Connection Failed! Rebooting...");
       delay(5000);
       ESP.restart();
     }
+
+    if(DebugMode)
+    printWifiStatus();
+
   }
 
   //Sync time
@@ -42,7 +46,13 @@ void connectWifi()
   if (currentMillis - wifiConnectMillis >= wifiRetryInterval)
   {
     wifiConnectMillis = currentMillis;
-    if (WiFi.isConnected())
+    printWifiStatus();
+  }
+}
+
+void printWifiStatus()
+{
+  if (WiFi.isConnected() && DebugMode)
     {
       Serial.println("-------------------------------");
       Serial.println("Wifi Connected");
@@ -57,8 +67,7 @@ void connectWifi()
       Serial.print("RSSI:\t\t");
       Serial.println(WiFi.RSSI());
 
-      myTZ.setLocation(F("Europe/Berlin"));
+      myTZ.setLocation(configuration.General.Time_Timezone);
       Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
     }
-  }
 }
