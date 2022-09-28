@@ -1,27 +1,10 @@
-input_boolean:
-  heizung_betrieb:
-    name: Heizungsbetrieb
-    initial: true
-  heizung_boost:
-    name: Boost
-    initial: false
-  heizung_fastheatup:
-    name: Schnellaufheizung
-    initial: false
-  heizung_dynamicadaption:
-    name: Dynamische Adaption
-    initial: false
-  heizung_ventilskalierung:
-    name: Ventilskalierung
-    initial: false
-
 input_number:
   heizung_fusspunkt:
     name: "Fußpunkt Heizung"
     min: -30
     max: 30
     step: 0.5
-    mode: slider
+    mode: box
     unit_of_measurement: "°C"
     icon: mdi:ray-start
   heizung_endpunkt:
@@ -29,7 +12,7 @@ input_number:
     min: 0
     max: 75
     step: 0.5
-    mode: slider
+    mode: box
     unit_of_measurement: "°C"
     icon: mdi:ray-end
   heizung_minimum:
@@ -37,7 +20,7 @@ input_number:
     min: 0
     max: 75
     step: 0.5
-    mode: slider
+    mode: box
     unit_of_measurement: "°C"
     icon: mdi:thermometer-low
   heizung_boostdauer:
@@ -70,3 +53,10 @@ input_number:
     mode: box
     unit_of_measurement: "%"
     icon: mdi:arrow-collapse-right
+  heizung_gewichtung_ventile:
+    name: "Gewichtung Ventilöffnung EG-OG"
+    min: 0
+    max: 100
+    mode: slider
+    unit_of_measurement: "%"
+    icon: mdi:scale

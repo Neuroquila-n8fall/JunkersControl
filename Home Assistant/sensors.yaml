@@ -1,76 +1,16 @@
-- platform: mqtt
-  name: "Vorlauftemperatur Heizung"
-  state_topic: "heizung/temperaturen/vorlauf"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Nachlauftemperatur Heizung"
-  state_topic: "heizung/temperaturen/nachlauf"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Abgastemperatur Heizung"
-  state_topic: "heizung/temperaturen/abgas"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Umgebungstemperatur Heizung"
-  state_topic: "heizung/temperaturen/umgebung"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Maximale Vorlauftemperatur Heizung"
-  state_topic: "heizung/temperaturen/maxvorlauf"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Aktuelle Vorlauftemperatur Heizung"
-  state_topic: "heizung/temperaturen/aktvorlauf"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Soll-Vorlauftemperatur Heizung"
-  state_topic: "heizung/temperaturen/sollvorlauf"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Außentemperaturfühler Heizung"
-  state_topic: "heizung/temperaturen/aussen"
-  unit_of_measurement: "°C"
-- platform: mqtt
-  name: "Heizung Brenner"
-  state_topic: "heizung/status/brenner"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Pumpe"
-  state_topic: "heizung/status/pumpe"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Saisonaler Betriebsmodus"
-  state_topic: "heizung/status/betriebsmodus"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Fehler"
-  state_topic: "heizung/status/fehler"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Heizbetrieb"
-  state_topic: "heizung/status/heizbetrieb"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Boost"
-  state_topic: "heizung/status/boost"
-  force_update: true
-- platform: mqtt
-  name: "Heizung Schnellaufheizung"
-  state_topic: "heizung/status/schnellaufheizung"
-  force_update: true
 - platform: template
   sensors:
     heizung_brenner_zustand:
       friendly_name: "Brenner"
       value_template: >-
-        {% set value = is_state('sensor.heizung_brenner','1') %}
+        {% set value = is_state('sensor.heizung_brenner','true') %}
         {% if value %}
         An
         {% else %}
         Aus
         {% endif %}
       icon_template: >-
-        {% set value = is_state('sensor.heizung_brenner','1') %}
+        {% set value = is_state('sensor.heizung_brenner','true') %}
         {% if value %}
         mdi:fire
         {% else %}
@@ -79,14 +19,14 @@
     heizung_pumpe_zustand:
       friendly_name: "Pumpe"
       value_template: >-
-        {% set value = is_state('sensor.heizung_pumpe','1') %}
+        {% set value = is_state('sensor.heizung_pumpe','true') %}
         {% if value %}
         An
         {% else %}
         Aus
         {% endif %}
       icon_template: >-
-        {% set value = is_state('sensor.heizung_pumpe','1') %}
+        {% set value = is_state('sensor.heizung_pumpe','true') %}
         {% if value %}
         mdi:autorenew
         {% else %}
@@ -95,14 +35,14 @@
     heizung_heizbetrieb_zustand:
       friendly_name: "Heizbetrieb"
       value_template: >-
-        {% set value = is_state('sensor.heizung_heizbetrieb','1') %}
+        {% set value = is_state('sensor.heizung_heizbetrieb','true') %}
         {% if value %}
         An
         {% else %}
         Aus
         {% endif %}
       icon_template: >-
-        {% set value = is_state('sensor.heizung_heizbetrieb','1') %}
+        {% set value = is_state('sensor.heizung_heizbetrieb','true') %}
         {% if value %}
         mdi:radiator
         {% else %}
@@ -111,14 +51,14 @@
     heizung_saisonmodus_zustand:
       friendly_name: "Saisonaler Heizbetrieb"
       value_template: >-
-        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','0') %}
+        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','false') %}
         {% if value %}
         Sommer
         {% else %}
         Winter
         {% endif %}
       icon_template: >-
-        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','0') %}
+        {% set value = is_state('sensor.heizung_saisonaler_betriebsmodus','false') %}
         {% if value %}
         mdi:weather-sunny
         {% else %}
@@ -126,64 +66,65 @@
         {% endif %}
     heizung_fehler_zustand:
       friendly_name: "Fehler"
+      unique_id: "Heizung_Fehlerbeschreibung"
       value_template: >-
-        {% set value = states.heizung_fehler.state | upper %}
-        {% if value == "NONE" %}
+        {% set value = states('sensor.heizung_fehler') | int %}
+        {% if value == 0 %}
         Betrieb
-        {% elif value == "161" %}
-        A1: Kennfeldpumpe trockengelaufen
-        {% elif value == "162" %}
+        {% elif value == 161 %}
+        A1: Kennfeldpumpe trockengelaufen        
+        {% elif value == 162 %}
         A2: Abgasaustritt: Brennkammer
-        {% elif value == "163" %}
+        {% elif value == 163 %}
         A3: Abgas-NTC defekt: Strömungssicherung
-        {% elif value == "164" %}
+        {% elif value == 164 %}
         A4: Abgasaustritt: Strömungssicherung
-        {% elif value == "166" %}
+        {% elif value == 166 %}
         A6: Abgas-NTC defekt: Brennkammer
-        {% elif value == "167" %}
+        {% elif value == 167 %}
         A7: Warmwasser-NTC defekt 
-        {% elif value == "168" %}
+        {% elif value == 168 %}
         A8: CAN-Kommunikation unterbrochen
-        {% elif value == "170" %}
+        {% elif value == 170 %}
         AA: Sekundär-Wärmetauscher verkalkt
-        {% elif value == "172" %}
+        {% elif value == 172 %}
         AC: Modul nicht erkannt.
-        {% elif value == "173" %}
+        {% elif value == 173 %}
         AD: Speicher-NTC 1 nicht erkannt 
-        {% elif value == "177" %}
+        {% elif value == 177 %}
         B1: Kodierstecker nicht erkannt
-        {% elif value == "202" %}
+        {% elif value == 202 %}
         CA: Turbinendrehzahl zu hoch
-        {% elif value == "204" %}
+        {% elif value == 204 %}
         CC: Außentemperatur-NTC nicht erkannt
-        {% elif value == "209" %}
+        {% elif value == 209 %}
         D1: LSM Verriegelt
-        {% elif value == "211" %}
+        {% elif value == 211 %}
         D3: Brücke 8-9 nicht erkannt
-        {% elif value == "226" %}
+        {% elif value == 226 %}
         E2: Vorlauftemperatur-NTC defekt
-        {% elif value == "229" %}
+        {% elif value == 229 %}
         E5: Brenner-NTC Temperatur überschritten
-        {% elif value == "231" %}
+        {% elif value == 231 %}
         E7: Brenner-NTC defekt
-        {% elif value == "233" %}
+        {% elif value == 233 %}
         E9: STB im Vorlauf hat ausgelöst. Druck auf 1-2 Bar prüfen.
-        {% elif value == "234" %}
+        {% elif value == 234 %}
         EA: Im Betrieb: Flamme wird nicht erkannt
-        {% elif value == "240" %}
+        {% elif value == 240 %}
         F0: Interner Fehler
-        {% elif value == "247" %}
+        {% elif value == 247 %}
         F7: Obwohl Gerät ausgeschaltet: Flamme wird erkannt
-        {% elif value == "250" %}
+        {% elif value == 250 %}
         FA: Nach Gasabschaltung: Flamme wird erkannt
-        {% elif value == "252" %}
+        {% elif value == 252 %}
         FC: Textdisplay nicht erkannt
-        {% elif value == "253" %}
+        {% elif value == 253 %}
         FD: Entstörtaste irrtümlich gedrückt
         {% endif %}
       icon_template: >-
-        {% set value = states.heizung_fehler.state | upper %}
-        {% if value == "NONE" %}
+        {% set value = states('sensor.heizung_fehler') | int %}
+        {% if value == 0 %}
         mdi:check
         {% else %}
         mdi:alert-circle
@@ -193,22 +134,22 @@
     heating_feed_return_diff:
       friendly_name: "Spreizung VL-NL"
       value_template: >-
-        {% set feed = states('sensor.vorlauftemperatur_heizung')| float %}
-        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {% set feed = states('sensor.externe_vorlauftemperatur')| float(default=0) %}
+        {% set return = states('sensor.externe_rucklauftemperatur')| float(default=0) %}
         {{ (feed - return) | round(2) }}
       unit_of_measurement: "°C"
     heating_setpoint_return_diff:
       friendly_name: "Spreizung Soll-NL"
       value_template: >-
-        {% set feed = states('sensor.soll_vorlauftemperatur_heizung')| float %}
-        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {% set feed = states('sensor.soll_vorlauftemperatur_heizung')| float(default=0) %}
+        {% set return = states('sensor.externe_rucklauftemperatur')| float(default=0) %}
         {{ (feed - return) | round(2) }}
       unit_of_measurement: "°C"
     heating_adaption_return_ambient:
       friendly_name: "Adaption Zieltemperatur und Rücklauf"
       value_template: >-
-        {% set ambient = states('input_number.heizung_zieltemperatur')| float %}
-        {% set return = states('sensor.nachlauftemperatur_heizung')| float %}
+        {% set ambient = states('input_number.heizung_zieltemperatur')| float(default=0) %}
+        {% set return = states('sensor.externe_rucklauftemperatur')| float(default=0) %}
         {{ (ambient - return) | round(2) }}
       unit_of_measurement: "°C"
 - platform: template
@@ -218,26 +159,26 @@
       icon_template: mdi:thermometer
       unit_of_measurement: "°C"
       value_template: >-
-        {% set from_min =  states('input_number.heizung_endpunkt')|float %}
-        {% set from_max =  states('input_number.heizung_fusspunkt')|float %}
-        {% set to_min =  states('input_number.heizung_minimum')|float %}
-        {% set to_max =  states('sensor.maximale_vorlauftemperatur_heizung')|float %}
-        {% set input_value = states('sensor.aussentemperaturfuhler_heizung')|float %}
-        {% set adaption = states('input_number.heizung_adaption')|float %}
+        {% set from_min =  states('input_number.heizung_endpunkt')|float(default=0) %}
+        {% set from_max =  states('input_number.heizung_fusspunkt')|float(default=0) %}
+        {% set to_min =  states('input_number.heizung_minimum')|float(default=0) %}
+        {% set to_max =  states('sensor.maximale_vorlauftemperatur_heizung')|float(default=0) %}
+        {% set input_value = states('sensor.aussentemperaturfuhler_heizung')|float(default=0) %}
+        {% set adaption = states('input_number.heizung_adaption')|float(default=0) %}
         {{ (((input_value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min) + adaption) | round(2) }}
 - platform: template
   sensors:
     heating_boost_active:
       friendly_name: "Boostfunktion aktiv"
       icon_template: >-
-        {% set value = is_state('sensor.heizung_boost','1') %}
+        {% set value = is_state('sensor.heizung_boost','true') %}
         {% if value %}
         mdi:fire
         {% else %}
         mdi:cancel
         {% endif %}
       value_template: >-
-        {% set value = is_state('sensor.heizung_boost','1') %}
+        {% set value = is_state('sensor.heizung_boost','true') %}
         {% if value %}
         An
         {% else %}
@@ -248,16 +189,152 @@
     heating_fastheatup_active:
       friendly_name: "Schnellaufheizung aktiv"
       icon_template: >-
-        {% set value = is_state('sensor.heizung_schnellaufheizung','1') %}
+        {% set value = is_state('sensor.heizung_schnellaufheizung','true') %}
         {% if value %}
         mdi:fast-forward
         {% else %}
         mdi:cancel
         {% endif %}
       value_template: >-
-        {% set value = is_state('sensor.heizung_schnellaufheizung','1') %}
+        {% set value = is_state('sensor.heizung_schnellaufheizung','true') %}
         {% if value %}
         An
         {% else %}
         Aus
         {% endif %}
+- platform: template
+  sensors:
+    heating_dynamic_adaption_int:
+      friendly_name: "INT Dynamische Adaption"
+      value_template: >-
+        {% set value = is_state('input_boolean.heizung_dynamicadaption','on') %}
+        {% if value %}
+        1
+        {% else %}
+        0
+        {% endif %}
+- platform: template
+  sensors:
+    heating_valve_scaling_int:
+      friendly_name: "INT Ventilskalierung"
+      value_template: >-
+        {% set value = is_state('input_boolean.heizung_ventilskalierung','on') %}
+        {% if value %}
+        1
+        {% else %}
+        0
+        {% endif %}
+### Min/Max Thermostats
+- platform: min_max
+  name: "Ventilöffnung MinMax"
+  entity_ids:
+    # - Valve Entities you want to monitor
+### Average Values Heating
+- platform: average
+  end: "{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}"
+  duration:
+    hours: 1
+  name: "Durchschnitt Vorlauftemperatur (1 Stunde)"
+  entities:
+    - sensor.externe_vorlauftemperatur
+- platform: average
+  end: "{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}"
+  duration:
+    hours: 1
+  name: "Durchschnitt Nachlauftemperatur (1 Stunde)"
+  entities:
+    - sensor.externe_rucklauftemperatur
+- platform: average
+  end: "{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}"
+  duration:
+    hours: 1
+  name: "Durchschnitt Abgastemperatur (1 Stunde)"
+  entities:
+    - sensor.externe_abgastemperatur
+- platform: average
+  end: "{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}"
+  duration:
+    minutes: 15
+  name: "Durchschnitt Helligkeit außen 15 Minuten"
+  entities:
+    - sensor.lichtsensor_aussen_current_illumination
+- platform: average
+  end: "{{ now().replace(hour=0).replace(minute=0).replace(second=0) }}"
+  duration:
+    minutes: 15
+  precision: 0
+  name: "Durchschnittliche Ventilöffnung 15 Minuten"
+  unique_id: "average_valve_period"
+  entities:
+    # - Valve Entities you want to monitor
+- platform: average
+  name: "Durchschnittliche Ventilöffnung Aktuell"
+  unique_id: "average_valve_act"
+  precision: 0
+  entities:
+    # - Valve Entities you want to monitor
+- platform: average
+  name: "Durchschnittliche Ventilöffnung EG"
+  unique_id: "average_valve_act_eg"
+  precision: 0
+  entities:
+    # - Valve Entities you want to monitor
+- platform: average
+  name: "Durchschnittliche Ventilöffnung OG"
+  unique_id: "average_valve_act_og"
+  precision: 0
+  entities:
+    # - Valve Entities you want to monitor
+- platform: template
+  sensors:
+    average_weighted_valve:
+      unique_id: "average_weighted_valve"
+      friendly_name: "Ventilöffnung gewichtet"
+      icon_template: "mdi:scale-balance"
+      value_template: >-
+        {% set eg =  states('sensor.durchschnittliche_ventiloffnung_eg') | float(default=100) %}
+        {% set og =  states('sensor.durchschnittliche_ventiloffnung_og') | float(default=30) %}
+        {% set weight = states('input_number.heizung_gewichtung_ventile') | int %}
+        {% set lesserWeight = 100 - weight %}
+        {% set value = ((eg * weight/100) + (og * lesserWeight/100)) | round() %}
+        {{ value }}
+
+- platform: history_stats
+  name: "Brennerstatistik Tag"
+  entity_id: sensor.heizung_brenner
+  state: "true"
+  type: count
+  end: "{{ now() }}"
+  duration:
+    hours: 24
+
+- platform: template
+  sensors:
+    brennerstarts_intervall_tag:
+      friendly_name: "Brennerstarts Intervall Tag"
+      unit_of_measurement: "minuten"
+      value_template: >-
+        {% set perDay = states('sensor.brennerstatistik_tag') | int %}
+        {% set hour =  60*24 | int %}
+        {% set value = hour / perDay | float %}
+        {{ value | round(2) }}
+
+- platform: history_stats
+  name: "Brennerstatistik Stunde"
+  entity_id: sensor.heizung_brenner
+  state: "true"
+  type: count
+  end: "{{ now() }}"
+  duration:
+    hours: 1
+
+- platform: template
+  sensors:
+    brennerstarts_intervall_stunde:
+      friendly_name: "Brennerstarts Intervall Stunde"
+      unit_of_measurement: "minuten"
+      value_template: >-
+        {% set perHour = states('sensor.brennerstatistik_stunde') | int %}
+        {% set hour =  60 | int %}
+        {% set value = hour / perHour | float %}
+        {{ value | round(2) }}

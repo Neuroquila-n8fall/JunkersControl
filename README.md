@@ -1,7 +1,10 @@
 # JunkersControl
 
+## NOTE: Documentation is mostly accurate right now.
+**Feel free to open an issue if something is unclear.**
 ## Table of contents
 - [JunkersControl](#junkerscontrol)
+  - [NOTE: Documentation is mostly accurate right now.](#note-documentation-is-mostly-accurate-right-now)
   - [Table of contents](#table-of-contents)
   - [Community](#community)
   - [Purpose and Aim](#purpose-and-aim)
@@ -30,6 +33,7 @@
     - [Calculate yourself](#calculate-yourself)
     - [Valve-based control](#valve-based-control)
     - [OTA Updates and Console](#ota-updates-and-console)
+  - [Home Assistant Integration](#home-assistant-integration)
   - [Hints](#hints)
   - [Getting Started](#getting-started)
     - [Configuration](#configuration-1)
@@ -38,8 +42,6 @@
   - [Special Thanks](#special-thanks)
 
 ![Alt_Text](/assets/example_ha_dashboard.jpg)
-
-#NOTE: Documentation is still being updated for recent changes but the important bits are sorted.
 
 ## Community
 You can reach out to us on [Discord](https://discord.gg/9Wrndbqu7t) where we can discuss and help eachother.
@@ -353,9 +355,12 @@ The standard "Arduino OTA" procedure is included which means you can upload the 
 
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
+## Home Assistant Integration
+This project was originally specifically designed to be run alongside Home Assistant and efforts have been taken to make the setup as hassle-free as possible but the so-called autodiscovery is still in the works. In the meantime you may find the necessary scripts, values and other stuff inside the [Home Assistant Folder](Home%20Assistant)
+
 ## Hints
-- If you just wanna read then you have to set the variable `Override` to `false`. This way nothing will be sent on the bus but you can read everything.
-- For debug purposes the `Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
+- If you just wanna read then usually you have nothing to modify. The program will see other controllers on the bus and will go into "read-only" mode by itself. If you're not wanting to take any risks, you have to set the variable `OverrideControl` in [main.cpp](src/main.cpp) to `false`. This way nothing will be sent on the bus udner any circumstances but you can read everything.
+- For debug purposes the `DebugMode` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
@@ -364,7 +369,7 @@ Debug info can be retrieved using a very basic telnet implementation. Simply con
 1) Copy [Configuration.json](assets/Templates/Configurations/configuration.json) to the `data` folder.
 2) Use this `configuration.json` to configure the project to your requirements.
 3) Upload the project
-4) Now It will format the SPIFFS filesystem.
+4) Now it will format the SPIFFS filesystem.
 5) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
 6) It will now read this config and will reach operational status
 

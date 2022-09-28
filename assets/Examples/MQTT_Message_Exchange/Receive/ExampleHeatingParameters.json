@@ -7,7 +7,6 @@
     "AuxilaryTemperature": 11.6,
     "AmbientTemperature": 0,
     "TargetAmbientTemperature": 21,
-    "OnDemandBoost": false,
     "OnDemandBoostDuration": 600,
     "FastHeatup": false,
     "Adaption": 0,
