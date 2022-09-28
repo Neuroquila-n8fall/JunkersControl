@@ -67,7 +67,7 @@ void printWifiStatus()
       Serial.print("RSSI:\t\t");
       Serial.println(WiFi.RSSI());
 
-      myTZ.setLocation(F("Europe/Berlin"));
+      myTZ.setLocation(configuration.General.Time_Timezone);
       Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
     }
 }
