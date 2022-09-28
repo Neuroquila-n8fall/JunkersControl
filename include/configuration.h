@@ -48,8 +48,10 @@ struct Configuration
             char WaterValues[255];
             char WaterParameters[255];
             char AuxilaryValues[255];
-            char Status[255]; // "cerasmarter/status"
+            char Status[255]; 
             char StatusRequest[255];
+            char Boost[255];
+            char FastHeatup[255];
         } Topics;
 
     } Mqtt;

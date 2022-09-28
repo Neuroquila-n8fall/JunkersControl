@@ -75,6 +75,8 @@ bool ReadConfiguration()
     strlcpy(configuration.Mqtt.Topics.AuxilaryValues, MQTT_Topics["AuxilaryParameters"], sizeof(configuration.Mqtt.Topics.AuxilaryValues)); //"cerasmarter/auxilary/parameters"
     strlcpy(configuration.Mqtt.Topics.Status, MQTT_Topics["Status"], sizeof(configuration.Mqtt.Topics.Status));                                     // "cerasmarter/status"
     strlcpy(configuration.Mqtt.Topics.StatusRequest, MQTT_Topics["StatusRequest"], sizeof(configuration.Mqtt.Topics.StatusRequest));                                     // "cerasmarter/status/get"
+    strlcpy(configuration.Mqtt.Topics.Boost, MQTT_Topics["Boost"], sizeof(configuration.Mqtt.Topics.Boost));                                     // "cerasmarter/status/get"
+    strlcpy(configuration.Mqtt.Topics.FastHeatup, MQTT_Topics["FastHeatup"], sizeof(configuration.Mqtt.Topics.FastHeatup));                                     // "cerasmarter/status/get"
 
     JsonObject Features = doc["Features"];
     configuration.Features.Features_HeatingParameters = Features["HeatingParameters"];   // true

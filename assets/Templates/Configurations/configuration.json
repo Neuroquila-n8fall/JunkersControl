@@ -16,7 +16,9 @@
             "WaterParameters": "cerasmarter/water/parameters",
             "AuxilaryParameters": "cerasmarter/auxilary/values",
             "Status": "cerasmarter/status",
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
     },
     "Features": {

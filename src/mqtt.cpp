@@ -39,6 +39,8 @@ void reconnectMqtt()
       client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
       client.subscribe(configuration.Mqtt.Topics.WaterParameters);
       client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+      client.subscribe(configuration.Mqtt.Topics.Boost);
+      client.subscribe(configuration.Mqtt.Topics.FastHeatup);
       if (configuration.HomeAssistant.Enabled)
       {
         SetupAutodiscovery(HaSensorsFileName);
@@ -185,29 +187,13 @@ void callback(char *topic, byte *payload, unsigned int length)
     commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
     commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
     commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
-
-    if (doc["OnDemandBoost"] != commandedValues.Heating.Boost)
-    {
-      commandedValues.Heating.Boost = doc["OnDemandBoost"];
-      commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
-      setFeedImmediately = true;
-    }
-
-    commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
-    if (doc["FastHeatup"] != commandedValues.Heating.FastHeatup)
-    {
-      setFeedImmediately = true;
-      // Set reference Temperature
-      commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
-    }
-
-    commandedValues.Heating.FastHeatup = doc["FastHeatup"];
     commandedValues.Heating.FeedAdaption = doc["Adaption"];
     commandedValues.Heating.ValveScaling = doc["ValveScaling"];
     commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
     commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
     commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
     commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
+    commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
 
     // Dispatch Feed Setpoint immediately
     if (setFeedImmediately)
@@ -238,6 +224,24 @@ void callback(char *topic, byte *payload, unsigned int length)
       commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
     }
   }
+
+  // On-Demand Boost
+  if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
+  {
+    int i = s.toInt();
+    commandedValues.Heating.Boost = (i == 1 ? true : false); 
+    commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+    SetFeedTemperature();
+  }
+
+  // Fast Heatup
+  if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
+  {
+    int i = s.toInt();
+    commandedValues.Heating.FastHeatup = (i == 1 ? true : false); 
+    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+    SetFeedTemperature();
+  }
 }
 
 void PublishStatus()
@@ -246,12 +250,7 @@ void PublishStatus()
   /* Example JSON
   {
       "GasBurner": true,
-      "Pump": true,
       "Error": 0..255,
-      "Season": true,
-      "Working": true,
-      "Boost": true,
-      "FastHeatup": true
   }
   */
   StaticJsonDocument<384> doc;
@@ -303,7 +302,12 @@ void PublishHeatingTemperaturesAndStatus()
       "FeedMaximum": 75.10,
       "FeedCurrent": 30.10,
       "FeedSetpoint": 10.10,
-      "Outside": 15.10
+      "Outside": 15.10,
+      "Season": true,
+      "Working": true,
+      "Boost": true,
+      "BoostTimeLeft": 600,
+      "FastHeatup": true
   }
   */
 
@@ -324,6 +328,7 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
   jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
+  jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
 
   if (DebugMode)
