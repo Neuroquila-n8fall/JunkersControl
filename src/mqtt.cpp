@@ -114,10 +114,20 @@ void callback(char *topic, byte *payload, unsigned int length)
             "Status": true
         }
     */
-    bool HeatingTemperatures = doc["HeatingTemperatures"];   // false
-    bool WaterTemperatures = doc["WaterTemperatures"];       // false
-    bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
-    bool Status = doc["Status"];                             // false
+
+    bool HeatingTemperatures = false;
+    bool WaterTemperatures = false;
+    bool AuxilaryTemperatures = false;
+    bool Status = false;
+
+    if (!doc["HeatingTemperatures"].isNull())
+      HeatingTemperatures = doc["HeatingTemperatures"]; // false
+    if (!doc["WaterTemperatures"].isNull())
+      WaterTemperatures = doc["WaterTemperatures"]; // false
+    if (!doc["AuxilaryTemperatures"].isNull())
+      AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
+    if (!doc["Status"].isNull())
+      Status = doc["Status"]; // false
 
     if (HeatingTemperatures)
     {
@@ -178,22 +188,36 @@ void callback(char *topic, byte *payload, unsigned int length)
     }
 
     // Request Enable/Disable Heating and set the status of the heating accordingly
-    commandedValues.Heating.Active = doc["Enabled"];
-
-    commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
-    commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
-    commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
-    commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
-    commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
-    commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
-    commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
-    commandedValues.Heating.FeedAdaption = doc["Adaption"];
-    commandedValues.Heating.ValveScaling = doc["ValveScaling"];
-    commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
-    commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
-    commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
-    commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
-    commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
+    if (!doc["Enabled"].isNull())
+      commandedValues.Heating.Active = doc["Enabled"];
+    if (!doc["FeedSetpoint"].isNull())
+      commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
+    if (!doc["FeedBaseSetpoint"].isNull())
+      commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
+    if (!doc["FeedCutOff"].isNull())
+      commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
+    if (!doc["FeedMinimum"].isNull())
+      commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
+    if (!doc["AuxilaryTemperature"].isNull())
+      commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
+    if (!doc["AmbientTemperature"].isNull())
+      commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
+    if (!doc["TargetAmbientTemperature"].isNull())
+      commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
+    if (!doc["Adaption"].isNull())
+      commandedValues.Heating.FeedAdaption = doc["Adaption"];
+    if (!doc["ValveScaling"].isNull())
+      commandedValues.Heating.ValveScaling = doc["ValveScaling"];
+    if (!doc["ValveScalingMaxOpening"].isNull())
+      commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
+    if (!doc["ValveScalingOpening"].isNull())
+      commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
+    if (!doc["DynamicAdaption"].isNull())
+      commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
+    if (!doc["OverrideSetpoint"].isNull())
+      commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
+    if (!doc["OnDemandBoostDuration"].isNull())
+      commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
 
     // Dispatch Feed Setpoint immediately
     if (setFeedImmediately)
@@ -220,8 +244,8 @@ void callback(char *topic, byte *payload, unsigned int length)
         return;
       }
 
-      // TODO: Water Temperature Setpoint variable to be populated here...
-      commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
+      if (!doc["Setpoint"].isNull())
+        commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
     }
   }
 
@@ -229,7 +253,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
   {
     int i = s.toInt();
-    commandedValues.Heating.Boost = (i == 1 ? true : false); 
+    commandedValues.Heating.Boost = (i == 1 ? true : false);
     commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
     SetFeedTemperature();
   }
@@ -238,7 +262,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
   {
     int i = s.toInt();
-    commandedValues.Heating.FastHeatup = (i == 1 ? true : false); 
+    commandedValues.Heating.FastHeatup = (i == 1 ? true : false);
     commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     SetFeedTemperature();
   }
@@ -290,8 +314,6 @@ void PublishStatus()
   {
     client.publish(configuration.Mqtt.Topics.Status, buffer, n);
   }
-
-
 }
 
 void PublishHeatingTemperaturesAndStatus()
