@@ -86,7 +86,7 @@ extern String generateClientId();
 extern void setupMqttClient();
 extern void callback(char *topic, byte *payload, unsigned int length);
 extern void PublishStatus();
-extern void PublishHeatingTemperatures();
+extern void PublishHeatingTemperaturesAndStatus();
 extern void PublishWaterTemperatures();
 extern void PublishAuxilaryTemperatures();
 extern void ShowActivityLed();

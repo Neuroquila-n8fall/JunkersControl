@@ -119,7 +119,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (HeatingTemperatures)
     {
-      PublishHeatingTemperatures();
+      PublishHeatingTemperaturesAndStatus();
     }
 
     if (WaterTemperatures)
@@ -295,7 +295,7 @@ void PublishStatus()
 
 }
 
-void PublishHeatingTemperatures()
+void PublishHeatingTemperaturesAndStatus()
 {
   ShowActivityLed();
   /* Example JSON

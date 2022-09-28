@@ -275,7 +275,7 @@ void loop()
 
     // Publish Heating Temperatures
     if (configuration.Features.Features_HeatingParameters)
-      PublishHeatingTemperatures();
+      PublishHeatingTemperaturesAndStatus();
 
     // Publish Water Temperatures
     if (configuration.Features.Features_WaterParameters)
