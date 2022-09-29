@@ -16,7 +16,7 @@ bool OverrideControl = true;
 //   After this timeout this controller will take over control.
 int controllerMessageTimeout = 30000;
 
-// Set this to true to view debug info
+// This will be overwritten by Configuration!
 bool DebugMode = true;
 
 //——————————————————————————————————————————————————————————————————————————————
@@ -43,6 +43,9 @@ int currentStep = 0;
 
 //-- Date & Time Interval: 0...MAXINT, Ex.: '5' for a 5 second delay between setting time.
 int dateTimeSendDelay = 30;
+
+//-- CAN Error Counter
+volatile int CanSendErrorCount;
 
 
 void setup()
@@ -359,7 +362,6 @@ void Reboot()
 
 void SendMessage(CANMessage msg)
 {
-  static int CanSendErrorCount;
   // Send message if not empty and override is true.
   if (msg.id != 0 && OverrideControl)
   {
@@ -370,26 +372,29 @@ void SendMessage(CANMessage msg)
     }
     if(!can.tryToSend(msg))
     {
+      CanSendErrorCount++;
       if(CanErrorActivityHandle == NULL)
       {
         xTaskCreate(ShowCanError,"Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
       }
-      Log.printf("[%s] Failed to send message [0x%.3X] over CAN. This has happened %i times before in a row.\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, CanSendErrorCount++);
+      Log.printf("\e[0;31[%s] Failed to send message [0x%.3X] over CAN. This has happened %i times before in a row.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, CanSendErrorCount);
       char logMsg[64];
-      sprintf(logMsg,"CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount++);
+      sprintf(logMsg,"CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount);
       PublishLog(logMsg, __func__, LogLevel::Error);
     }
     else
     {
-      CanSendErrorCount = 0;
+      
       if (CanErrorActivityHandle != NULL)
       {
         vTaskDelete(CanErrorActivityHandle);
         CanErrorActivityHandle = NULL;
 
       char logMsg[50];
-      sprintf(logMsg,"CAN send error CLEARED", msg.id, CanSendErrorCount++);
+      sprintf(logMsg,"CAN send error CLEARED", msg.id, CanSendErrorCount);
       PublishLog(logMsg, __func__, LogLevel::Info);
+      Log.printf("\e[0;32[%s] CAN send error CLEARED after %i previously failed attempts.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), CanSendErrorCount);
+      CanSendErrorCount = 0;
       }
     }
     lastSentMessageTime = millis();
