@@ -96,6 +96,9 @@ extern unsigned long lastHeatingMessageTime;
 //-- Timestamp of the last message sent by us
 extern unsigned long lastSentMessageTime;
 
+//-- CAN Error Counter
+extern volatile int CanSendErrorCount;
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Macros / Extensions
 //——————————————————————————————————————————————————————————————————————————————
