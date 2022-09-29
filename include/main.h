@@ -21,6 +21,8 @@
 #include <t_sensors.h>
 // NTP Timesync
 #include <timesync.h>
+// Webconfig & Server
+#include <webconfig.h>
 
 #include <ESPmDNS.h>
 
@@ -98,6 +100,9 @@ extern unsigned long lastSentMessageTime;
 
 //-- CAN Error Counter
 extern volatile int CanSendErrorCount;
+
+//-- Setup Mode Flag
+extern volatile bool SetupMode;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Macros / Extensions

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set WiFi Credentials</title>
+    <link rel="stylesheet" href="frontend/bootstrap.min.css">
+</head>
+
+<body>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+            <div class="row">
+                <nav class="navbar navbar-expand-lg bg-light">
+                    <div class="container-fluid">
+                        <a class="navbar-brand" href="#">Cerasmarter</a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false"
+                            aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div class="collapse navbar-collapse" id="navbarText">
+                            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="/">Home</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link active"  aria-current="page" href="/wifi">Wifi</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                        href="/filemanager">Filemanager</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+            <div class="row">
+                <h3>Set Wifi Credentials</h3>
+            </div>
+            <div class="row">
+                <form action="/wifi" method="POST">
+                    <div class="text-start">
+                        <div class="mb-3 row">
+                            <label class="col-sm-2 col-form-label" for="wifi_ssid">SSID</label>
+                            <div class="col-sm-10">
+                                <input id="wifi_ssid" name="wifi_ssid" placeholder="The 'SSID' or name of your WiFi network to connect to"
+                                    type="text" required="required" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label for="wifi_pw" class="col-sm-2 col-form-label">Password</label>
+                            <div class="col-sm-10">
+                                <input id="wifi_pw" name="wifi_pw" type="text" required="required" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label for="hostname" class="col-sm-2 col-form-label">Hostname</label>
+                            <div class="col-sm-10">
+                                <input id="hostname" name="hostname" placeholder="Leave empty to use default &quot;Cerasmarter&quot;"
+                                    type="text" aria-describedby="hostnameHelpBlock" class="form-control" value="Cerasmarter">
+                                <span id="hostnameHelpBlock" class="form-text text-muted">This will be used to display the name of this
+                                    device on your network. It will also influence how the internal WiFi network will be called.</span>
+                            </div>
+                        </div>
+                        <div class="mb-3 row justify-content-end">
+                            <div class="col-sm-10">
+                                <button name="submit" type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            </div>
+            <div class="col-md-3">
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

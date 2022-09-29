@@ -12,8 +12,16 @@ WiFiClient espClient;
 
 void connectWifi()
 {
-  //(re)connect WiFi
-  if (!WiFi.isConnected())
+  if (configuration.Wifi.SSID == NULL && configuration.Wifi.Password == NULL)
+  {
+    SetupMode = true;
+    StartApMode();
+    return;
+  }
+  //(re)connect WiFi if:
+  //      - We are in STATION mode and not connected
+  //      - We are not connected and not in SetupMode
+  if (!WiFi.isConnected() && WiFi.getMode() == WIFI_MODE_STA || !WiFi.isConnected() && !SetupMode )
   {
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
@@ -24,13 +32,16 @@ void connectWifi()
 
     if(DebugMode)
     Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
-
+    unsigned long prevConnectMillis = millis();
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
-      Serial.println("Connection Failed! Rebooting...");
-      delay(5000);
-      ESP.restart();
+      // WAit 10 seconds to connect
+      if (millis() - prevConnectMillis >= 10000)
+      {
+        Serial.println("Connection Failed! Rebooting...");
+        ESP.restart();
+      }      
     }
 
     if(DebugMode)
@@ -67,7 +78,7 @@ void printWifiStatus()
       Serial.print("RSSI:\t\t");
       Serial.println(WiFi.RSSI());
 
-      myTZ.setLocation(configuration.General.Time_Timezone);
+      myTZ.setLocation(configuration.General.Timezone);
       Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
     }
 }

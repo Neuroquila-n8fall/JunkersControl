@@ -23,10 +23,6 @@ unsigned long convertHexString(const char *src)
 
 bool ReadConfiguration()
 {
-    // Init SPIFFS
-    if (!SPIFFS.begin())
-        SPIFFS.begin(true);
-
     if (!SPIFFS.exists(configFileName))
     {
         Log.println("Configuration file could not be found. Please upload it first.");
@@ -197,9 +193,111 @@ bool ReadConfiguration()
         }
     }
 
+void WriteConfiguration()
+{
+    DynamicJsonDocument doc(3072);
 
-    // We don't need to keep it open at this point.
-    SPIFFS.end();
+    JsonObject Wifi = doc.createNestedObject("Wifi");
+    Wifi["SSID"] = configuration.Wifi.SSID;
+    Wifi["Password"] = configuration.Wifi.Password;
+    Wifi["Hostname"] = configuration.Wifi.Hostname;
 
-    return true;
+    JsonObject MQTT = doc.createNestedObject("MQTT");
+    MQTT["Server"] = configuration.Mqtt.Server;
+    MQTT["Port"] = configuration.Mqtt.Port;
+    MQTT["User"] = configuration.Mqtt.User;
+    MQTT["Password"] = configuration.Mqtt.Password;
+
+    JsonObject MQTT_Topics = MQTT.createNestedObject("Topics");
+    MQTT_Topics["HeatingValues"] = configuration.Mqtt.Topics.HeatingValues;
+    MQTT_Topics["HeatingParameters"] = configuration.Mqtt.Topics.HeatingParameters;
+    MQTT_Topics["WaterValues"] = configuration.Mqtt.Topics.WaterValues;
+    MQTT_Topics["WaterParameters"] = configuration.Mqtt.Topics.WaterParameters;
+    MQTT_Topics["AuxilaryValues"] = configuration.Mqtt.Topics.AuxilaryValues;
+    MQTT_Topics["Status"] = configuration.Mqtt.Topics.Status;
+    MQTT_Topics["StatusRequest"] = configuration.Mqtt.Topics.StatusRequest;
+    MQTT_Topics["Boost"] = configuration.Mqtt.Topics.Boost;
+    MQTT_Topics["FastHeatup"] = configuration.Mqtt.Topics.FastHeatup;
+
+    JsonObject Features = doc.createNestedObject("Features");
+    Features["HeatingParameters"] = configuration.Features.HeatingParameters;
+    Features["WaterParameters"] = configuration.Features.WaterParameters;
+    Features["AuxilaryValues"] = configuration.Features.AuxilaryParameters;
+
+    doc["Time"]["Timezone"] = configuration.General.Timezone;
+
+    JsonObject General = doc.createNestedObject("General");
+    General["BusMessageTimeout"] = configuration.General.BusMessageTimeout;
+    General["Debug"] = configuration.General.Debug;
+    General["Sniffing"] = configuration.General.Sniffing;
+
+    JsonObject HomeAssistant = doc.createNestedObject("HomeAssistant");
+    HomeAssistant["AutoDiscoveryPrefix"] = configuration.HomeAssistant.AutoDiscoveryPrefix;
+    HomeAssistant["OffDelay"] = configuration.HomeAssistant.OffDelay;
+    HomeAssistant["Enabled"] = configuration.HomeAssistant.Enabled;
+    HomeAssistant["DeviceId"] = configuration.HomeAssistant.DeviceId;
+    HomeAssistant["TempUnit"] = configuration.HomeAssistant.TempUnit;
+
+    JsonObject CAN = doc.createNestedObject("CAN");
+    CAN["Quartz"] = configuration.CanModuleConfig.CAN_Quartz;
+
+    JsonObject CAN_Addresses = CAN.createNestedObject("Addresses");
+
+    JsonObject CAN_Addresses_Controller = CAN_Addresses.createNestedObject("Controller");
+    CAN_Addresses_Controller["FlameStatus"] = configuration.CanAddresses.General.FlameLit;
+    CAN_Addresses_Controller["Error"] = configuration.CanAddresses.General.Error;
+    CAN_Addresses_Controller["DateTime"] = configuration.CanAddresses.General.DateTime;
+
+    JsonObject CAN_Addresses_Heating = CAN_Addresses.createNestedObject("Heating");
+    CAN_Addresses_Heating["FeedCurrent"] = configuration.CanAddresses.Heating.FeedCurrent;
+    CAN_Addresses_Heating["FeedMax"] = configuration.CanAddresses.Heating.FeedMax;
+    CAN_Addresses_Heating["FeedSetpoint"] = configuration.CanAddresses.Heating.FeedSetpoint;
+    CAN_Addresses_Heating["OutsideTemperature"] = configuration.CanAddresses.Heating.OutsideTemperature;
+    CAN_Addresses_Heating["Pump"] = configuration.CanAddresses.Heating.Pump;
+    CAN_Addresses_Heating["Season"] = configuration.CanAddresses.Heating.Season;
+    CAN_Addresses_Heating["Operation"] = configuration.CanAddresses.Heating.Operation;
+    CAN_Addresses_Heating["Power"] = configuration.CanAddresses.Heating.Power;
+    CAN_Addresses_Heating["Mode"] = configuration.CanAddresses.Heating.Mode;
+    CAN_Addresses_Heating["Economy"] = configuration.CanAddresses.Heating.Economy;
+
+    JsonObject CAN_Addresses_HotWater = CAN_Addresses.createNestedObject("HotWater");
+    CAN_Addresses_HotWater["SetpointTemperature"] = configuration.CanAddresses.HotWater.SetpointTemperature;
+    CAN_Addresses_HotWater["MaxTemperature"] = configuration.CanAddresses.HotWater.MaxTemperature;
+    CAN_Addresses_HotWater["CurrentTemperature"] = configuration.CanAddresses.HotWater.CurrentTemperature;
+    CAN_Addresses_HotWater["Now"] = configuration.CanAddresses.HotWater.Now;
+    CAN_Addresses_HotWater["BufferOperation"] = configuration.CanAddresses.HotWater.BufferOperation;
+    CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature;
+
+    JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses.createNestedObject("MixedCircuit");
+    CAN_Addresses_MixedCircuit["Pump"] = configuration.CanAddresses.MixedCircuit.Pump;
+    CAN_Addresses_MixedCircuit["FeedSetpoint"] = configuration.CanAddresses.MixedCircuit.FeedSetpoint;
+    CAN_Addresses_MixedCircuit["FeedCurrent"] = configuration.CanAddresses.MixedCircuit.FeedCurrent;
+    CAN_Addresses_MixedCircuit["Economy"] = configuration.CanAddresses.MixedCircuit.Economy;
+
+    JsonArray AuxilarySensors_Sensors = doc["AuxilarySensors"].createNestedArray("Sensors");
+
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    {
+        JsonObject sensorEntry = AuxilarySensors_Sensors.createNestedObject();
+        Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
+        sensorEntry["Label"] = curSensor.Label;
+        sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
+        JsonArray address = sensorEntry.createNestedArray("Address");
+        // Device address has a fixed size of 8
+        for (size_t x = 0; x < 8; x++)
+        {
+            char byteBuf[4];
+            sprintf(byteBuf, "0x%.2X", curSensor.Address[x]);
+            address.add(byteBuf);
+        }
+    }
+
+    JsonObject LEDs = doc.createNestedObject("LEDs");
+    LEDs["Wifi"] = configuration.LEDs.WifiLed;
+    LEDs["Status"] = configuration.LEDs.StatusLed;
+    LEDs["Mqtt"] = configuration.LEDs.MqttLed;
+    LEDs["Heating"] = configuration.LEDs.HeatingLed;
+
+    File file = SPIFFS.open(configFileName, FILE_WRITE, true);
+    serializeJson(doc, file);
 }

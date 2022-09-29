@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rebooting...</title>
+    <link rel="stylesheet" href="frontend/bootstrap.min.css">
+</head>
+
+<body>
+    <div class="alert alert-secondary" role="alert">
+        Rebooting, returning to main page in <span class="badge text-bg-primary" id="countdown">30</span> seconds
+    </div>
+    <script type="text/javascript">
+        var seconds = 20;
+        function countdown() {
+            seconds = seconds - 1;
+            if (seconds < 0) {
+                window.location = "/";
+            } else {
+                document.getElementById("countdown").innerHTML = seconds;
+                window.setTimeout("countdown()", 1000);
+            }
+        }
+        countdown();
+    </script>
+</body>
+
+</html>

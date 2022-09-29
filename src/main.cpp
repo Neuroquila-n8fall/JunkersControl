@@ -47,12 +47,50 @@ int dateTimeSendDelay = 30;
 //-- CAN Error Counter
 volatile int CanSendErrorCount;
 
+volatile bool SetupMode = false;
 
 void setup()
 {
+  // Init SPIFFS
+  if (!SPIFFS.begin())
+    SPIFFS.begin(true);
   // Setup Serial
   Serial.begin(115200);
   Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
+
+  Serial.printf("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\r\n\e[0m", STR(ENV));
+
+#pragma region "Setup Mode"
+
+  unsigned long curmils = millis();
+  // Give the user the chance to push the "BOOT" button.
+  while (millis() - curmils <= 5000)
+  {
+    SetupMode = !digitalRead(GPIO_NUM_0);
+    if (SetupMode)
+    {
+      break;
+    }
+  }
+
+  if (SetupMode)
+  {
+
+    if (!SPIFFS.exists("/configuration.json"))
+    {
+      Serial.println("\e[1;31mPlease upload the Filesystem image first.\e[0m");
+      return;
+    }
+    // Launch AP Mode to let the user configure the basics.
+    StartApMode();
+    ConfigureAndStartWebserver();
+    ota();
+    return;
+  }
+
+#pragma endregion
+
+Serial.printf("\e[1;36mSetup Mode not enabled. You can enable it at every time by pressing the \"BOOT\" button once. \r\n\e[0m", STR(ENV));
 
   // Read configuration
   bool result = ReadConfiguration();
@@ -66,15 +104,13 @@ void setup()
   DebugMode = configuration.General.Debug;
   controllerMessageTimeout = configuration.General.BusMessageTimeout;
 
-
-
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
   pinMode(configuration.LEDs.WifiLed, OUTPUT);
   pinMode(configuration.LEDs.MqttLed, OUTPUT);
   pinMode(configuration.LEDs.HeatingLed, OUTPUT);
 
-  //Test Leds
+  // Test Leds
   digitalWrite(configuration.LEDs.StatusLed, HIGH);
   delay(1000);
   digitalWrite(configuration.LEDs.WifiLed, HIGH);
@@ -104,19 +140,38 @@ void setup()
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
 
-  xTaskCreate(ReadTemperatures,"Read Aux Temp", 4096, NULL, 5, NULL);
+  xTaskCreate(ReadTemperatures, "Read Aux Temp", 4096, NULL, 5, NULL);
 
-  xTaskCreate(ShowHeartbeat,"Heartbeat LED", 1024, NULL, 5, NULL);
+  xTaskCreate(ShowHeartbeat, "Heartbeat LED", 1024, NULL, 5, NULL);
 
   xTaskCreate(ShowMqttActivity, "MQTT Activity", 2048, NULL, 5, &MqttActivityHandle);
 
   xTaskCreate(UpdateLeds, "Update LEDs", 2048, NULL, 5, NULL);
 
   xTaskCreate(TrackBoostFunction, "Track Boost", 2048, NULL, 1, NULL);
+
+  ConfigureAndStartWebserver();
 }
 
 void loop()
 {
+  // Stop executing when SetupMode is active.
+  if (SetupMode)
+  {
+    // But we like to be still able to update files via OTA ofc
+    ArduinoOTA.handle();
+    return;
+  }
+
+  // Check if the user has pressed the "BOOT" button
+  if (digitalRead(GPIO_NUM_0) == LOW)
+  {
+    SetupMode = true;
+    // Disconnect Wifi and launch in AP Mode
+    StartApMode();
+    return;
+  }
+
   // Run Timer Events
   events();
   // store the current timer millis
@@ -212,7 +267,7 @@ void loop()
 
       case 2:
         SetFeedTemperature();
-        
+
         if (DebugMode)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
@@ -273,17 +328,17 @@ void loop()
 
     // Request Temperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    if (configuration.Features.Features_AuxilaryParameters)
+    if (configuration.Features.AuxilaryParameters)
     {
       PublishAuxilaryTemperatures();
     }
 
     // Publish Heating Temperatures
-    if (configuration.Features.Features_HeatingParameters)
+    if (configuration.Features.HeatingParameters)
       PublishHeatingTemperaturesAndStatus();
 
     // Publish Water Temperatures
-    if (configuration.Features.Features_WaterParameters)
+    if (configuration.Features.WaterParameters)
       PublishWaterTemperatures();
   }
 
@@ -370,31 +425,31 @@ void SendMessage(CANMessage msg)
       Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
       WriteMessage(msg);
     }
-    if(!can.tryToSend(msg))
+    if (!can.tryToSend(msg))
     {
       CanSendErrorCount++;
-      if(CanErrorActivityHandle == NULL)
+      if (CanErrorActivityHandle == NULL)
       {
-        xTaskCreate(ShowCanError,"Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
+        xTaskCreate(ShowCanError, "Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
       }
       Log.printf("\e[0;31[%s] Failed to send message [0x%.3X] over CAN. This has happened %i times before in a row.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, CanSendErrorCount);
       char logMsg[64];
-      sprintf(logMsg,"CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount);
+      sprintf(logMsg, "CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount);
       PublishLog(logMsg, __func__, LogLevel::Error);
     }
     else
     {
-      
+
       if (CanErrorActivityHandle != NULL)
       {
         vTaskDelete(CanErrorActivityHandle);
         CanErrorActivityHandle = NULL;
 
-      char logMsg[50];
-      sprintf(logMsg,"CAN send error CLEARED", msg.id, CanSendErrorCount);
-      PublishLog(logMsg, __func__, LogLevel::Info);
-      Log.printf("\e[0;32[%s] CAN send error CLEARED after %i previously failed attempts.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), CanSendErrorCount);
-      CanSendErrorCount = 0;
+        char logMsg[50];
+        sprintf(logMsg, "CAN send error CLEARED", msg.id, CanSendErrorCount);
+        PublishLog(logMsg, __func__, LogLevel::Info);
+        Log.printf("\e[0;32[%s] CAN send error CLEARED after %i previously failed attempts.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), CanSendErrorCount);
+        CanSendErrorCount = 0;
       }
     }
     lastSentMessageTime = millis();
@@ -434,7 +489,7 @@ void SetDateTime()
   {
     if (lastSentMessageTime - millis() >= 1000)
     {
-      
+
       CANMessage msg = PrepareMessage(configuration.CanAddresses.General.DateTime, 4);
 
       // Get day of week:
@@ -482,7 +537,7 @@ bool SafeToSendMessage(bool dontWaitForController /*= true*/)
 
 void ShowHeartbeat(void *pvParameter)
 {
-  while(true)
+  while (true)
   {
     digitalWrite(configuration.LEDs.StatusLed, HIGH);
     vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -497,20 +552,20 @@ void ShowHeartbeat(void *pvParameter)
 
 void ShowMqttActivity(void *pvParameter)
 {
-  digitalWrite(configuration.LEDs.MqttLed,LOW);
+  digitalWrite(configuration.LEDs.MqttLed, LOW);
   vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(configuration.LEDs.MqttLed,HIGH);
+  digitalWrite(configuration.LEDs.MqttLed, HIGH);
   vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(configuration.LEDs.MqttLed,LOW);
+  digitalWrite(configuration.LEDs.MqttLed, LOW);
   vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(configuration.LEDs.MqttLed,HIGH);
+  digitalWrite(configuration.LEDs.MqttLed, HIGH);
   MqttActivityHandle = NULL;
-  vTaskDelete(NULL);  
+  vTaskDelete(NULL);
 }
 
 void ShowCanError(void *pvParameter)
 {
-  while(true)
+  while (true)
   {
     digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
     vTaskDelay(500);
@@ -579,7 +634,7 @@ void TrackBoostFunction(void *pvParameter)
         commandedValues.Heating.BoostTimeCountdown--;
         if (DebugMode)
         {
-          Log.printf("[%s][%s] Time: %i Left: %i \r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), __func__ , commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
+          Log.printf("[%s][%s] Time: %i Left: %i \r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), __func__, commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
         }
       }
       else

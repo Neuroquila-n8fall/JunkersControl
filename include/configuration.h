@@ -31,13 +31,13 @@ struct Configuration
     {
         char SSID[255];     // "ssid"
         char Password[255]; // "pass"
-        char Hostname[255]; // "CERASMARTER"
+        char Hostname[255] = "CERASMARTER"; // "CERASMARTER"
     } Wifi;
 
     struct Mqtt_
     {
         char Server[15];    // "192.168.1.123"
-        int Port;           // "Default: 1883"
+        int Port = 1883;           // "Default: 1883"
         char User[255];     // "user"
         char Password[255]; // "pass"
 
@@ -58,14 +58,14 @@ struct Configuration
 
     struct Features_
     {
-        bool Features_HeatingParameters;  // true
-        bool Features_WaterParameters;    // false
-        bool Features_AuxilaryParameters; // false
+        bool HeatingParameters;  // true
+        bool WaterParameters;    // false
+        bool AuxilaryParameters; // false
     } Features;
 
     struct General_
     {
-        char Time_Timezone[255]; // Timezone to be used for NTP, i.e. Europe/Berlin
+        char Timezone[255]; // Timezone to be used for NTP, i.e. Europe/Berlin
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
         bool Debug;            // Output debug messages, true|false
