@@ -127,7 +127,7 @@ The `MQTT` section has everything and this is where you define the topics:
             // Send values here to steer the hot water circuit and functions
             "WaterParameters": "cerasmarter/water/parameters",
             // Topic for receiving temperatures from auxilary sensors
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxilaryValues": "cerasmarter/auxilary/values",
             // Topic for receiving status information
             "Status": "cerasmarter/status",
             // Send values here to receive values on demand

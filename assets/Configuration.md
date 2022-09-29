@@ -33,7 +33,7 @@ This block configures the connection to your MQTT broker
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxilaryValues": "cerasmarter/auxilary/values",
             "Status": "cerasmarter/status",
             "StatusRequest": "cerasmarter/status/get"
         }
@@ -58,7 +58,7 @@ These should be self-explanatory.
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxilaryValues": "cerasmarter/auxilary/values",
             "Status": "cerasmarter/status",
             "StatusRequest": "cerasmarter/status/get"
         }
@@ -71,7 +71,7 @@ These topics are used by the program to send data.
 ```json
             "HeatingValues": "cerasmarter/heating/values",
             "WaterValues": "cerasmarter/water/values",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxilaryValues": "cerasmarter/auxilary/values",
             "Status": "cerasmarter/status",
 ```
 
@@ -99,7 +99,7 @@ This topic is used for requesting data on-demand. See [Status Request Explanatio
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxilaryParameters": false
+        "AuxilaryValues": false
     },
 ```
 
