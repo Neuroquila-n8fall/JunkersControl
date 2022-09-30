@@ -109,7 +109,7 @@ function downloadDeleteButton(filename, action) {
         listFiles(CurrentPath);
         showUsagePercentage();
         _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
-        <strong>File Deleted!</strong> The File ${file.name} has been successfully deleted from ${CurrentPath}
+        <strong>File Deleted!</strong> The File ${filename} has been successfully deleted from ${CurrentPath}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>`;
     }
@@ -131,6 +131,7 @@ function showUsagePercentage() {
     _("space-total").innerHTML = humanReadableSize(usage.Total);
 
     // Colorize progressbar depending on usage
+    _("progUsage").setAttribute("class","progress-bar");
     if (usage.UsedPercent <= 50) {
         _("progUsage").classList.add("bg-success");
         return;
@@ -212,6 +213,7 @@ function completeHandler(event) {
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`;
     _("upload_form").reset();
+    _("loaded_n_total").innerHTML = "";
 }
 function errorHandler(event) {
     _("status").innerHTML = "Upload Failed";
