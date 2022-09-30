@@ -23,13 +23,13 @@ unsigned long convertHexString(const char *src)
 
 bool ReadConfiguration()
 {
-    if (!SPIFFS.exists(configFileName))
+    if (!LittleFS.exists(configFileName))
     {
         Log.println("Configuration file could not be found. Please upload it first.");
         return false;
     }
 
-    File file = SPIFFS.open(configFileName);
+    File file = LittleFS.open(configFileName);
 
     if (!file)
     {
@@ -298,6 +298,6 @@ void WriteConfiguration()
     LEDs["Mqtt"] = configuration.LEDs.MqttLed;
     LEDs["Heating"] = configuration.LEDs.HeatingLed;
 
-    File file = SPIFFS.open(configFileName, FILE_WRITE, true);
+    File file = LittleFS.open(configFileName, FILE_WRITE, true);
     serializeJson(doc, file);
 }

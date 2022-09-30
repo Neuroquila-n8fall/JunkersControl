@@ -61,19 +61,19 @@ void SetupAutodiscoveryForAuxSensors()
 void SetupAutodiscovery(const char *fileName)
 {
     // Init SPIFFS
-    if (!SPIFFS.begin())
+    if (!LittleFS.begin())
     {
         Log.println("SPIFFS Filesystem not ready.");
         return;
     }
 
-    if (!SPIFFS.exists(fileName))
+    if (!LittleFS.exists(fileName))
     {
         Log.println("HA Autodiscovery file could not be found. Please upload it first.");
         return;
     }
 
-    File file = SPIFFS.open(fileName);
+    File file = LittleFS.open(fileName);
 
     if (!file)
     {
@@ -155,6 +155,6 @@ void SetupAutodiscovery(const char *fileName)
     if (DebugMode)
         Log.println("----- HA AD Config END -----///");
 
-    // Close SPIFFS.
-    SPIFFS.end();
+    // Close LittleFS.
+    LittleFS.end();
 }

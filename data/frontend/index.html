@@ -6,16 +6,56 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>CERASMARTER Configuration</title>
-    <link rel="stylesheet" href="frontend/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
 </head>
-<h1>CERASMARTER Configuration</h1>
 
 <body>
-    <div class="container-fluid">
-        <div>
-            <a href="/wifi" class="btn btn-primary">Configure WiFi Network</a>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <div class="row">
+                    <nav class="navbar navbar-expand-lg bg-light">
+                        <div class="container-fluid">
+                            <a class="navbar-brand" href="#">Cerasmarter</a>
+                            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false"
+                                aria-label="Toggle navigation">
+                                <span class="navbar-toggler-icon"></span>
+                            </button>
+                            <div class="collapse navbar-collapse" id="navbarText">
+                                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" aria-current="page" href="/">Home</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="/wifi">Wifi</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" href="/filemanager">Filemanager</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+                <div class="row mt-5">
+                    <h3></h3>
+                </div>
+
+                <div class="row mt-5">
+                    <div class="d-grid gap-2 col-6 mx-auto">
+                        <button class="btn btn-danger" onclick="rebootButton()">Reboot</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+            </div>
         </div>
     </div>
+    <script src="frontend/js/filemanager.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

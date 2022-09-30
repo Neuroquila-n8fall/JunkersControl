@@ -52,8 +52,8 @@ volatile bool SetupMode = false;
 void setup()
 {
   // Init SPIFFS
-  if (!SPIFFS.begin())
-    SPIFFS.begin(true);
+  if (!LittleFS.begin())
+    LittleFS.begin(true);
   // Setup Serial
   Serial.begin(115200);
   Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
@@ -76,7 +76,7 @@ void setup()
   if (SetupMode)
   {
 
-    if (!SPIFFS.exists("/configuration.json"))
+    if (!LittleFS.exists("/configuration.json"))
     {
       Serial.println("\e[1;31mPlease upload the Filesystem image first.\e[0m");
       return;

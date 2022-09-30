@@ -6,7 +6,7 @@ volatile bool ShouldReboot = false;
 
 void StartApMode()
 {
-    // MAke sure we're disconnected
+    // Make sure we're disconnected
     WiFi.disconnect();
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(configuration.Wifi.Hostname, NULL);
@@ -19,24 +19,51 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 
-String getFsUsagePercent()
+void getFsUsagePercent(AsyncWebServerRequest *request)
 {
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
     StaticJsonDocument<128> doc;
-    double total = SPIFFS.totalBytes();
-    double used = SPIFFS.usedBytes();
+    double total = LittleFS.totalBytes();
+    double used = LittleFS.usedBytes();
     double free = total - used;
     doc["Free"] = free;
     doc["Used"] = used;
     doc["Total"] = total;
     double usedPercent = (used / total) * 100.0;
     double freePercent = (free / total) * 100.0;
-    Serial.printf("Calculated SPIFFS Space: Percent free: %.2f Percent used: %.2f", freePercent, usedPercent);
     doc["UsedPercent"] = ceil(usedPercent);
     doc["FreePercent"] = ceil(freePercent);
-    String result;
-    serializeJson(doc, result);
 
-    return result;
+    serializeJson(doc, *response);
+    request->send(response);
+}
+
+void listFsFiles(AsyncWebServerRequest *request, String path /* = "/" */)
+{
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    if (path.isEmpty())
+        path = "/";
+    if (!LittleFS.exists(path))
+    {
+        request->send(404, "application/json", "{ \"status\":\"Path not found\",\"path\":\"" + path + "\"}");
+        return;
+    }
+    File rootDir = LittleFS.open(path);
+    File fsEntry = rootDir.openNextFile();
+    StaticJsonDocument<2048> doc;
+    JsonArray files = doc.createNestedArray((String)rootDir.path());
+
+    while (fsEntry)
+    {
+        JsonObject file = files.createNestedObject();
+        file["Name"] = (String)fsEntry.name();
+        file["Size"] = (int)fsEntry.size();
+        file["Directory"] = fsEntry.isDirectory();
+        fsEntry = rootDir.openNextFile();
+    }
+
+    serializeJson(doc, *response);
+    request->send(response);
 }
 
 void ConfigureAndStartWebserver()
@@ -51,10 +78,23 @@ void ConfigureAndStartWebserver()
     server->onFileUpload(handleUpload);
 
     server->on("/filemanager", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(SPIFFS, "/frontend/filemanager.html", "text/html", false, processor); });
+               { request->send(LittleFS, "/frontend/filemanager.html", "text/html", false, processor); });
 
     server->on("/api/freestorage", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(200, "application/json", getFsUsagePercent()); });
+               { getFsUsagePercent(request); });
+
+    server->on("/api/listfiles", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+                   if (request->hasParam("path"))
+                   {
+                       const String path = request->getParam("path")->value();
+                       listFsFiles(request, path);
+                   }
+                   else
+                   {
+                       listFsFiles(request);
+                   }
+               });
 
     server->on("/listfiles", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(200, "text/plain", listFiles(true)); });
@@ -65,13 +105,13 @@ void ConfigureAndStartWebserver()
       if (request->hasParam("name") && request->hasParam("action")) {
         const char *fileName = request->getParam("name")->value().c_str();
         const char *fileAction = request->getParam("action")->value().c_str();
-        if (!SPIFFS.exists(fileName)) {
+        if (!LittleFS.exists(fileName)) {
           request->send(400, "text/plain", "ERROR: file does not exist");
         } else {
           if (strcmp(fileAction, "download") == 0) {
-            request->send(SPIFFS, fileName, "application/octet-stream");
+            request->send(LittleFS, fileName, "application/octet-stream");
           } else if (strcmp(fileAction, "delete") == 0) {
-            SPIFFS.remove(fileName);
+            LittleFS.remove(fileName);
             request->send(200, "text/plain", "Deleted File: " + String(fileName));
           } else {
             request->send(400, "text/plain", "ERROR: invalid action param supplied");
@@ -84,11 +124,11 @@ void ConfigureAndStartWebserver()
     // Web Server Root URL
     server->on("/", HTTP_GET, [](AsyncWebServerRequest *request)
                { Log.println("Server Accessed");
-                request->send(SPIFFS, "/frontend/index.html", "text/html"); });
+                request->send(LittleFS, "/frontend/index.html", "text/html"); });
 
     // WiFi config
     server->on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(SPIFFS, "/frontend/wifi.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/wifi.html", "text/html"); });
 
     // Process WiFi input
     server->on("/wifi", HTTP_POST, [](AsyncWebServerRequest *request)
@@ -120,12 +160,12 @@ void ConfigureAndStartWebserver()
     server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest * request) {
     String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
 
-      request->send(SPIFFS, "/frontend/reboot.html", "text/html");
+      request->send(LittleFS, "/frontend/reboot.html", "text/html");
       ShouldReboot = true;
 
   });
 
-    server->serveStatic("/", SPIFFS, "/");
+    server->serveStatic("/", LittleFS, "/");
 
     // Finally, start the server
     server->begin();
@@ -135,17 +175,17 @@ String processor(const String &var)
 {
     if (var == "FREESPIFFS")
     {
-        return humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes()));
+        return humanReadableSize((LittleFS.totalBytes() - LittleFS.usedBytes()));
     }
 
     if (var == "USEDSPIFFS")
     {
-        return humanReadableSize(SPIFFS.usedBytes());
+        return humanReadableSize(LittleFS.usedBytes());
     }
 
     if (var == "TOTALSPIFFS")
     {
-        return humanReadableSize(SPIFFS.totalBytes());
+        return humanReadableSize(LittleFS.totalBytes());
     }
 
     return "";
@@ -168,7 +208,7 @@ String humanReadableSize(const size_t bytes)
 String listFiles(bool ishtml)
 {
     String returnText = "";
-    File root = SPIFFS.open("/");
+    File root = LittleFS.open("/");
     File foundfile = root.openNextFile();
     if (ishtml)
     {
@@ -202,10 +242,11 @@ String listFiles(bool ishtml)
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
 {
     Serial.printf("UPLOAD: Index %i Len %i Final %i Filename %s\r\n", index, len, final, filename);
+    
     if (!index)
     {
         // open the file on first call and store the file handle in the request object
-        request->_tempFile = SPIFFS.open("/" + filename, FILE_WRITE, true);
+        request->_tempFile = LittleFS.open(filename, FILE_WRITE, true);
     }
 
     if (len)

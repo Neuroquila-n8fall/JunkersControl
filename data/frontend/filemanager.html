@@ -6,10 +6,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Manage Files</title>
-    <link rel="stylesheet" href="frontend/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
 </head>
 
 <body>
+    <!-- Modal -->
+    <div class="modal fade" id="confirm-delete-modal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the file <span id="delete-confirm-filename"></span>?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="btn-confirm-delete" onclick="null">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container text-center">
         <div class="row">
             <div class="col-md-3">
@@ -48,11 +66,11 @@
                     <div class="container text-center">
                         <div class="row m-5">
                             <div class="container text-center">
-                                <div class="badge bg-secondary">Free Storage <span class="badge bg-primary">%FREESPIFFS%</span>
+                                <div class="badge bg-secondary">Free Storage <span class="badge bg-primary" id="space-free"></span>
                                 </div>
-                                <div class="badge bg-secondary">Used Storage <span class="badge bg-primary">%USEDSPIFFS%</span>
+                                <div class="badge bg-secondary">Used Storage <span class="badge bg-primary" id="space-occupied"></span>
                                 </div>
-                                <div class="badge bg-secondary">Total Storage <span class="badge bg-primary">%TOTALSPIFFS%</span>
+                                <div class="badge bg-secondary">Total Storage <span class="badge bg-primary" id="space-total"></span>
                                 </div>
                                 <div class="progress mt-3">
                                     <div class="progress-bar" role="progressbar" id="progUsage" aria-label="Filesystem Usage" style="width: 50%;"
@@ -67,12 +85,19 @@
                     <span id="detailsheader"></span>
                     <span id="details"></span>
                     <span id="status"></span>
+                    <div class="badge rounded-pill bg-light text-dark" id="loaded_n_total"></div>
                 </div>
                 <div class="row">
-                    <div class="d-grid gap-2 col-6 mx-auto">
-                        <button class="btn btn-primary" onclick="listFilesButton()">List Files</button>
-                        <button class="btn btn-primary" onclick="showUploadButtonFancy()">Upload File</button>
-                    </div>
+                    <form id="upload_form" enctype="multipart/form-data" method="post">
+                        <div class="mb-5">
+                            <label for="file1" class="form-label">Upload File</label>
+                            <input class="form-control" type="file" id="file1" name="file1" onchange="uploadFile()">
+                        </div>
+                        <div class="progress" id="progress" hidden>
+                            <div class="progress-bar" role="progressbar" id="progressBar" aria-label="Upload Progress"
+                                style="display: none !important;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>                                        
+                    </form>
                 </div>
                 <div class="row mt-5">
                     <div class="d-grid gap-2 col-6 mx-auto">
@@ -84,9 +109,11 @@
             </div>
         </div>
     </div>
-    <script src="frontend/filemanager.js"></script>
+    <script src="frontend/js/filemanager.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript">
         showUsagePercentage();
+        listFiles();
     </script>
 </body>
 

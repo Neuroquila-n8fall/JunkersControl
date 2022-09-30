@@ -36,7 +36,7 @@ void connectWifi()
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
-      // WAit 10 seconds to connect
+      // Wait 10 seconds to connect
       if (millis() - prevConnectMillis >= 10000)
       {
         Serial.println("Connection Failed! Rebooting...");

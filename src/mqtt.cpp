@@ -284,13 +284,6 @@ void PublishStatus()
   jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
 
-  if (DebugMode)
-  {
-    Log.println("//START\r\n[MQTT - SEND STATUS]");
-    serializeJsonPretty(doc, Log);
-    Log.println("//END");
-  }
-
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
     return;
@@ -348,13 +341,6 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
 
-  if (DebugMode)
-  {
-    Log.println("//START\r\n[MQTT - SEND HEATING]");
-    serializeJsonPretty(doc, Log);
-    Log.println("//END");
-  }
-
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
     return;
@@ -406,13 +392,6 @@ void PublishWaterTemperatures()
   jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
   jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
 
-  if (DebugMode)
-  {
-    Log.println("//START\r\n[MQTT - SEND WATER]");
-    serializeJsonPretty(doc, Log);
-    Log.println("//END");
-  }
-
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
     return;
@@ -461,13 +440,6 @@ void PublishAuxilaryTemperatures()
     JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
     sensorVal["Temperature"] = ceraValues.Auxilary.Temperatures[i];
     sensorVal["Reachable"] = boolToString(curSensor.reachable);
-  }
-
-  if (DebugMode)
-  {
-    Log.println("//START\r\n[MQTT - SEND AUX]");
-    serializeJsonPretty(doc, Log);
-    Log.println("//END");
   }
 
   // Mute Flag Set. Don't send message.

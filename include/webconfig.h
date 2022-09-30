@@ -5,7 +5,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <wifi_config.h>
 #include <configuration.h>
 
@@ -22,6 +22,8 @@ extern String processor(const String &var);
 extern String humanReadableSize(const size_t bytes);
 
 extern String listFiles(bool ishtml);
+
+extern void listFsFiles(AsyncWebServerRequest *request, String path  = "/");
 
 extern volatile bool ShouldReboot;
 
