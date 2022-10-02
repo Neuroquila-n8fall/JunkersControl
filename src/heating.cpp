@@ -99,7 +99,7 @@ double CalculateFeedTemperature()
     // Dynamic Adaption Feature. Only active when fast heatup is inactive!
     if (commandedValues.Heating.DynamicAdaption && !commandedValues.Heating.FastHeatup)
     {
-        double dynamicAdaption = commandedValues.Heating.TargetAmbientTemperature - ceraValues.Auxilary.FeedReturnTemperatureReference;
+        double dynamicAdaption = commandedValues.Heating.TargetAmbientTemperature - ceraValues.Auxiliary.FeedReturnTemperatureReference;
         // In this case we add the manual adaption.
         dynamicAdaption += commandedValues.Heating.FeedAdaption;
         // ... then we add everything up

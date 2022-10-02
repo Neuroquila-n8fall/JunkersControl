@@ -10,15 +10,17 @@ Configuration configuration;
 
 // Converters
 
-void convertFromJson(JsonVariantConst src, byte &dst)
-{
-    dst = strtoul(src.as<const char *>(), NULL, 16);
-}
-
 unsigned long convertHexString(const char *src)
 {
     byte addr = strtoul(src, NULL, 16);
     return strtoul(src, NULL, 16);
+}
+
+String IntToHex(int value)
+{
+    char buf[5];
+    sprintf(buf, "0x%.3X", value);
+    return buf;
 }
 
 bool ReadConfiguration()
@@ -34,6 +36,7 @@ bool ReadConfiguration()
     if (!file)
     {
         Log.println("Configuration file could not be loaded. Consider checking and reuploading it.");
+        file.close();
         return false;
     }
 
@@ -45,6 +48,7 @@ bool ReadConfiguration()
     if (error)
     {
         Log.printf("Error processing configuration: %s\r\n", error.c_str());
+        file.close();
         return false;
     }
 
@@ -68,7 +72,7 @@ bool ReadConfiguration()
     strlcpy(configuration.Mqtt.Topics.WaterValues, MQTT_Topics["WaterValues"], sizeof(configuration.Mqtt.Topics.WaterValues));                   //"cerasmarter/water/values"
     strlcpy(configuration.Mqtt.Topics.HeatingParameters, MQTT_Topics["HeatingParameters"], sizeof(configuration.Mqtt.Topics.HeatingParameters)); //"cerasmarter/heating/parameters"
     strlcpy(configuration.Mqtt.Topics.WaterParameters, MQTT_Topics["WaterParameters"], sizeof(configuration.Mqtt.Topics.WaterParameters));       //"cerasmarter/water/parameters"
-    strlcpy(configuration.Mqtt.Topics.AuxilaryValues, MQTT_Topics["AuxilaryValues"], sizeof(configuration.Mqtt.Topics.AuxilaryValues));          //"cerasmarter/auxilary/parameters"
+    strlcpy(configuration.Mqtt.Topics.AuxiliaryValues, MQTT_Topics["AuxiliaryValues"], sizeof(configuration.Mqtt.Topics.AuxiliaryValues));          //"cerasmarter/auxiliary/parameters"
     strlcpy(configuration.Mqtt.Topics.Status, MQTT_Topics["Status"], sizeof(configuration.Mqtt.Topics.Status));                                  // "cerasmarter/status"
     strlcpy(configuration.Mqtt.Topics.StatusRequest, MQTT_Topics["StatusRequest"], sizeof(configuration.Mqtt.Topics.StatusRequest));             // "cerasmarter/status/get"
     strlcpy(configuration.Mqtt.Topics.Boost, MQTT_Topics["Boost"], sizeof(configuration.Mqtt.Topics.Boost));                                     // "cerasmarter/status/get"
@@ -77,7 +81,7 @@ bool ReadConfiguration()
     JsonObject Features = doc["Features"];
     configuration.Features.HeatingParameters = Features["HeatingParameters"]; // true
     configuration.Features.WaterParameters = Features["WaterParameters"];     // false
-    configuration.Features.AuxilaryParameters = Features["AuxilaryValues"];   // false
+    configuration.Features.AuxiliaryParameters = Features["AuxiliaryValues"];   // false
 
     JsonObject TimeSettings = doc["Time"];
     strlcpy(configuration.General.Timezone, TimeSettings["Timezone"], sizeof(configuration.General.Timezone)); // true
@@ -144,17 +148,17 @@ bool ReadConfiguration()
     int curSensor = 0;
     bool tempReferenceSensorSet = false;
 
-    JsonArray sensors = doc["AuxilarySensors"]["Sensors"].as<JsonArray>();
+    JsonArray sensors = doc["AuxiliarySensors"]["Sensors"].as<JsonArray>();
 
     const int sensorCount = sensors.size();
 
     // Resize the Temperature array
-    ceraValues.Auxilary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
+    ceraValues.Auxiliary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
 
     // Set initial values to zero.
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
     {
-        ceraValues.Auxilary.Temperatures[i] = 0.0F;
+        ceraValues.Auxiliary.Temperatures[i] = 0.0F;
     }
 
     // Init Sensors: This might cause trouble if too many sensors are added... we'll have to see where this is going.
@@ -163,14 +167,14 @@ bool ReadConfiguration()
     // Set the amount of sensors
     configuration.TemperatureSensors.SensorCount = sensorCount;
 
-    for (JsonObject AuxilarySensors_Sensor : sensors)
+    for (JsonObject AuxiliarySensors_Sensor : sensors)
     {
         Sensor newSensor;
-        strlcpy(newSensor.Label, AuxilarySensors_Sensor["Label"], sizeof(newSensor.Label)); // true
-        newSensor.UseAsReturnValueReference = AuxilarySensors_Sensor["IsReturnValue"].as<bool>();
-        JsonArray AuxilarySensors_Sensor_Address = AuxilarySensors_Sensor["Address"];
+        strlcpy(newSensor.Label, AuxiliarySensors_Sensor["Label"], sizeof(newSensor.Label)); // true
+        newSensor.UseAsReturnValueReference = AuxiliarySensors_Sensor["IsReturnValue"].as<bool>();
+        JsonArray AuxiliarySensors_Sensor_Address = AuxiliarySensors_Sensor["Address"];
         int i = 0;
-        for (JsonVariant value : AuxilarySensors_Sensor_Address)
+        for (JsonVariant value : AuxiliarySensors_Sensor_Address)
         {
             byte addrByte = strtoul(value.as<const char *>(), NULL, 16);
             newSensor.Address[i++] = addrByte;
@@ -190,6 +194,7 @@ bool ReadConfiguration()
             Log.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
         }
     }
+    file.close();
     return true;
 }
 
@@ -213,7 +218,7 @@ void WriteConfiguration()
     MQTT_Topics["HeatingParameters"] = configuration.Mqtt.Topics.HeatingParameters;
     MQTT_Topics["WaterValues"] = configuration.Mqtt.Topics.WaterValues;
     MQTT_Topics["WaterParameters"] = configuration.Mqtt.Topics.WaterParameters;
-    MQTT_Topics["AuxilaryValues"] = configuration.Mqtt.Topics.AuxilaryValues;
+    MQTT_Topics["AuxiliaryValues"] = configuration.Mqtt.Topics.AuxiliaryValues;
     MQTT_Topics["Status"] = configuration.Mqtt.Topics.Status;
     MQTT_Topics["StatusRequest"] = configuration.Mqtt.Topics.StatusRequest;
     MQTT_Topics["Boost"] = configuration.Mqtt.Topics.Boost;
@@ -222,7 +227,7 @@ void WriteConfiguration()
     JsonObject Features = doc.createNestedObject("Features");
     Features["HeatingParameters"] = configuration.Features.HeatingParameters;
     Features["WaterParameters"] = configuration.Features.WaterParameters;
-    Features["AuxilaryValues"] = configuration.Features.AuxilaryParameters;
+    Features["AuxiliaryValues"] = configuration.Features.AuxiliaryParameters;
 
     doc["Time"]["Timezone"] = configuration.General.Timezone;
 
@@ -244,41 +249,41 @@ void WriteConfiguration()
     JsonObject CAN_Addresses = CAN.createNestedObject("Addresses");
 
     JsonObject CAN_Addresses_Controller = CAN_Addresses.createNestedObject("Controller");
-    CAN_Addresses_Controller["FlameStatus"] = configuration.CanAddresses.General.FlameLit;
-    CAN_Addresses_Controller["Error"] = configuration.CanAddresses.General.Error;
-    CAN_Addresses_Controller["DateTime"] = configuration.CanAddresses.General.DateTime;
+    CAN_Addresses_Controller["FlameStatus"] = IntToHex(configuration.CanAddresses.General.FlameLit);
+    CAN_Addresses_Controller["Error"] = IntToHex(configuration.CanAddresses.General.Error);
+    CAN_Addresses_Controller["DateTime"] = IntToHex(configuration.CanAddresses.General.DateTime);
 
     JsonObject CAN_Addresses_Heating = CAN_Addresses.createNestedObject("Heating");
-    CAN_Addresses_Heating["FeedCurrent"] = configuration.CanAddresses.Heating.FeedCurrent;
-    CAN_Addresses_Heating["FeedMax"] = configuration.CanAddresses.Heating.FeedMax;
-    CAN_Addresses_Heating["FeedSetpoint"] = configuration.CanAddresses.Heating.FeedSetpoint;
-    CAN_Addresses_Heating["OutsideTemperature"] = configuration.CanAddresses.Heating.OutsideTemperature;
-    CAN_Addresses_Heating["Pump"] = configuration.CanAddresses.Heating.Pump;
-    CAN_Addresses_Heating["Season"] = configuration.CanAddresses.Heating.Season;
-    CAN_Addresses_Heating["Operation"] = configuration.CanAddresses.Heating.Operation;
-    CAN_Addresses_Heating["Power"] = configuration.CanAddresses.Heating.Power;
-    CAN_Addresses_Heating["Mode"] = configuration.CanAddresses.Heating.Mode;
-    CAN_Addresses_Heating["Economy"] = configuration.CanAddresses.Heating.Economy;
+    CAN_Addresses_Heating["FeedCurrent"] = IntToHex(configuration.CanAddresses.Heating.FeedCurrent);
+    CAN_Addresses_Heating["FeedMax"] = IntToHex(configuration.CanAddresses.Heating.FeedMax);
+    CAN_Addresses_Heating["FeedSetpoint"] = IntToHex(configuration.CanAddresses.Heating.FeedSetpoint);
+    CAN_Addresses_Heating["OutsideTemperature"] = IntToHex(configuration.CanAddresses.Heating.OutsideTemperature);
+    CAN_Addresses_Heating["Pump"] = IntToHex(configuration.CanAddresses.Heating.Pump);
+    CAN_Addresses_Heating["Season"] = IntToHex(configuration.CanAddresses.Heating.Season);
+    CAN_Addresses_Heating["Operation"] = IntToHex(configuration.CanAddresses.Heating.Operation);
+    CAN_Addresses_Heating["Power"] = IntToHex(configuration.CanAddresses.Heating.Power);
+    CAN_Addresses_Heating["Mode"] = IntToHex(configuration.CanAddresses.Heating.Mode);
+    CAN_Addresses_Heating["Economy"] = IntToHex(configuration.CanAddresses.Heating.Economy);
 
     JsonObject CAN_Addresses_HotWater = CAN_Addresses.createNestedObject("HotWater");
-    CAN_Addresses_HotWater["SetpointTemperature"] = configuration.CanAddresses.HotWater.SetpointTemperature;
-    CAN_Addresses_HotWater["MaxTemperature"] = configuration.CanAddresses.HotWater.MaxTemperature;
-    CAN_Addresses_HotWater["CurrentTemperature"] = configuration.CanAddresses.HotWater.CurrentTemperature;
-    CAN_Addresses_HotWater["Now"] = configuration.CanAddresses.HotWater.Now;
-    CAN_Addresses_HotWater["BufferOperation"] = configuration.CanAddresses.HotWater.BufferOperation;
-    CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature;
+    CAN_Addresses_HotWater["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.SetpointTemperature);
+    CAN_Addresses_HotWater["MaxTemperature"] = IntToHex(configuration.CanAddresses.HotWater.MaxTemperature);
+    CAN_Addresses_HotWater["CurrentTemperature"] = IntToHex(configuration.CanAddresses.HotWater.CurrentTemperature);
+    CAN_Addresses_HotWater["Now"] = IntToHex(configuration.CanAddresses.HotWater.Now);
+    CAN_Addresses_HotWater["BufferOperation"] = IntToHex(configuration.CanAddresses.HotWater.BufferOperation);
+    CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature);
 
     JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses.createNestedObject("MixedCircuit");
-    CAN_Addresses_MixedCircuit["Pump"] = configuration.CanAddresses.MixedCircuit.Pump;
-    CAN_Addresses_MixedCircuit["FeedSetpoint"] = configuration.CanAddresses.MixedCircuit.FeedSetpoint;
-    CAN_Addresses_MixedCircuit["FeedCurrent"] = configuration.CanAddresses.MixedCircuit.FeedCurrent;
-    CAN_Addresses_MixedCircuit["Economy"] = configuration.CanAddresses.MixedCircuit.Economy;
+    CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
+    CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
+    CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
+    CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
 
-    JsonArray AuxilarySensors_Sensors = doc["AuxilarySensors"].createNestedArray("Sensors");
+    JsonArray AuxiliarySensors_Sensors = doc["AuxiliarySensors"].createNestedArray("Sensors");
 
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
     {
-        JsonObject sensorEntry = AuxilarySensors_Sensors.createNestedObject();
+        JsonObject sensorEntry = AuxiliarySensors_Sensors.createNestedObject();
         Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
         sensorEntry["Label"] = curSensor.Label;
         sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
@@ -299,5 +304,7 @@ void WriteConfiguration()
     LEDs["Heating"] = configuration.LEDs.HeatingLed;
 
     File file = LittleFS.open(configFileName, FILE_WRITE, true);
-    serializeJson(doc, file);
+    serializeJsonPretty(doc, file);
+    serializeJsonPretty(doc, Serial);
+    file.close();
 }

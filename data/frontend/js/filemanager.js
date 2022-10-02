@@ -1,8 +1,5 @@
 var CurrentPath ="/";
 
-function _(el) {
-    return document.getElementById(el);
-}
 function rebootButton() {
     document.getElementById("statusdetails").innerHTML = "Invoking Reboot ...";
     var xhr = new XMLHttpRequest();
@@ -33,7 +30,6 @@ function listFiles(path) {
             var currentPath;
             var table = `<table class="table text-start"><thead><tr><th scope="col">Name</th><th scope="col">Size</th><th></th><th></th></tr></thead>`;
             table += `<tbody class="table-group-divider">`;
-            console.log(this.responseText);
             var files = JSON.parse(this.responseText);
             for(var prop in files) {
                 var entries = files[prop];
@@ -55,17 +51,19 @@ function listFiles(path) {
                     }
                     
                 }
-                console.log(currentPath);
                 table += `</tbody></table>`;
-                var breadCrumbs = `<a href="#" onclick="listFiles()">Root</a>`;
+                var breadCrumbs = `<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                  <li class="breadcrumb-item"><a href="#" onclick="listFiles()">Root</a></li>`;
                 var itemPath = "";
-                for(var item in currentPath) {
+                for (var item in currentPath) {
                     var segment = currentPath[item];
-                    if(segment.trim().length !== 0) {
+                    if (segment.trim().length !== 0) {
                         itemPath += `/${segment}`;
-                        breadCrumbs += `&sol;<a href="#" onclick="listFiles('${itemPath}/')">${segment}</a>`
+                        breadCrumbs += `<li class="breadcrumb-item"><a href="#" onclick="listFiles('${itemPath}/')">${segment}</a></li>`
                     }
                 }
+                breadCrumbs += `</ol></nav>`;
                 _("details").innerHTML = breadCrumbs + `<br>` + table;
                 break;
             }
@@ -81,16 +79,7 @@ function sortByDirectory(a, b) {
         return 1;
     return 0;
 }
-function humanReadableSize(bytes) {
-    if (bytes < 1024)
-        return bytes + " B";
-    else if (bytes < (1024 * 1024))
-        return (bytes / 1024.0).toFixed(2) + " KB";
-    else if (bytes < (1024 * 1024 * 1024))
-        return (bytes / 1024.0 / 1024.0).toFixed(2) + " MB";
-    else
-        return (bytes / 1024.0 / 1024.0 / 1024.0).toFixed(2) + " GB";
-}
+
 function deleteFile(path)
 {
     var dialog = new bootstrap.Modal(_("confirm-delete-modal"), null);
@@ -103,15 +92,19 @@ function downloadDeleteButton(filename, action) {
     xmlhttp = new XMLHttpRequest();
     if (action == "delete") {
         xmlhttp.open("GET", urltocall, false);
+        xmlhttp.addEventListener("readystatechange", function () {
+            if (this.readyState === 4) {
+                var dialog = bootstrap.Modal.getInstance(_("confirm-delete-modal"));
+                dialog.hide();
+                listFiles(CurrentPath);
+                showUsagePercentage();
+                _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>File Deleted!</strong> The File ${filename} has been successfully deleted from ${CurrentPath}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>`;
+            }
+        });
         xmlhttp.send();
-        var dialog = bootstrap.Modal.getInstance(_("confirm-delete-modal"));
-        dialog.hide();
-        listFiles(CurrentPath);
-        showUsagePercentage();
-        _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
-        <strong>File Deleted!</strong> The File ${filename} has been successfully deleted from ${CurrentPath}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>`;
     }
     if (action == "download") {
         _("status").innerHTML = "";
@@ -121,30 +114,34 @@ function downloadDeleteButton(filename, action) {
 function showUsagePercentage() {
     xmlhttp = new XMLHttpRequest();
     xmlhttp.open("GET", "/api/freestorage", false);
+    xmlhttp.addEventListener("readystatechange", function () {
+        if (this.readyState === 4) {
+            var usage = JSON.parse(xmlhttp.responseText);
+            _("progUsage").style = "width: " + usage.UsedPercent + "%;";
+            _("progUsage").setAttribute('aria-valuenow', usage.UsedPercent);
+            _("usedSpaceLabel").innerHTML = usage.UsedPercent + "%";
+            _("space-free").innerHTML = humanReadableSize(usage.Free);
+            _("space-occupied").innerHTML = humanReadableSize(usage.Used);
+            _("space-total").innerHTML = humanReadableSize(usage.Total);
+
+            // Colorize progressbar depending on usage
+            _("progUsage").setAttribute("class", "progress-bar");
+            if (usage.UsedPercent <= 50) {
+                _("progUsage").classList.add("bg-success");
+                return;
+            }
+            if (usage.UsedPercent >= 50) {
+                _("progUsage").classList.add("bg-warning");
+                return;
+            }
+            if (usage.UsedPercent >= 90) {
+                _("progUsage").classList.add("bg-alert");
+                return;
+            }
+            
+        }
+    });
     xmlhttp.send();
-    var usage = JSON.parse(xmlhttp.responseText);
-    _("progUsage").style = "width: " + usage.UsedPercent + "%;";
-    _("progUsage").setAttribute('aria-valuenow', usage.UsedPercent);
-    _("usedSpaceLabel").innerHTML = usage.UsedPercent + "%";
-    _("space-free").innerHTML = humanReadableSize(usage.Free);
-    _("space-occupied").innerHTML = humanReadableSize(usage.Used);
-    _("space-total").innerHTML = humanReadableSize(usage.Total);
-
-    // Colorize progressbar depending on usage
-    _("progUsage").setAttribute("class","progress-bar");
-    if (usage.UsedPercent <= 50) {
-        _("progUsage").classList.add("bg-success");
-        return;
-    }
-    if (usage.UsedPercent >= 50) {
-        _("progUsage").classList.add("bg-warning");
-        return;
-    }
-    if (usage.UsedPercent >= 90) {
-        _("progUsage").classList.add("bg-alert");
-        return;
-    }  
-
 }
 function showUploadButtonFancy() {
     _("detailsheader").innerHTML = "<h3>Upload File<h3>"
@@ -168,16 +165,14 @@ function uploadFile() {
     var file = _("file1").files[0];
     var fileName = file.name;
     var modFile = renameFile(file, `${CurrentPath}${fileName}`);
-    // alert(file.name+" | "+file.size+" | "+file.type);
     var formdata = new FormData();
     formdata.append("file1", modFile);
-    formdata.append("path", CurrentPath);
     var ajax = new XMLHttpRequest();
     ajax.upload.addEventListener("progress", progressHandler, false);
     ajax.addEventListener("load", completeHandler, false); // doesnt appear to ever get called even upon success
     ajax.addEventListener("error", errorHandler, false);
     ajax.addEventListener("abort", abortHandler, false);
-    ajax.open("POST", "/");
+    ajax.open("POST", "/filemanager/upload");
     ajax.send(formdata);
 }
 
@@ -189,8 +184,7 @@ function renameFile(originalFile, newName) {
 }
 
 function progressHandler(event) {
-    //_("loaded_n_total").innerHTML = "Uploaded " + event.loaded + " bytes of " + event.total; // event.total doesnt show accurate total file size
-    _("loaded_n_total").innerHTML = "Uploaded " + event.loaded + " bytes";
+    _("loaded_n_total").innerHTML = "Uploaded " + humanReadableSize(event.loaded);
     var percent = (event.loaded / event.total) * 100;
     var roundedPercent = Math.round(percent);
     _("progressBar").style = "width: " + roundedPercent + "%;";
@@ -216,8 +210,16 @@ function completeHandler(event) {
     _("loaded_n_total").innerHTML = "";
 }
 function errorHandler(event) {
-    _("status").innerHTML = "Upload Failed";
+    _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <strong>File Upload Failed!</strong><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+    _("upload_form").reset();
+    listFiles(CurrentPath);
 }
 function abortHandler(event) {
-    _("status").innerHTML = "inUpload Aborted";
+    _("status").innerHTML = `<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <strong>File Upload Aborted!</strong><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+    _("upload_form").reset();
+    listFiles(CurrentPath);
 }

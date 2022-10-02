@@ -14,7 +14,7 @@
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryValues": "cerasmarter/auxilary/values",
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
             "StatusRequest": "cerasmarter/status/get",
             "Boost": "cerasmarter/boost/set",
@@ -24,7 +24,7 @@
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxilaryValues": false
+        "AuxiliaryValues": false
     },
     "Time": {
         "Timezone": "Europe/Berlin"
@@ -80,7 +80,7 @@
             }
         }
     },
-    "AuxilarySensors":
+    "AuxiliarySensors":
     {
         "Sensors":
         [

@@ -22,7 +22,7 @@ extern OneWire oneWire;
 extern DallasTemperature sensors;
 
 
-//-- Auxilary Sensor Values (OneWire Sensors)
+//-- Auxiliary Sensor Values (OneWire Sensors)
 extern double aux_feedTemperature;
 extern double aux_returnTemperature;
 extern double aux_ambientTemperature;

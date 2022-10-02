@@ -48,8 +48,8 @@ void SetupAutodiscoveryForAuxSensors()
         String label = configuration.TemperatureSensors.Sensors[i].Label;
         label.replace(" ", "-");
         char *valTempl;
-        sprintf(valTempl, "{{ value_json.Auxilary.%s }}", label);
-        String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
+        sprintf(valTempl, "{{ value_json.Auxiliary.%s }}", label);
+        String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
         CreateAndPublishAutoDiscoverySensorJson(
             label.c_str(),
             configuration.HomeAssistant.TempUnit.c_str(),

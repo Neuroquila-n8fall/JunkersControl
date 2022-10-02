@@ -34,8 +34,8 @@ struct CommandedValues
         double MinimumFeedTemperature = 10.0F;
         // Whether the heating should be off or not
         bool Active = true;
-        // Auxilary Temperature
-        double AuxilaryTemperature = 0.00F;
+        // Auxiliary Temperature
+        double AuxiliaryTemperature = 0.00F;
         // Boost will max the feed temperature for BoostTime seconds
         bool Boost = false;
         // Boost Duration (Seconds)
@@ -88,7 +88,7 @@ extern void callback(char *topic, byte *payload, unsigned int length);
 extern void PublishStatus();
 extern void PublishHeatingTemperaturesAndStatus();
 extern void PublishWaterTemperatures();
-extern void PublishAuxilaryTemperatures();
+extern void PublishAuxiliaryTemperatures();
 extern void ShowActivityLed();
 extern String boolToString(bool src);
 extern void PublishLog(const char *msg, const char *func, LogLevel level);

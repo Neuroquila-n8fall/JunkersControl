@@ -30,7 +30,7 @@ void initSensors()
 
 }
 
-//Reads the attached temperature sensors and puts them into ceraValues.Auxilary
+//Reads the attached temperature sensors and puts them into ceraValues.Auxiliary
 void ReadTemperatures(void *pvParameters)
 {
     while (true)
@@ -42,12 +42,12 @@ void ReadTemperatures(void *pvParameters)
             float value = sensors.getTempC(configuration.TemperatureSensors.Sensors[i].Address);
             if (value != DEVICE_DISCONNECTED_C)
             {
-                ceraValues.Auxilary.Temperatures[i] = value;
+                ceraValues.Auxiliary.Temperatures[i] = value;
                 configuration.TemperatureSensors.Sensors[i].reachable = true;
                 // Set Return Feed Reference
                 if (configuration.TemperatureSensors.Sensors[i].UseAsReturnValueReference)
                 {
-                    ceraValues.Auxilary.FeedReturnTemperatureReference = value;
+                    ceraValues.Auxiliary.FeedReturnTemperatureReference = value;
                 }
 
                 if (DebugMode)
@@ -57,7 +57,7 @@ void ReadTemperatures(void *pvParameters)
             }
             else
             {
-                ceraValues.Auxilary.Temperatures[i] = 0.0F;
+                ceraValues.Auxiliary.Temperatures[i] = 0.0F;
                 configuration.TemperatureSensors.Sensors[i].reachable = false;
                 if (DebugMode)
                 {

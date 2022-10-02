@@ -132,11 +132,11 @@ struct CeraValues
     int Minutes = 0;
   } Time;
 
-  struct Auxilary_
+  struct Auxiliary_
   {
     float *Temperatures;
     double FeedReturnTemperatureReference;
-  } Auxilary;
+  } Auxiliary;
 };
 
 extern CeraValues ceraValues;

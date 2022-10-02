@@ -13,6 +13,10 @@
 
 extern bool ReadConfiguration();
 
+extern void WriteConfiguration();
+
+extern String IntToHex(int value);
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
 //——————————————————————————————————————————————————————————————————————————————
@@ -47,7 +51,7 @@ struct Configuration
             char HeatingParameters[255];
             char WaterValues[255];
             char WaterParameters[255];
-            char AuxilaryValues[255];
+            char AuxiliaryValues[255];
             char Status[255]; 
             char StatusRequest[255];
             char Boost[255];
@@ -60,7 +64,7 @@ struct Configuration
     {
         bool HeatingParameters;  // true
         bool WaterParameters;    // false
-        bool AuxilaryParameters; // false
+        bool AuxiliaryParameters; // false
     } Features;
 
     struct General_

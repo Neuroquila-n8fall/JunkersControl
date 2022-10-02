@@ -3,6 +3,7 @@
 AsyncWebServer *server;
 
 volatile bool ShouldReboot = false;
+static size_t content_len;
 
 void StartApMode()
 {
@@ -13,10 +14,11 @@ void StartApMode()
     Serial.printf("\e[1;32mWiFi AP launched. Find me @ %s\r\n\e[0m", WiFi.softAPIP().toString());
 }
 
-void notFound(AsyncWebServerRequest *request) {
-  String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
-  Serial.println(logmessage);
-  request->send(404, "text/plain", "Not found");
+void notFound(AsyncWebServerRequest *request)
+{
+    String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
+    Serial.println(logmessage);
+    request->send(404, "text/plain", "Not found");
 }
 
 void getFsUsagePercent(AsyncWebServerRequest *request)
@@ -66,6 +68,23 @@ void listFsFiles(AsyncWebServerRequest *request, String path /* = "/" */)
     request->send(response);
 }
 
+void getWifiConfig(AsyncWebServerRequest *request)
+{
+
+    StaticJsonDocument<256> doc;
+    doc["wifi_ssid"] = configuration.Wifi.SSID;
+    doc["wifi_pw"] = configuration.Wifi.Password;
+    doc["hostname"] = configuration.Wifi.Hostname;
+    sendJson(doc, request);
+}
+
+void sendJson(JsonDocument &doc, AsyncWebServerRequest *request)
+{
+    AsyncResponseStream *response = request->beginResponseStream("application/json");
+    serializeJson(doc, *response);
+    request->send(response);
+}
+
 void ConfigureAndStartWebserver()
 {
     server = new AsyncWebServer(80);
@@ -73,9 +92,22 @@ void ConfigureAndStartWebserver()
     server->onNotFound(notFound);
 
     //-------------------------------------------------------------------------
-    // File Manager
+    // Firmware Update
+    server->on(
+        "/upload-firmware", HTTP_POST, [](AsyncWebServerRequest *request) {
+        request->send(200);
+      }, handleDoUpdate);
 
-    server->onFileUpload(handleUpload);
+    server->on("/update-firmware", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/firmware.html", "text/html"); });
+
+
+    //-------------------------------------------------------------------------
+    // File Manager
+    
+    server->on("/filemanager/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
+        request->send(200);
+      }, handleUpload);
 
     server->on("/filemanager", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/filemanager.html", "text/html", false, processor); });
@@ -93,8 +125,7 @@ void ConfigureAndStartWebserver()
                    else
                    {
                        listFsFiles(request);
-                   }
-               });
+                   } });
 
     server->on("/listfiles", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(200, "text/plain", listFiles(true)); });
@@ -123,47 +154,77 @@ void ConfigureAndStartWebserver()
 
     // Web Server Root URL
     server->on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-               { Log.println("Server Accessed");
-                request->send(LittleFS, "/frontend/index.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/index.html", "text/html"); });
 
-    // WiFi config
+    // Info GET
+    server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getSystemStatus(request); });
+
+    // MQTT config Page
+    server->on("/mqtt", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/mqtt.html", "text/html"); });
+
+    // MQTT Config GET
+    server->on("/api/config/mqtt", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getMqttConfig(request); });
+
+    // MQTT Config POST
+    AsyncCallbackJsonWebHandler *mqttConfigRcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/mqtt",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onMqttConfigReceive(request, json);
+            });
+
+    server->addHandler(mqttConfigRcvHandler);
+
+    // MQTT Topics GET
+    server->on("/api/config/mqtt-topics", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getMqttTopicConfig(request); });
+    // MQTT Topics POST
+    AsyncCallbackJsonWebHandler *mqttTopicsRcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/mqtt-topics",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onMqttTopicConfigReceive(request, json);
+            });
+
+    server->addHandler(mqttTopicsRcvHandler);
+
+    // WiFi config Page
     server->on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/wifi.html", "text/html"); });
 
-    // Process WiFi input
-    server->on("/wifi", HTTP_POST, [](AsyncWebServerRequest *request)
+    // Wifi Networks GET
+    server->on("/api/wifi/networks", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getWifiNetworks(request); });
+
+    // Wifi Current Connected Network GET
+    server->on("/api/wifi/network", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getCurrentWifiNetwork(request); });
+
+    // Wifi Config POST
+    AsyncCallbackJsonWebHandler *wifiConfigRcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/wifi",
+             [](AsyncWebServerRequest *request, JsonVariant &json) {
+                onWifiConfigReceive(request, json);
+             });
+
+    server->addHandler(wifiConfigRcvHandler);
+
+    // Wifi Config GET
+    server->on("/api/config/wifi", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getWifiConfig(request); });
+
+    server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
                {
-        int params = request->params();
-        for (int i = 0; i < params; i++)
-        {
-            AsyncWebParameter *p = request->getParam(i);
-            if (p->isPost())
-            {
-                // HTTP POST ssid value
-                if (p->name() == "wifi_ssid")
-                {
-                    p->value().toCharArray(configuration.Wifi.SSID, 255);
-                }
-                // HTTP POST pass value
-                if (p->name() == "wifi_pw")
-                {
-                    p->value().toCharArray(configuration.Wifi.Password, 255);
-                }
-                // HTTP POST ip value
-                if (p->name() == "hostname")
-                {
-                    p->value().toCharArray(configuration.Wifi.Hostname, 255);
-                }
-            }
-        } });
+                   String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
 
-    server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
-
-      request->send(LittleFS, "/frontend/reboot.html", "text/html");
-      ShouldReboot = true;
-
-  });
+                   request->send(LittleFS, "/frontend/reboot.html", "text/html");
+                   ShouldReboot = true; });
 
     server->serveStatic("/", LittleFS, "/");
 
@@ -171,6 +232,185 @@ void ConfigureAndStartWebserver()
     server->begin();
 }
 
+void onWifiConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<200> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    if (doc["wifi_ssid"].isNull() || doc["wifi_pw"].isNull() || doc["hostname"].isNull())
+    {
+        request->send(400, "application/json", "{\"status\":400, \"msg\":\"Missing field values. Expected fields are: wifi_ssid, wifi_pw, hostname\"}");
+        return;
+    }
+
+    /*
+{
+    "wifi_ssid": "",
+    "wifi_pw": "",
+    "hostname": ""
+}
+*/
+    strlcpy(configuration.Wifi.SSID, doc["wifi_ssid"], sizeof(configuration.Wifi.SSID));
+    strlcpy(configuration.Wifi.Password, doc["wifi_pw"], sizeof(configuration.Wifi.Password));
+    strlcpy(configuration.Wifi.Hostname, doc["hostname"], sizeof(configuration.Wifi.Hostname));
+    WriteConfiguration();
+
+    request->send(200, "application/json", "{\"status\":200, \"msg\":\"Wifi configuration has been saved.\"}");
+}
+
+void getCurrentWifiNetwork(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<512> doc;
+    doc["ssid"] = WiFi.SSID();
+    doc["rssi"] = WiFi.RSSI();
+    doc["ip"] = WiFi.localIP().toString();
+    doc["gateway"] = WiFi.gatewayIP().toString();
+    doc["dns"] = WiFi.dnsIP().toString();
+    doc["mask"] = WiFi.subnetMask().toString();
+    doc["channel"] = WiFi.channel();
+    sendJson(doc, request);
+}
+
+void getWifiNetworks(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+
+    int count = WiFi.scanNetworks();
+    if (count == 0)
+        sendJson(doc, request);
+    for (size_t i = 0; i < count; i++)
+    {
+        JsonObject network = doc.createNestedObject();
+        network["SSID"] = WiFi.SSID(i);
+        network["RSSI"] = WiFi.RSSI(i);
+        network["Encryption"] = WiFi.encryptionType(i);
+    }
+    sendJson(doc, request);
+}
+
+void getMqttConfig(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    doc["mqtt-server"] = configuration.Mqtt.Server;
+    doc["mqtt-port"] = configuration.Mqtt.Port;
+    doc["mqtt-user"] = configuration.Mqtt.User;
+    doc["mqtt-password"] = configuration.Mqtt.Password;
+
+    sendJson(doc, request);
+}
+
+void onMqttConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<200> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    if (doc["mqtt-server"].isNull() || doc["mqtt-port"].isNull() || doc["mqtt-user"].isNull() || doc["mqtt-password"].isNull())
+    {
+        request->send(400, "application/json", "{\"status\":400, \"msg\":\"Missing field values. Expected fields are: server, port, user, password\"}");
+        return;
+    }
+
+    strlcpy(configuration.Mqtt.Server, doc["mqtt-server"], sizeof(configuration.Mqtt.Server));
+    configuration.Mqtt.Port = doc["mqtt-port"];
+    strlcpy(configuration.Mqtt.User, doc["mqtt-user"], sizeof(configuration.Mqtt.User));
+    strlcpy(configuration.Mqtt.Password, doc["mqtt-password"], sizeof(configuration.Mqtt.Password));
+    WriteConfiguration();
+
+    request->send(200, "application/json", "{\"status\":200, \"msg\":\"MQTT configuration has been saved.\"}");
+}
+
+void getMqttTopicConfig(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    doc["status"] = configuration.Mqtt.Topics.Status;
+    doc["statusrequest"] = configuration.Mqtt.Topics.StatusRequest;
+    doc["auxvalues"] = configuration.Mqtt.Topics.AuxiliaryValues;
+    doc["boost"] = configuration.Mqtt.Topics.Boost;
+    doc["fastheatup"] = configuration.Mqtt.Topics.FastHeatup;
+    doc["heatingparameters"] = configuration.Mqtt.Topics.HeatingParameters;
+    doc["heatingvalues"] = configuration.Mqtt.Topics.HeatingValues;
+    doc["waterparameters"] = configuration.Mqtt.Topics.WaterParameters;
+    doc["watervalues"] = configuration.Mqtt.Topics.WaterValues;
+
+    sendJson(doc, request);
+}
+
+void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<200> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    if (doc["status"].isNull() ||
+        doc["statusrequest"].isNull() ||
+        doc["auxvalues"].isNull() ||
+        doc["boost"].isNull() ||
+        doc["fastheatup"].isNull() ||
+        doc["heatingparameters"].isNull() ||
+        doc["heatingvalues"].isNull() ||
+        doc["waterparameters"].isNull() ||
+        doc["watervalues"].isNull())
+    {
+        request->send(400, "application/json",
+                      "{\"status\":400, \"msg\":\"Missing field values. Expected fields are: status, statusrequest, auxvalues, boost, fastheaup, heatingvalues, heatingparameters, waterparameters, watervalues\"}");
+        return;
+    }
+
+    strlcpy(configuration.Mqtt.Topics.AuxiliaryValues, doc["auxvalues"], sizeof(configuration.Mqtt.Topics.AuxiliaryValues));
+    strlcpy(configuration.Mqtt.Topics.Boost, doc["boost"], sizeof(configuration.Mqtt.Topics.Boost));
+    strlcpy(configuration.Mqtt.Topics.FastHeatup, doc["fastheatup"], sizeof(configuration.Mqtt.Topics.FastHeatup));
+    strlcpy(configuration.Mqtt.Topics.HeatingParameters, doc["heatingparameters"], sizeof(configuration.Mqtt.Topics.HeatingParameters));
+    strlcpy(configuration.Mqtt.Topics.HeatingValues, doc["heatingvalues"], sizeof(configuration.Mqtt.Topics.HeatingValues));
+    strlcpy(configuration.Mqtt.Topics.Status, doc["status"], sizeof(configuration.Mqtt.Topics.Status));
+    strlcpy(configuration.Mqtt.Topics.StatusRequest, doc["statusrequest"], sizeof(configuration.Mqtt.Topics.StatusRequest));
+    strlcpy(configuration.Mqtt.Topics.WaterParameters, doc["waterparameters"], sizeof(configuration.Mqtt.Topics.WaterParameters));
+    strlcpy(configuration.Mqtt.Topics.WaterValues, doc["watervalues"], sizeof(configuration.Mqtt.Topics.WaterValues));
+    WriteConfiguration();
+
+    request->send(200, "application/json", "{\"status\":200, \"msg\":\"MQTT Topics have been saved.\"}");
+}
+
+void getSystemStatus(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    doc["cores"] = ESP.getChipCores();
+    doc["model"] = ESP.getChipModel();
+    doc["revision"] = ESP.getChipRevision();
+    doc["frequency"] = ESP.getCpuFreqMHz();
+    doc["freeheap"] = ESP.getFreeHeap();
+    doc["heap"] = ESP.getHeapSize();
+    doc["freesketch"] = ESP.getFreeSketchSpace();
+    doc["sketchsize"] = ESP.getSketchSize();
+    doc["canstatus"] = CanSendErrorCount == 0;
+    doc["canerrorcount"] = CanSendErrorCount;
+    doc["mqtt"] = client.connected();
+
+    sendJson(doc, request);
+}
+
+/// @brief Process Literals inside webpages (i.e. %TOTALSPIFFS%) into processed text
+/// @param var
+/// @return
 String processor(const String &var)
 {
     if (var == "FREESPIFFS")
@@ -242,7 +482,7 @@ String listFiles(bool ishtml)
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
 {
     Serial.printf("UPLOAD: Index %i Len %i Final %i Filename %s\r\n", index, len, final, filename);
-    
+
     if (!index)
     {
         // open the file on first call and store the file handle in the request object
@@ -259,5 +499,45 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     {
         // close the file handle as the upload is now done
         request->_tempFile.close();
+    }
+}
+
+void handleDoUpdate(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+{
+    if (!index)
+    {
+        Serial.println("Update");
+        content_len = request->contentLength();
+        // Decide what to update. If the filename contains "littlefs" it's a filesystem image.
+        int cmd = (filename.indexOf("littlefs") > -1) ? U_SPIFFS : U_FLASH;
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd))
+        {
+            Update.printError(Serial);
+        }
+    }
+
+    if (Update.write(data, len) != len)
+    {
+        Update.printError(Serial);
+        StaticJsonDocument<512> doc;
+        doc["status"] = 500;
+        doc["msg"] = Update.errorString();
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    }
+
+    if (final)
+    {
+        if (!Update.end(true))
+        {
+            Update.printError(Serial);
+            request->send(500, "application/json", "{\"status\":500, \"msg\":\"Update has failed. Please retry again after rebooting.\"}");
+        }
+        else
+        {
+            Serial.println("Update complete");
+            request->send(200, "application/json", "{\"status\":200, \"msg\":\"Update completed. Reboot to apply.\"}");
+        }
     }
 }

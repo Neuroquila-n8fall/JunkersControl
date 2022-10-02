@@ -291,7 +291,7 @@ void loop()
         msg.data[0] = 20;
         if (DebugMode)
         {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, configuration.CanAddresses.HotWater.SetpointTemperature);
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, ceraValues.Hotwater.SetPoint);
         }
         break;
 
@@ -328,9 +328,9 @@ void loop()
 
     // Request Temperatures and report them back to the MQTT broker
     //   Note: If 85.00° is shown or "unreachable" then the wiring is bad.
-    if (configuration.Features.AuxilaryParameters)
+    if (configuration.Features.AuxiliaryParameters)
     {
-      PublishAuxilaryTemperatures();
+      PublishAuxiliaryTemperatures();
     }
 
     // Publish Heating Temperatures
@@ -408,6 +408,8 @@ void loop()
     // Set Date & Time
     SetDateTime();
   }
+  // Allow the CPU to switch tasks.
+  vTaskDelay(2);
 }
 
 void Reboot()

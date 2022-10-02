@@ -126,8 +126,8 @@ The `MQTT` section has everything and this is where you define the topics:
             "WaterValues": "cerasmarter/water/values",
             // Send values here to steer the hot water circuit and functions
             "WaterParameters": "cerasmarter/water/parameters",
-            // Topic for receiving temperatures from auxilary sensors
-            "AuxilaryValues": "cerasmarter/auxilary/values",
+            // Topic for receiving temperatures from auxiliary sensors
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             // Topic for receiving status information
             "Status": "cerasmarter/status",
             // Send values here to receive values on demand
@@ -146,7 +146,7 @@ The `MQTT` section has everything and this is where you define the topics:
   "FeedBaseSetpoint": -10,
   "FeedCutOff": 22,
   "FeedMinimum": 10,
-  "AuxilaryTemperature": 11.6,
+  "AuxiliaryTemperature": 11.6,
   "AmbientTemperature": 0,
   "TargetAmbientTemperature": 21,
   "OnDemandBoost": false,
@@ -283,7 +283,7 @@ The oneWire and DallasTemperature libraries are included and used to fetch addit
 
 Configured using `/data/configuration.json`. 
 
-See [Auxilary Sensors](assets/Configuration.md#auxilary-sensors)
+See [Auxiliary Sensors](assets/Configuration.md#auxiliary-sensors)
 
 ### Dynamic Adaption
 

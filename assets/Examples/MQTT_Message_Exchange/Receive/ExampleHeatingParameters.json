@@ -4,7 +4,7 @@
     "FeedBaseSetpoint": -10,
     "FeedCutOff": 22,
     "FeedMinimum": 10,
-    "AuxilaryTemperature": 11.6,
+    "AuxiliaryTemperature": 11.6,
     "AmbientTemperature": 0,
     "TargetAmbientTemperature": 21,
     "OnDemandBoostDuration": 600,

@@ -89,9 +89,9 @@ Honestly it's not quite clear what this setting is telling us. Most likely it's 
 ```
 This setting is telling you whether the heating circuit runs in buffer mode or not, which means water is stored and monitored inside a dedicated buffer.
 
-## Auxilary Sensors
+## Auxiliary Sensors
 
-- [Auxilary Values](ExampleAuxValues.json) contains temperatures of your externally attached sensors. Pay special attention to the [Configuration](../../../../data/configuration.json.template#L68) for setting it up
+- [Auxiliary Values](ExampleAuxValues.json) contains temperatures of your externally attached sensors. Pay special attention to the [Configuration](../../../../data/configuration.json.template#L68) for setting it up
 
 ### Example JSON
 

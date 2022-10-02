@@ -14,6 +14,7 @@ void connectWifi()
 {
   if (configuration.Wifi.SSID == NULL && configuration.Wifi.Password == NULL)
   {
+    Serial.println("Invalid WiFi configuration. Launching AP mode.");
     SetupMode = true;
     StartApMode();
     return;
@@ -24,10 +25,9 @@ void connectWifi()
   if (!WiFi.isConnected() && WiFi.getMode() == WIFI_MODE_STA || !WiFi.isConnected() && !SetupMode )
   {
     WiFi.disconnect();
-    WiFi.mode(WIFI_STA);
-    //NOTE: This results in 255.255.255 for ALL addresses and has been removed until the issue has been resolved.
-    //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); // Workaround: makes setHostname() work
     WiFi.setHostname(configuration.Wifi.Hostname);
+    WiFi.mode(WIFI_STA);
+    
     Serial.println("WiFi not connected. Reconnecting...");
 
     if(DebugMode)
@@ -36,6 +36,8 @@ void connectWifi()
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
+      // Allow switching tasks
+      vTaskDelay(2);
       // Wait 10 seconds to connect
       if (millis() - prevConnectMillis >= 10000)
       {
@@ -43,6 +45,8 @@ void connectWifi()
         ESP.restart();
       }      
     }
+
+    MDNS.begin(configuration.Wifi.Hostname);
 
     if(DebugMode)
     printWifiStatus();

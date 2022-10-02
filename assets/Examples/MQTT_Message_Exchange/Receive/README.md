@@ -12,7 +12,7 @@ These are the example messages which can be processed by the application. These 
     "FeedBaseSetpoint": -10,
     "FeedCutOff": 22,
     "FeedMinimum": 10,
-    "AuxilaryTemperature": 11.6,
+    "AuxiliaryTemperature": 11.6,
     "AmbientTemperature": 0,
     "TargetAmbientTemperature": 21,
     "OnDemandBoost": false,
@@ -72,10 +72,10 @@ The heating will stop operation when the outside temperature has reached this va
 This is a more or less static value determined by your heating system. If the feed temperature goes below this point, the heating will resume operation to prevent pipes from freezing. You can now use this how you like but you can't go below 10°C
 
 
-###### Auxilary Temperature
+###### Auxiliary Temperature
 
 ```json
-    "AuxilaryTemperature": 11.6,
+    "AuxiliaryTemperature": 11.6,
 ```
 
 In case your built-in outside temperature sensor is not working as you wish it would, you can send your own temperature into the system to be used for several adaptive calculations.
@@ -164,7 +164,7 @@ This is the desired water temperature. The same rules apply like for the heating
 {
     "HeatingTemperatures": true,
     "WaterTemperatures": true,
-    "AuxilaryTemperatures": true,
+    "AuxiliaryTemperatures": true,
     "Status": true
 }
 ```

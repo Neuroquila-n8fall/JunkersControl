@@ -110,22 +110,22 @@ void callback(char *topic, byte *payload, unsigned int length)
         {
             "HeatingTemperatures": true,
             "WaterTemperatures": true,
-            "AuxilaryTemperatures": true,
+            "AuxiliaryTemperatures": true,
             "Status": true
         }
     */
 
     bool HeatingTemperatures = false;
     bool WaterTemperatures = false;
-    bool AuxilaryTemperatures = false;
+    bool AuxiliaryTemperatures = false;
     bool Status = false;
 
     if (!doc["HeatingTemperatures"].isNull())
       HeatingTemperatures = doc["HeatingTemperatures"]; // false
     if (!doc["WaterTemperatures"].isNull())
       WaterTemperatures = doc["WaterTemperatures"]; // false
-    if (!doc["AuxilaryTemperatures"].isNull())
-      AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
+    if (!doc["AuxiliaryTemperatures"].isNull())
+      AuxiliaryTemperatures = doc["AuxiliaryTemperatures"]; // true
     if (!doc["Status"].isNull())
       Status = doc["Status"]; // false
 
@@ -139,9 +139,9 @@ void callback(char *topic, byte *payload, unsigned int length)
       PublishWaterTemperatures();
     }
 
-    if (AuxilaryTemperatures)
+    if (AuxiliaryTemperatures)
     {
-      PublishAuxilaryTemperatures();
+      PublishAuxiliaryTemperatures();
     }
 
     if (Status)
@@ -161,7 +161,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       "FeedBaseSetpoint": -10,
       "FeedCutOff": 22,
       "FeedMinimum": 10,
-      "AuxilaryTemperature": 11.6,
+      "AuxiliaryTemperature": 11.6,
       "AmbientTemperature": 0,
       "TargetAmbientTemperature": 21,
       "OnDemandBoost": false,
@@ -197,8 +197,8 @@ void callback(char *topic, byte *payload, unsigned int length)
       commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
     if (!doc["FeedMinimum"].isNull())
       commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
-    if (!doc["AuxilaryTemperature"].isNull())
-      commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
+    if (!doc["AuxiliaryTemperature"].isNull())
+      commandedValues.Heating.AuxiliaryTemperature = doc["AuxiliaryTemperature"];
     if (!doc["AmbientTemperature"].isNull())
       commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
     if (!doc["TargetAmbientTemperature"].isNull())
@@ -413,7 +413,7 @@ void PublishWaterTemperatures()
   }
 }
 
-void PublishAuxilaryTemperatures()
+void PublishAuxiliaryTemperatures()
 {
   ShowActivityLed();
   /*
@@ -431,14 +431,14 @@ void PublishAuxilaryTemperatures()
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("Auxilary");
+    jsonObj = doc.createNestedObject("Auxiliary");
   }
 
   for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
   {
     Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
     JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
-    sensorVal["Temperature"] = ceraValues.Auxilary.Temperatures[i];
+    sensorVal["Temperature"] = ceraValues.Auxiliary.Temperatures[i];
     sensorVal["Reachable"] = boolToString(curSensor.reachable);
   }
 
@@ -453,12 +453,12 @@ void PublishAuxilaryTemperatures()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
+    String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
     client.publish(topic.c_str(), buffer, n);
   }
   else
   {
-    client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
+    client.publish(configuration.Mqtt.Topics.AuxiliaryValues, buffer, n);
   }
 }
 
