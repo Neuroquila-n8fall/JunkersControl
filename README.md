@@ -1,5 +1,5 @@
 # JunkersControl
-
+[![CI](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml/badge.svg)](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml)
 ## NOTE: Documentation is mostly accurate right now.
 **Feel free to open an issue if something is unclear.**
 ## Table of contents
