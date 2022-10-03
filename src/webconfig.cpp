@@ -129,13 +129,13 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     }
 
     if (!doc["heatingvalues"].isNull())
-        configuration.Features.HeatingParameters = doc["heatingvalues"];
+        configuration.Features.HeatingParameters = doc["heatingvalues"] == "true";
 
     if (!doc["watervalues"].isNull())
-        configuration.Features.WaterParameters = doc["watervalues"];
+        configuration.Features.WaterParameters = doc["watervalues"] == "true";
 
     if (!doc["auxvalues"].isNull())
-        configuration.Features.AuxiliaryParameters = doc["auxvalues"];
+        configuration.Features.AuxiliaryParameters = doc["auxvalues"] == "true";
 
     if (!doc["tz"].isNull())
         strlcpy(configuration.General.Timezone, doc["tz"], sizeof(configuration.General.Timezone));
@@ -144,10 +144,10 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         configuration.General.BusMessageTimeout = doc["busmsgtimeout"];
 
     if (!doc["debug"].isNull())
-        configuration.General.Debug = doc["debug"];
+        configuration.General.Debug = doc["debug"] == "true";
 
     if (!doc["sniffing"].isNull())
-        configuration.General.Sniffing = doc["sniffing"];
+        configuration.General.Sniffing = doc["sniffing"] == "true";
 
     configuration.General.Debug = configuration.General.Debug;
     
