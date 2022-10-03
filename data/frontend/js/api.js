@@ -132,6 +132,58 @@ async function sendMqttTopicsConfig(event) {
     _("save-topics").disabled = false;
 }
 
+async function sendGeneralConfig(event) {
+    // Prevent the form from submitting.
+    event.preventDefault();
+    event.disabled = true;
+    _("form-fieldset").disabled = true;
+    _("general-saving").hidden = false;
+    _("save-general-label").innerHTML = "Saving Settings...";
+    _("save-general").disabled = true;
+    const formData = new FormData(event.target);
+
+    // We have to get the values of the form by ourselves when options and selects are involved
+    formData.append("heatingvalues", _("heatingvalues").checked);
+    formData.append("watervalues", _("watervalues").checked);
+    formData.append("auxvalues", _("auxvalues").checked);
+    formData.append("tz", _("tz").value);
+    formData.append("debug", _("debug").checked);
+    formData.append("sniffing", _("sniffing").checked);
+    const formJSON = Object.fromEntries(formData.entries());
+
+    const json = JSON.stringify(formJSON);
+    console.log(json);
+    const response = await fetch('/api/config/general', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: json,
+    });
+    switch (response.status) {
+        case 200:
+            _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong>Config Saved!</strong><br/>Configuration has been updated.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+        case 400:
+            _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Error</strong><br/>Configuration not saved because the received data was of a wrong format.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+        default:
+            _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Error</strong><br/>Received a status ${response.status} telling ${response.statusText}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+    }
+    event.disabled = false;
+    _("general-saving").hidden = true;
+    _("save-general-label").innerHTML = "Save Settings";
+    _("save-general").disabled = false;
+    _("form-fieldset").disabled = false;
+}
+
 async function getWifiConfig() {
     var response = await fetch("/api/config/wifi");
     var config = await response.json();
@@ -158,6 +210,12 @@ async function getMqttConfig() {
 
 async function getMqttTopicsConfig() {
     var response = await fetch("/api/config/mqtt-topics");
+    var result = await response.json();
+    return result;
+}
+
+async function getGeneralConfig() {
+    var response = await fetch("/api/config/general");
     var result = await response.json();
     return result;
 }

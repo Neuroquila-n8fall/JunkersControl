@@ -18,13 +18,11 @@ extern void notFound(AsyncWebServerRequest *request);
 
 extern void ConfigureAndStartWebserver();
 
-extern String processor(const String &var);
-
 extern String humanReadableSize(const size_t bytes);
 
-extern String listFiles(bool ishtml);
-
 extern void listFsFiles(AsyncWebServerRequest *request, String path  = "/");
+
+extern void getFsUsagePercent(AsyncWebServerRequest *request);
 
 extern void handleDoUpdate(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
 
@@ -49,6 +47,20 @@ extern void getMqttTopicConfig(AsyncWebServerRequest *request);
 extern void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
 
 extern void getSystemInfo(AsyncWebServerRequest *request);
+
+extern void getGeneralConfig(AsyncWebServerRequest *request);
+
+extern void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
+
+extern void configureGeneralEndpoints();
+
+extern void configureGeneralApiEndpoints();
+
+extern void configureFilemanagerEndpoints();
+
+extern void configureMqttEndpoints();
+
+extern void configureWifiEndpoints();
 
 extern volatile bool ShouldReboot;
 
