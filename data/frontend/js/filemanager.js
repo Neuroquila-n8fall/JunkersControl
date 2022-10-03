@@ -88,7 +88,7 @@ function deleteFile(path)
     dialog.show();
 }
 function downloadDeleteButton(filename, action) {
-    var urltocall = "/file?name=" + filename + "&action=" + action;
+    var urltocall = "/filemanager/file?name=" + filename + "&action=" + action;
     xmlhttp = new XMLHttpRequest();
     if (action == "delete") {
         xmlhttp.open("GET", urltocall, false);
