@@ -93,19 +93,19 @@ void SetupAutodiscovery(const char *fileName)
         Log.println(error.c_str());
         return;
     }
-    if (DebugMode)
+    if (configuration.General.Debug)
         Log.println("///----- Reading HA AD Config -----");
     // Sensor Type Category Block: Sensor, Binary Sensor, ...
     for (JsonPair SensorCategory : sensors)
     {
-        if (DebugMode)
+        if (configuration.General.Debug)
             Log.println(SensorCategory.key().c_str());
         // Sensor Device Specific Category like Heating, Water, ...
         JsonObject CurCategoryObj = doc[SensorCategory.key().c_str()].as<JsonObject>();
 
         for (JsonPair InternalDevCategory : CurCategoryObj)
         {
-            if (DebugMode)
+            if (configuration.General.Debug)
                 Log.printf("\t%s\r\n", InternalDevCategory.key().c_str());
             // Specific Internal Device Category Config
             JsonArray CurSensorObject = CurCategoryObj[InternalDevCategory.key().c_str()].as<JsonArray>();
@@ -118,7 +118,7 @@ void SetupAutodiscovery(const char *fileName)
                     curKey = curPair.key().c_str();
                     break;
                 }
-                if (DebugMode)
+                if (configuration.General.Debug)
                     Log.printf("\t\t%s\r\n", curKey);
 
                 JsonObject CurrentSensor = SensorConfig[curKey];
@@ -142,7 +142,7 @@ void SetupAutodiscovery(const char *fileName)
                 // Sensor is assembled. We have to transmit this config to HA now in order to get it working
                 char buffer[768];
                 size_t n = serializeJson(CurrentSensor, buffer);
-                if (DebugMode)
+                if (configuration.General.Debug)
                 {
                     Log.println(discoveryTopic);
                     serializeJsonPretty(CurrentSensor, Serial);
@@ -152,7 +152,7 @@ void SetupAutodiscovery(const char *fileName)
         }
     }
 
-    if (DebugMode)
+    if (configuration.General.Debug)
         Log.println("----- HA AD Config END -----///");
 
     // Close LittleFS.

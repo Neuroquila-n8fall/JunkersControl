@@ -40,7 +40,7 @@ void SetFeedTemperature()
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
-  if (DebugMode)
+  if (configuration.General.Debug)
   {
     Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
   }
@@ -58,7 +58,7 @@ void setupCan()
 
   const uint16_t errorCode = can.begin(settings, []
                                        { can.isr(); });
-  if (errorCode == 0 && DebugMode)
+  if (errorCode == 0 && configuration.General.Debug)
   {
     Log.print("Bit Rate prescaler: ");
     Log.println(settings.mBitRatePrescaler);
@@ -96,7 +96,7 @@ void processCan()
   {
     unsigned long curMillis = millis();
 
-    if (DebugMode || configuration.General.Sniffing)
+    if (configuration.General.Debug || configuration.General.Sniffing)
     {
       WriteMessage(Message);
     }

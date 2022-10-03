@@ -50,7 +50,7 @@ void ReadTemperatures(void *pvParameters)
                     ceraValues.Auxiliary.FeedReturnTemperatureReference = value;
                 }
 
-                if (DebugMode)
+                if (configuration.General.Debug)
                 {
                     Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
                 }
@@ -59,7 +59,7 @@ void ReadTemperatures(void *pvParameters)
             {
                 ceraValues.Auxiliary.Temperatures[i] = 0.0F;
                 configuration.TemperatureSensors.Sensors[i].reachable = false;
-                if (DebugMode)
+                if (configuration.General.Debug)
                 {
                     Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
                 }

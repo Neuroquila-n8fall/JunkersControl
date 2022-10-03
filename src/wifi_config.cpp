@@ -30,7 +30,7 @@ void connectWifi()
     
     Serial.println("WiFi not connected. Reconnecting...");
 
-    if(DebugMode)
+    if(configuration.General.Debug)
     Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
     unsigned long prevConnectMillis = millis();
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
@@ -48,7 +48,7 @@ void connectWifi()
 
     MDNS.begin(configuration.Wifi.Hostname);
 
-    if(DebugMode)
+    if(configuration.General.Debug)
     printWifiStatus();
 
   }
@@ -67,7 +67,7 @@ void connectWifi()
 
 void printWifiStatus()
 {
-  if (WiFi.isConnected() && DebugMode)
+  if (WiFi.isConnected() && configuration.General.Debug)
     {
       Serial.println("-------------------------------");
       Serial.println("Wifi Connected");

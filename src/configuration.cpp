@@ -52,7 +52,7 @@ bool ReadConfiguration()
         return false;
     }
 
-    if (DebugMode)
+    if (configuration.General.Debug)
     {
         serializeJsonPretty(doc, Log);
     }
@@ -180,7 +180,7 @@ bool ReadConfiguration()
             newSensor.Address[i++] = addrByte;
         }
         configuration.TemperatureSensors.Sensors[curSensor++] = newSensor;
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
             if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
             {

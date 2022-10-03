@@ -71,7 +71,7 @@ double CalculateFeedTemperature()
             double dynamicAdaption = map_Generic(ceraValues.General.OutsideTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.EndpointTemperature, 0, commandedValues.Heating.FeedAdaption);
             // This will map the current opening from the possible range (0 to commandedValues.Heating.MaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
             scaledTemp = map_Generic(commandedValues.Heating.ValveOpening, 0, commandedValues.Heating.MaxValveOpening, commandedValues.Heating.MinimumFeedTemperature + dynamicAdaption, ceraValues.Heating.FeedMaximum);
-            if (DebugMode)
+            if (configuration.General.Debug)
             {
                 Log.printf("DEBUG SET TEMP: Valve Scaled + Dyn. Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, dynamicAdaption);
             }
@@ -81,7 +81,7 @@ double CalculateFeedTemperature()
         {
             // This will map the current opening from the possible range (0 to commandedValues.Heating.MaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
             scaledTemp = map_Generic(commandedValues.Heating.ValveOpening, 0, commandedValues.Heating.MaxValveOpening, commandedValues.Heating.MinimumFeedTemperature + commandedValues.Heating.FeedAdaption, ceraValues.Heating.FeedMaximum);
-            if (DebugMode)
+            if (configuration.General.Debug)
             {
                 Log.printf("DEBUG SET TEMP: Valve Scaled + Static Adapt.: %.2f (Including %.2f Adaption)  \r\n", scaledTemp, commandedValues.Heating.FeedAdaption);
             }
@@ -159,7 +159,7 @@ double CalculateFeedTemperature()
             // Half-Step-Round
             double hrFhTemp = llround(fhTemp * 2) / 2.0;
 
-            if (DebugMode)
+            if (configuration.General.Debug)
             {
                 Log.printf("DEBUG SET TEMP: Fast Heatup is active. Current: %.2f Target: %.2f Setpoint is %.2f \r\n", commandedValues.Heating.AmbientTemperature, commandedValues.Heating.TargetAmbientTemperature, fhTemp);
             }
@@ -167,7 +167,7 @@ double CalculateFeedTemperature()
             // Check if the calculated temperature is higher than the reported maximum feed temperature.
             if (hrFhTemp > ceraValues.Heating.FeedMaximum)
             {
-                if (DebugMode)
+                if (configuration.General.Debug)
                 {
                     Log.println("DEBUG SET TEMP: Fast Heatup is active. Calculated Temperature is higher than the maximum possible!");
                 }
@@ -185,7 +185,7 @@ double CalculateFeedTemperature()
         }
     }
 
-    if (DebugMode)
+    if (configuration.General.Debug)
     {
         Log.printf("DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f\r\n", ceraValues.General.OutsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
     }

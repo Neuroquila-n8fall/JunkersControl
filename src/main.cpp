@@ -12,13 +12,6 @@
 //   It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
 bool OverrideControl = true;
 
-// Controller Message Timeout
-//   After this timeout this controller will take over control.
-int controllerMessageTimeout = 30000;
-
-// This will be overwritten by Configuration!
-bool DebugMode = true;
-
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
@@ -100,9 +93,6 @@ Serial.printf("\e[1;36mSetup Mode not enabled. You can enable it at every time b
     Log.println("Unable to read configuration.");
     return;
   }
-
-  DebugMode = configuration.General.Debug;
-  controllerMessageTimeout = configuration.General.BusMessageTimeout;
 
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
@@ -252,7 +242,7 @@ void loop()
         // Switch economy mode. This is always the opposite of the desired operational state
         msg = PrepareMessage(configuration.CanAddresses.Heating.Economy, 1);
         msg.data[0] = !commandedValues.Heating.Active;
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Heating Economy: %d\r\n", currentStep, !commandedValues.Heating.Active);
         }
@@ -268,7 +258,7 @@ void loop()
       case 2:
         SetFeedTemperature();
 
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
         }
@@ -279,7 +269,7 @@ void loop()
       case 3:
         msg = PrepareMessage(configuration.CanAddresses.HotWater.Now, 1);
         msg.data[0] = 0x01;
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Set DHW Now to %s\r\n", currentStep, ceraValues.Hotwater.Now ? "ON" : "OFF");
         }
@@ -289,7 +279,7 @@ void loop()
       case 4:
         msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
         msg.data[0] = 20;
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, ceraValues.Hotwater.SetPoint);
         }
@@ -298,7 +288,7 @@ void loop()
       case 5:
         // Request? Data
         msg = PrepareMessage(0xF9, 0);
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("DEBUG STEP CHAIN #%i: Sending KeepAlive\r\n", currentStep);
         }
@@ -422,7 +412,7 @@ void SendMessage(CANMessage msg)
   // Send message if not empty and override is true.
   if (msg.id != 0 && OverrideControl)
   {
-    if (DebugMode)
+    if (configuration.General.Debug)
     {
       Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
       WriteMessage(msg);
@@ -502,7 +492,7 @@ void SetDateTime()
       msg.data[2] = myTZ.minute();
       // As of now we don't know what this value is for but it seems mandatory.
       msg.data[3] = 4;
-      if (DebugMode)
+      if (configuration.General.Debug)
       {
         Log.printf("DEBUG: Date and Time DOW:%i H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
       }
@@ -634,7 +624,7 @@ void TrackBoostFunction(void *pvParameter)
       if (commandedValues.Heating.BoostTimeCountdown > 0)
       {
         commandedValues.Heating.BoostTimeCountdown--;
-        if (DebugMode)
+        if (configuration.General.Debug)
         {
           Log.printf("[%s][%s] Time: %i Left: %i \r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), __func__, commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
         }

@@ -64,13 +64,6 @@ extern void TrackBoostFunction(void *pvParameter);
 //  It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
 extern bool OverrideControl;
 
-//Controller Message Timeout
-//  After this timeout this controller will take over control.
-extern int controllerMessageTimeout;
-
-//Set this to true to view debug info
-extern bool DebugMode;
-
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
 //——————————————————————————————————————————————————————————————————————————————
