@@ -58,13 +58,17 @@ extern void configureGeneralApiEndpoints();
 
 extern void configureFilemanagerEndpoints();
 
+extern void configureFirmwareEndpoints();
+
 extern void configureMqttEndpoints();
 
 extern void configureWifiEndpoints();
 
 extern volatile bool ShouldReboot;
 
-extern void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool);
+extern void handleUpload(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool);
+
+extern void configureCanConfigEndpoints();
 
 
 #endif

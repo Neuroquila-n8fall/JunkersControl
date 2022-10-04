@@ -568,6 +568,16 @@ void handleUpload(AsyncWebServerRequest *request, const String& filename, size_t
 
 #pragma endregion
 
+#pragma region "CAN Config"
+
+void configureCanConfigEndpoints()
+{
+    server->on("/canbus", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/canbus.html", "text/html"); });
+}
+
+#pragma endregion
+
 void getSystemStatus(AsyncWebServerRequest *request)
 {
     StaticJsonDocument<1024> doc;
