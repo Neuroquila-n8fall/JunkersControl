@@ -146,7 +146,7 @@ void SetupAutodiscovery(const char *fileName)
                 {
                     Log.println(discoveryTopic);
                     serializeJsonPretty(CurrentSensor, Serial);
-                };
+                }
                 client.publish(discoveryTopic.c_str(), buffer, n);
             }
         }

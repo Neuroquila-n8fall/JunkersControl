@@ -59,7 +59,7 @@ double CalculateFeedTemperature()
             commandedValues.Heating.FastHeatup = false;
         }
 
-        double scaledTemp = 0.0;
+        double scaledTemp = 0.0F;
         // Calculate dynamic adaption if requested.
         if (commandedValues.Heating.DynamicAdaption)
         {
