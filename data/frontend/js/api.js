@@ -1,4 +1,4 @@
-var EncryptionTypes = [
+const EncryptionTypes = [
     "OPEN",         /**< authenticate mode : open */
     "WEP",              /**< authenticate mode : WEP */
     "WPA PSK",          /**< authenticate mode : WPA_PSK */
@@ -9,7 +9,7 @@ var EncryptionTypes = [
     "WPA2 WPA3_PSK",    /**< authenticate mode : WPA2_WPA3_PSK */
     "WAPI PSK",         /**< authenticate mode : WAPI_PSK */
     "MAX"
-]
+];
 
 
 async function sendWifiConfig(event) {
@@ -19,9 +19,9 @@ async function sendWifiConfig(event) {
     const formData = new FormData(event.target);
     const formJSON = Object.fromEntries(formData.entries());
 
-    var json = JSON.stringify(formJSON);
+    const json = JSON.stringify(formJSON);
 
-    var response = await fetch('/api/config/wifi', {
+    const response = await fetch('/api/config/wifi', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -58,9 +58,9 @@ async function sendMqttConfig(event) {
     const formData = new FormData(event.target);
     const formJSON = Object.fromEntries(formData.entries());
 
-    var json = JSON.stringify(formJSON);
+    const json = JSON.stringify(formJSON);
 
-    var response = await fetch('/api/config/mqtt', {
+    const response = await fetch('/api/config/mqtt', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -100,9 +100,9 @@ async function sendMqttTopicsConfig(event) {
     const formData = new FormData(event.target);
     const formJSON = Object.fromEntries(formData.entries());
 
-    var json = JSON.stringify(formJSON);
+    const json = JSON.stringify(formJSON);
 
-    var response = await fetch('/api/config/mqtt-topics', {
+    const response = await fetch('/api/config/mqtt-topics', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -184,37 +184,31 @@ async function sendGeneralConfig(event) {
 }
 
 async function getWifiConfig() {
-    var response = await fetch("/api/config/wifi");
-    var config = await response.json();
-    return config;
+    const response = await fetch("/api/config/wifi");
+    return await response.json();
 }
 
 async function getWifiNetworks() {
-    var response = await fetch("/api/wifi/networks");
-    var networks = await response.json();
-    return networks;
+    const response = await fetch("/api/wifi/networks");
+    return await response.json();
 }
 
 async function getSystemStatus() {
-    var response = await fetch("/api/info");
-    var status = await response.json();
-    return status;
+    const response = await fetch("/api/info");
+    return await response.json();
 }
 
 async function getMqttConfig() {
-    var response = await fetch("/api/config/mqtt");
-    var result = await response.json();
-    return result;
+    const response = await fetch("/api/config/mqtt");
+    return await response.json();
 }
 
 async function getMqttTopicsConfig() {
-    var response = await fetch("/api/config/mqtt-topics");
-    var result = await response.json();
-    return result;
+    const response = await fetch("/api/config/mqtt-topics");
+    return await response.json();
 }
 
 async function getGeneralConfig() {
-    var response = await fetch("/api/config/general");
-    var result = await response.json();
-    return result;
+    const response = await fetch("/api/config/general");
+    return await response.json();
 }

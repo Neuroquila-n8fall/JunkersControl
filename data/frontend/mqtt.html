@@ -38,10 +38,10 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label class="col-sm-2 col-form-label" for="mqtt-server">Port</label>
+                                <label class="col-sm-2 col-form-label" for="mqtt-port">Port</label>
                                 <div class="col-sm-10">
                                     <input id="mqtt-port" name="mqtt-port" placeholder="Default: 1883" type="number"
-                                        required class="form-control" autocomplete="mqtt-port" value="1883" required>
+                                        class="form-control" autocomplete="mqtt-port" value="1883" required>
                                 </div>
                             </div>
                             <div class="mb-3 row">
@@ -196,20 +196,20 @@
         loadMqttTopicsConfig();
 
         async function loadMqttConfig() {
-            var form = document.forms["mqtt-form"];
+            const form = document.forms["mqtt-form"];
             form.disabled = true;
-            var config = await getMqttConfig();
-            for (var entry in config) {
+            const config = await getMqttConfig();
+            for (let entry in config) {
                 form.elements[entry].value = config[entry];
             }
             form.disabled = false;
         }
 
         async function loadMqttTopicsConfig() {
-            var form = document.forms["mqtt-topics-form"];
+            const form = document.forms["mqtt-topics-form"];
             form.disabled = true;
-            var config = await getMqttTopicsConfig();
-            for (var entry in config) {
+            const config = await getMqttTopicsConfig();
+            for (let entry in config) {
                 form.elements[entry].value = config[entry];
             }
             form.disabled = false;

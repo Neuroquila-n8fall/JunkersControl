@@ -88,10 +88,10 @@
 
         async function loadWifiConfig()
         {
-            var form = document.forms["wifi-form"];
+            const form = document.forms["wifi-form"];
             form.disabled = true;
-            var config = await getWifiConfig();
-            for(var entry in config) {
+            const config = await getWifiConfig();
+            for(let entry in config) {
                 form.elements[entry].value = config[entry];
             }
             form.disabled = false;
@@ -101,12 +101,12 @@
             _("networks-loading").hidden = false;
             _("refresh-btn-label").innerHTML = "Scanning...";
             _("refresh-networks").disabled = true;
-            var networks = await getWifiNetworks();
+            const networks = await getWifiNetworks();
             _("networks-loading").hidden = true;
             _("refresh-btn-label").innerHTML = "Scan Networks";
             _("refresh-networks").disabled = false;
             console.log(networks);
-            var networkList = `<table class="table text-start"><thead><tr><th>SSID</th><th>Quality</th><th>Enc</th></thead><tbody>`;
+            let networkList = `<table class="table text-start"><thead><tr><th>SSID</th><th>Quality</th><th>Enc</th></thead><tbody>`;
 
             networks.forEach(network => {
                 networkList += `<tr><td>${network.SSID}</td><td>${Math.min(Math.max(2 * (network.RSSI + 100), 0), 100)}%</td><td>${EncryptionTypes[network.Encryption]}</td></tr>`;

@@ -95,12 +95,12 @@
 
         async function loadGeneralConfig() {
             let form = document.forms["general-form"];
-            var config = await getGeneralConfig();
-            for (var entry in config) {
+            const config = await getGeneralConfig();
+            for (let entry in config) {
                 let element = form.elements[entry];
                 if(element) {
                     console.log(element.type);
-                    if(element.type.toLowerCase() == "checkbox") {
+                    if(element.type.toLowerCase() === "checkbox") {
                         element.checked = config[entry];
                     }
                     element.value = config[entry];

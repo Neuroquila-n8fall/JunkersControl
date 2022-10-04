@@ -14,15 +14,15 @@ function humanReadableSize(bytes) {
 }
 
 function loadNavigation() {
-    var nav = _("navigation-container");
-    xhr = new XMLHttpRequest();
+    const nav = _("navigation-container");
+    let xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function (e) {
-        if (xhr.readyState == 4 && xhr.status == 200) {
+        if (xhr.readyState === 4 && xhr.status === 200) {
             nav.innerHTML = xhr.responseText;
-            var curLocation = window.location.pathname
+            let curLocation = window.location.pathname
                 .replace("/", "")
                 .trim();
-            if(curLocation.length == 0) {
+            if(curLocation.length === 0) {
                 curLocation = "home";
             }
             _(curLocation + "-link").classList.add("active");

@@ -2,10 +2,10 @@ function startUpdate(event) {
     // Prevent default HTML page refresh
     event.preventDefault();
     _("progress").hidden = false;
-    var file = _("file1").files[0];
-    var formdata = new FormData();
+    const file = _("file1").files[0];
+    const formdata = new FormData();
     formdata.append("file1", file);
-    var ajax = new XMLHttpRequest();
+    const ajax = new XMLHttpRequest();
     ajax.upload.addEventListener("progress", progressHandler, false);
     ajax.addEventListener("load", completeHandler, false); // doesnt appear to ever get called even upon success
     ajax.addEventListener("error", errorHandler, false);
@@ -18,8 +18,8 @@ function startUpdate(event) {
 function progressHandler(event) {
     //_("loaded_n_total").innerHTML = "Uploaded " + event.loaded + " bytes of " + event.total; // event.total doesnt show accurate total file size
     _("loaded_n_total").innerHTML = "Uploaded " + humanReadableSize(event.loaded);
-    var percent = (event.loaded / event.total) * 100;
-    var roundedPercent = Math.round(percent);
+    const percent = (event.loaded / event.total) * 100;
+    const roundedPercent = Math.round(percent);
     _("progressBar").style = "width: " + roundedPercent + "%;";
     _("progressBar").setAttribute('aria-valuenow',roundedPercent);
     _("progressBar").innerHTML = roundedPercent + "%";
