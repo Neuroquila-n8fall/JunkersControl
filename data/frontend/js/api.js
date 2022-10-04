@@ -183,6 +183,33 @@ async function sendGeneralConfig(event) {
     _("form-fieldset").disabled = false;
 }
 
+async function sendCanbusConfig(json) {
+    const response = await fetch('/api/config/canbus', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: json,
+    });
+    switch (response.status) {
+        case 200:
+            _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong>Config Saved!</strong><br/>Configuration has been updated.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+        case 400:
+            _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Error</strong><br/>Configuration not saved because the received data was of a wrong format.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+        default:
+            _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Error</strong><br/>Received a status ${response.status} telling ${response.statusText}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            break;
+    }
+}
+
 async function getWifiConfig() {
     const response = await fetch("/api/config/wifi");
     return await response.json();
@@ -210,5 +237,10 @@ async function getMqttTopicsConfig() {
 
 async function getGeneralConfig() {
     const response = await fetch("/api/config/general");
+    return await response.json();
+}
+
+async function getConfigJson(apiEndpoint) {
+    const response = await fetch(apiEndpoint);
     return await response.json();
 }

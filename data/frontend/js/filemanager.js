@@ -24,7 +24,7 @@ function listFiles(path) {
             let table = `<table class="table text-start"><thead><tr><th scope="col">Name</th><th scope="col">Size</th><th></th><th></th></tr></thead>`;
             table += `<tbody class="table-group-divider">`;
             const files = JSON.parse(this.responseText);
-            for(let prop in files) {
+            for (let prop in files) {
                 const entries = files[prop];
                 entries.sort(sortByDirectory);
                 for (let key in entries) {
@@ -33,7 +33,7 @@ function listFiles(path) {
                     const fileName = files[prop][key].Name;
                     const size = files[prop][key].Size;
                     const isDir = files[prop][key].Directory;
-                    if(!isDir) {
+                    if (!isDir) {
                         table += `<tr><td>${fileName}</td>`;
                         table += `<td>${humanReadableSize(size)}</td>`;
                         table += `<td><button class="btn btn-primary btn-sm" onclick="downloadDeleteButton('${prop}${fileName}', 'download')">Download</button>`;
@@ -42,7 +42,7 @@ function listFiles(path) {
                         table += `<tr><td><div class="badge rounded-pill bg-secondary me-3">dir</div><a href="#" onclick="listFiles('${prop}${fileName}/')">${fileName}</a></td>`;
                         table += `<td/><td/><td/></tr>`;
                     }
-                    
+
                 }
                 table += `</tbody></table>`;
                 let breadCrumbs = `<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
@@ -65,6 +65,7 @@ function listFiles(path) {
 
     xmlhttp.send();
 }
+
 function sortByDirectory(a, b) {
     if (a.Directory)
         return -1;
@@ -73,13 +74,15 @@ function sortByDirectory(a, b) {
     return 0;
 }
 
-function deleteFile(path)
-{
+function deleteFile(path) {
     const dialog = new bootstrap.Modal(_("confirm-delete-modal"), null);
     _("delete-confirm-filename").innerHTML = path;
-    _("btn-confirm-delete").onclick = function () { downloadDeleteButton(path, "delete") };
+    _("btn-confirm-delete").onclick = function () {
+        downloadDeleteButton(path, "delete")
+    };
     dialog.show();
 }
+
 function downloadDeleteButton(filename, action) {
     const urltocall = "/filemanager/file?name=" + filename + "&action=" + action;
     let xmlhttp = new XMLHttpRequest();
@@ -104,6 +107,7 @@ function downloadDeleteButton(filename, action) {
         window.open(urltocall, "_blank");
     }
 }
+
 function showUsagePercentage() {
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open("GET", "/api/freestorage", false);
@@ -131,7 +135,7 @@ function showUsagePercentage() {
                 _("progUsage").classList.add("bg-alert");
                 return;
             }
-            
+
         }
     });
     xmlhttp.send();
@@ -165,12 +169,13 @@ function progressHandler(event) {
     const percent = (event.loaded / event.total) * 100;
     const roundedPercent = Math.round(percent);
     _("progressBar").style = "width: " + roundedPercent + "%;";
-    _("progressBar").setAttribute('aria-valuenow',roundedPercent);
+    _("progressBar").setAttribute('aria-valuenow', roundedPercent);
     _("progressBar").innerHTML = roundedPercent + "%";
     if (percent >= 100) {
         _("status").innerHTML = `<div class="badge rounded-pill bg-info text-dark">Please wait, writing file to filesystem</div>`;
     }
 }
+
 function completeHandler(event) {
     _("progress").hidden = true;
     _("progressBar").style.width = 0;
@@ -186,6 +191,7 @@ function completeHandler(event) {
     _("upload_form").reset();
     _("loaded_n_total").innerHTML = "";
 }
+
 function errorHandler(event) {
     _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
     <strong>File Upload Failed!</strong><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -193,6 +199,7 @@ function errorHandler(event) {
     _("upload_form").reset();
     listFiles(CurrentPath);
 }
+
 function abortHandler(event) {
     _("status").innerHTML = `<div class="alert alert-info alert-dismissible fade show" role="alert">
     <strong>File Upload Aborted!</strong><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>

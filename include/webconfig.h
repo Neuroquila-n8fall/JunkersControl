@@ -70,5 +70,9 @@ extern void handleUpload(AsyncWebServerRequest *request, const String& filename,
 
 extern void configureCanConfigEndpoints();
 
+extern void getCanbusConfig(AsyncWebServerRequest *request);
+
+extern void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
+
 
 #endif

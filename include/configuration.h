@@ -17,6 +17,8 @@ extern void WriteConfiguration();
 
 extern String IntToHex(int value);
 
+extern unsigned long convertHexString(const char *src);
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
 //——————————————————————————————————————————————————————————————————————————————
@@ -151,5 +153,6 @@ struct Configuration
 
 extern const char *configFileName;
 extern Configuration configuration;
+
 
 #endif // CONFIGURATION_H

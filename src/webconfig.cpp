@@ -574,6 +574,115 @@ void configureCanConfigEndpoints()
 {
     server->on("/canbus", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/canbus.html", "text/html"); });
+
+    server->on("/api/config/canbus", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getCanbusConfig(request); });
+
+    // MQTT Topics POST
+    auto *rcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/canbus",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onCanbusConfigReceive(request, json);
+            });
+
+    server->addHandler(rcvHandler);
+}
+
+void getCanbusConfig(AsyncWebServerRequest *request) 
+{
+    // Take values directly from configuration
+    StaticJsonDocument<1024> doc;
+    JsonObject CAN_Addresses_Controller = doc.createNestedObject("Controller");
+    CAN_Addresses_Controller["FlameStatus"] = IntToHex(configuration.CanAddresses.General.FlameLit);
+    CAN_Addresses_Controller["Error"] = IntToHex(configuration.CanAddresses.General.Error);
+    CAN_Addresses_Controller["DateTime"] = IntToHex(configuration.CanAddresses.General.DateTime);
+
+    JsonObject CAN_Addresses_Heating = doc.createNestedObject("Heating");
+    CAN_Addresses_Heating["FeedCurrent"] = IntToHex(configuration.CanAddresses.Heating.FeedCurrent);
+    CAN_Addresses_Heating["FeedMax"] = IntToHex(configuration.CanAddresses.Heating.FeedMax);
+    CAN_Addresses_Heating["FeedSetpoint"] = IntToHex(configuration.CanAddresses.Heating.FeedSetpoint);
+    CAN_Addresses_Heating["OutsideTemperature"] = IntToHex(configuration.CanAddresses.Heating.OutsideTemperature);
+    CAN_Addresses_Heating["Pump"] = IntToHex(configuration.CanAddresses.Heating.Pump);
+    CAN_Addresses_Heating["Season"] = IntToHex(configuration.CanAddresses.Heating.Season);
+    CAN_Addresses_Heating["Operation"] = IntToHex(configuration.CanAddresses.Heating.Operation);
+    CAN_Addresses_Heating["Power"] = IntToHex(configuration.CanAddresses.Heating.Power);
+    CAN_Addresses_Heating["Mode"] = IntToHex(configuration.CanAddresses.Heating.Mode);
+    CAN_Addresses_Heating["Economy"] = IntToHex(configuration.CanAddresses.Heating.Economy);
+
+    JsonObject CAN_Addresses_HotWater = doc.createNestedObject("HotWater");
+    CAN_Addresses_HotWater["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.SetpointTemperature);
+    CAN_Addresses_HotWater["MaxTemperature"] = IntToHex(configuration.CanAddresses.HotWater.MaxTemperature);
+    CAN_Addresses_HotWater["CurrentTemperature"] = IntToHex(configuration.CanAddresses.HotWater.CurrentTemperature);
+    CAN_Addresses_HotWater["Now"] = IntToHex(configuration.CanAddresses.HotWater.Now);
+    CAN_Addresses_HotWater["BufferOperation"] = IntToHex(configuration.CanAddresses.HotWater.BufferOperation);
+    CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature);
+
+    JsonObject CAN_Addresses_MixedCircuit = doc.createNestedObject("MixedCircuit");
+    CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
+    CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
+    CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
+    CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
+
+    sendJson(doc, request);
+}
+
+void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<2048> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    // Quartz setting is added at top of the document
+    configuration.CanModuleConfig.CAN_Quartz = doc["quartz"];
+
+    // Now what follows is basically the same as in ReadConfiguration @configuration.cpp
+
+    JsonObject CAN_Addresses_Controller = doc["Controller"];
+    configuration.CanAddresses.General.FlameLit = convertHexString(CAN_Addresses_Controller["FlameStatus"].as<const char *>()); // "0x209"
+    configuration.CanAddresses.General.Error = convertHexString(CAN_Addresses_Controller["Error"].as<const char *>());          // "0x206"
+    configuration.CanAddresses.General.DateTime = convertHexString(CAN_Addresses_Controller["DateTime"].as<const char *>());    // "0x256"
+
+    JsonObject CAN_Addresses_Heating = doc["Heating"];
+    configuration.CanAddresses.Heating.FeedCurrent = convertHexString(CAN_Addresses_Heating["FeedCurrent"].as<const char *>());               // "0x201"
+    configuration.CanAddresses.Heating.FeedMax = convertHexString(CAN_Addresses_Heating["FeedMax"].as<const char *>());                       // "0x200"
+    configuration.CanAddresses.Heating.FeedSetpoint = convertHexString(CAN_Addresses_Heating["FeedSetpoint"].as<const char *>());             // "0x252"
+    configuration.CanAddresses.Heating.OutsideTemperature = convertHexString(CAN_Addresses_Heating["OutsideTemperature"].as<const char *>()); // "0x207"
+    configuration.CanAddresses.Heating.Pump = convertHexString(CAN_Addresses_Heating["Pump"].as<const char *>());                             // "0x20A"
+    configuration.CanAddresses.Heating.Season = convertHexString(CAN_Addresses_Heating["Season"].as<const char *>());                         // "0x20C"
+    configuration.CanAddresses.Heating.Operation = convertHexString(CAN_Addresses_Heating["Operation"].as<const char *>());                   // "0x250"
+    configuration.CanAddresses.Heating.Power = convertHexString(CAN_Addresses_Heating["Power"].as<const char *>());                           // "0x251"
+    configuration.CanAddresses.Heating.Mode = convertHexString(CAN_Addresses_Heating["Mode"].as<const char *>());                             // "0x258"
+    configuration.CanAddresses.Heating.Economy = convertHexString(CAN_Addresses_Heating["Economy"].as<const char *>());                       // "0x253"
+
+    JsonObject CAN_Addresses_HotWater = doc["HotWater"];
+    configuration.CanAddresses.HotWater.SetpointTemperature = convertHexString(CAN_Addresses_HotWater["SetpointTemperature"].as<const char *>()); // "0x203"
+    configuration.CanAddresses.HotWater.MaxTemperature = convertHexString(CAN_Addresses_HotWater["MaxTemperature"].as<const char *>());           // "0x204"
+    configuration.CanAddresses.HotWater.CurrentTemperature = convertHexString(CAN_Addresses_HotWater["CurrentTemperature"].as<const char *>());   // "0x205"
+    configuration.CanAddresses.HotWater.Now = convertHexString(CAN_Addresses_HotWater["Now"].as<const char *>());                                 // "0x254"
+    configuration.CanAddresses.HotWater.BufferOperation = convertHexString(CAN_Addresses_HotWater["BufferOperation"].as<const char *>());         // "0x20B"
+
+    configuration
+        .CanAddresses
+        .HotWater
+        .ContinousFlowSetpointTemperature = convertHexString(CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"].as<const char *>()); // "0x255"
+
+    JsonObject CAN_Addresses_MixedCircuit = doc["MixedCircuit"];
+    configuration.CanAddresses.MixedCircuit.Pump = convertHexString(CAN_Addresses_MixedCircuit["Pump"].as<const char *>());                 // "0x404"
+    configuration.CanAddresses.MixedCircuit.FeedSetpoint = convertHexString(CAN_Addresses_MixedCircuit["FeedSetpoint"].as<const char *>()); // "0x405"
+    configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char *>());   // "0x440"
+    configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char *>());           // "0x407"
+
+    WriteConfiguration();
+
+    request->send(200, "application/json", R"({"status":200, "msg":"CAN Config have been saved."})");
 }
 
 #pragma endregion
