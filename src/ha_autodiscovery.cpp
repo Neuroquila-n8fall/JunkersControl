@@ -48,7 +48,7 @@ void SetupAutodiscoveryForAuxSensors()
         String label = configuration.TemperatureSensors.Sensors[i].Label;
         label.replace(" ", "-");
         char *valTempl;
-        sprintf(valTempl, "{{ value_json.Auxiliary.%s }}", label);
+        sprintf(valTempl, "{{ value_json.Auxiliary.%s }}", label.c_str());
         String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
         CreateAndPublishAutoDiscoverySensorJson(
             label.c_str(),
@@ -119,7 +119,7 @@ void SetupAutodiscovery(const char *fileName)
                     break;
                 }
                 if (configuration.General.Debug)
-                    Log.printf("\t\t%s\r\n", curKey);
+                    Log.printf("\t\t%s\r\n", curKey.c_str());
 
                 JsonObject CurrentSensor = SensorConfig[curKey];
                 String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + SensorCategory.key().c_str() + "/" + configuration.HomeAssistant.DeviceId + "/" + curKey + "/config";

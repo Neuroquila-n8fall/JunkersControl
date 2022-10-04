@@ -12,13 +12,12 @@ Configuration configuration;
 
 unsigned long convertHexString(const char *src)
 {
-    byte addr = strtoul(src, NULL, 16);
     return strtoul(src, NULL, 16);
 }
 
 String IntToHex(int value)
 {
-    char buf[5];
+    char buf[6];
     sprintf(buf, "0x%.3X", value);
     return buf;
 }
@@ -148,9 +147,9 @@ bool ReadConfiguration()
     int curSensor = 0;
     bool tempReferenceSensorSet = false;
 
-    JsonArray sensors = doc["AuxiliarySensors"]["Sensors"].as<JsonArray>();
+    JsonArray sensorsArray = doc["AuxiliarySensors"]["Sensors"].as<JsonArray>();
 
-    const int sensorCount = sensors.size();
+    const size_t sensorCount = sensorsArray.size();
 
     // Resize the Temperature array
     ceraValues.Auxiliary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
@@ -161,15 +160,15 @@ bool ReadConfiguration()
         ceraValues.Auxiliary.Temperatures[i] = 0.0F;
     }
 
-    // Init Sensors: This might cause trouble if too many sensors are added... we'll have to see where this is going.
+    // Init Sensors: This might cause trouble if too many sensorsArray are added... we'll have to see where this is going.
     configuration.TemperatureSensors.Sensors = (Sensor *)malloc(sensorCount * sizeof(Sensor));
 
-    // Set the amount of sensors
+    // Set the amount of sensorsArray
     configuration.TemperatureSensors.SensorCount = sensorCount;
 
-    for (JsonObject AuxiliarySensors_Sensor : sensors)
+    for (JsonObject AuxiliarySensors_Sensor : sensorsArray)
     {
-        Sensor newSensor;
+        Sensor newSensor{};
         strlcpy(newSensor.Label, AuxiliarySensors_Sensor["Label"], sizeof(newSensor.Label)); // true
         newSensor.UseAsReturnValueReference = AuxiliarySensors_Sensor["IsReturnValue"].as<bool>();
         JsonArray AuxiliarySensors_Sensor_Address = AuxiliarySensors_Sensor["Address"];
@@ -184,7 +183,7 @@ bool ReadConfiguration()
         {
             if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
             {
-                Log.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.");
+                Log.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.", curSensor);
             }
             if (newSensor.UseAsReturnValueReference)
             {
@@ -289,10 +288,10 @@ void WriteConfiguration()
         sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
         JsonArray address = sensorEntry.createNestedArray("Address");
         // Device address has a fixed size of 8
-        for (size_t x = 0; x < 8; x++)
+        for (unsigned char curAddress : curSensor.Address)
         {
-            char byteBuf[4];
-            sprintf(byteBuf, "0x%.2X", curSensor.Address[x]);
+            char byteBuf[5];
+            sprintf(byteBuf, "0x%.2X", curAddress);
             address.add(byteBuf);
         }
     }

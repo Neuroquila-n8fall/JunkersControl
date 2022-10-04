@@ -63,7 +63,7 @@ struct CeraValues
   struct HotWater_
   {
     //-- Setpoint (Target Temperature) for DHW
-    int SetPoint = 40.0F;
+    double SetPoint = 40.0F;
     //-- The currently reported temperature of the DHW circuit
     double TemperatureCurrent = 0.00F;
     //-- Whether this installation utilizes a buffer(or battery)

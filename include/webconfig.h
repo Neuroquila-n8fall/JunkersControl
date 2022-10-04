@@ -24,7 +24,7 @@ extern void listFsFiles(AsyncWebServerRequest *request, String path  = "/");
 
 extern void getFsUsagePercent(AsyncWebServerRequest *request);
 
-extern void handleDoUpdate(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+extern void handleDoUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final);
 
 extern void getSystemStatus(AsyncWebServerRequest *request);
 

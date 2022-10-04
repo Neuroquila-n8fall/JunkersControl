@@ -248,7 +248,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
   {
     int i = s.toInt();
-    commandedValues.Heating.Boost = (i == 1 ? true : false);
+    commandedValues.Heating.Boost = i == 1;
     commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
     SetFeedTemperature();
   }
@@ -257,7 +257,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
   {
     int i = s.toInt();
-    commandedValues.Heating.FastHeatup = (i == 1 ? true : false);
+    commandedValues.Heating.FastHeatup = i == 1;
     commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     SetFeedTemperature();
   }

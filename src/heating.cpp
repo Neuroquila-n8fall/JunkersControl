@@ -3,7 +3,6 @@
 #include <mqtt.h>
 #include <templates.h>
 #include <telnet.h>
-#include <t_sensors.h>
 
 CeraValues ceraValues;
 
@@ -15,7 +14,6 @@ CeraValues ceraValues;
 //   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
 double CalculateFeedTemperature()
 {
-    char printbuf[255];
 
     // Map the current ambient temperature to the desired feed temperature:
     //         Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.

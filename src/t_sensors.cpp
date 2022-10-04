@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <t_sensors.h>
-#include <mqtt.h>
 #include <main.h>
 #include <telnet.h>
 #include <heating.h>

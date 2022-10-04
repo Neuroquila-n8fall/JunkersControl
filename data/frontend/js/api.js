@@ -152,7 +152,6 @@ async function sendGeneralConfig(event) {
     const formJSON = Object.fromEntries(formData.entries());
 
     const json = JSON.stringify(formJSON);
-    console.log(json);
     const response = await fetch('/api/config/general', {
         method: 'POST',
         headers: {

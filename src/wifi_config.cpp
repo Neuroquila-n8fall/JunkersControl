@@ -12,7 +12,7 @@ WiFiClient espClient;
 
 void connectWifi()
 {
-  if (configuration.Wifi.SSID == NULL && configuration.Wifi.Password == NULL)
+  if (strlen(configuration.Wifi.SSID) == 0 && strlen(configuration.Wifi.Password) == 0)
   {
     Serial.println("Invalid WiFi configuration. Launching AP mode.");
     SetupMode = true;

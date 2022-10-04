@@ -31,8 +31,7 @@ double temp = 0.00F;
 void SetFeedTemperature()
 {
   CANMessage msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint,1);
-  char printbuf[255];
-  int feedSetpoint = 0;
+  int feedSetpoint;
 
   // Get raw Setpoint
   commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
@@ -128,8 +127,7 @@ void processCan()
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
      **************************************/
 
-    unsigned int rawTemp = 0;
-    char errorCode[2];
+    unsigned int rawTemp;
 
     // Take note of the last time we received a message from the boiler
     if (Message.id < 0x250 || Message.id > 0x260)
@@ -221,7 +219,7 @@ void processCan()
       {
         Log.println("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         return;
-      };
+      }
 
       if (!ceraValues.General.HasReceivedOT)
       {

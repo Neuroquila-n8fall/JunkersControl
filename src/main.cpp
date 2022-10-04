@@ -51,7 +51,7 @@ void setup()
   Serial.begin(115200);
   Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
 
-  Serial.printf("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\r\n\e[0m", STR(ENV));
+  Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
 
 #pragma region "Setup Mode"
 
@@ -83,7 +83,7 @@ void setup()
 
 #pragma endregion
 
-Serial.printf("\e[1;36mSetup Mode not enabled. You can enable it at every time by pressing the \"BOOT\" button once. \r\n\e[0m", STR(ENV));
+Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time by pressing the \"BOOT\" button once. \e[0m");
 
   // Read configuration
   bool result = ReadConfiguration();
@@ -219,7 +219,7 @@ void loop()
   runEverySeconds(5)
   {
     // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
-    if (SafeToSendMessage)
+    if (SafeToSendMessage())
     {
 
       // Send desired Values to the heating controller
@@ -232,9 +232,6 @@ void loop()
       //   intervals of approximately 1 second.
 
       CANMessage msg;
-
-      double feedTemperature = 0.0F;
-      int feedSetpoint = 0;
 
       switch (currentStep)
       {
@@ -281,7 +278,7 @@ void loop()
         msg.data[0] = 20;
         if (configuration.General.Debug)
         {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, ceraValues.Hotwater.SetPoint);
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %.2F\r\n", currentStep, ceraValues.Hotwater.SetPoint);
         }
         break;
 
@@ -437,9 +434,7 @@ void SendMessage(CANMessage msg)
         vTaskDelete(CanErrorActivityHandle);
         CanErrorActivityHandle = NULL;
 
-        char logMsg[50];
-        sprintf(logMsg, "CAN send error CLEARED", msg.id, CanSendErrorCount);
-        PublishLog(logMsg, __func__, LogLevel::Info);
+        PublishLog("CAN send error CLEARED", __func__, LogLevel::Info);
         Log.printf("\e[0;32[%s] CAN send error CLEARED after %i previously failed attempts.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), CanSendErrorCount);
         CanSendErrorCount = 0;
       }
@@ -476,7 +471,6 @@ void WriteMessage(CANMessage msg)
 
 void SetDateTime()
 {
-  char printbuf[255];
   runEverySeconds(dateTimeSendDelay)
   {
     if (lastSentMessageTime - millis() >= 1000)
