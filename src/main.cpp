@@ -412,7 +412,7 @@ void SendMessage(CANMessage msg)
     if (configuration.General.Debug)
     {
       Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
-      WriteMessage(msg);
+      WriteMessage(msg, false);
     }
     if (!can.tryToSend(msg))
     {
@@ -443,11 +443,16 @@ void SendMessage(CANMessage msg)
   }
 }
 
-void WriteMessage(CANMessage msg)
+void WriteMessage(CANMessage msg, bool received /* = true */)
 {
   // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
   char dataBuf[255];
   String data;
+  StaticJsonDocument<128> doc;
+  doc["id"] = msg.id;
+  doc["len"] = msg.len;
+  doc["rcv"] = received;
+  JsonArray msgData = doc.createNestedArray("data");
 
   for (int x = 0; x < msg.len; x++)
   {
@@ -459,14 +464,18 @@ void WriteMessage(CANMessage msg)
     temp.trim();
     // Concat
     data += temp;
+
+    msgData.add((int)msg.data[x]);
     // Add tab between data
     if (x < msg.len - 1)
     {
       data += "\t";
     }
   }
-
-  Log.printf("[%s]\t\e[0mCAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, data.c_str());
+  String json;
+  serializeJson(doc, json);
+  eventSource->send(json.c_str(), "can");
+  Log.printf("[%s]\t\e[0m[%s]CAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), received ? "\e[1;36m◄\e[0m" : "\e[1;35m►\e[0m", msg.id, data.c_str());
 }
 
 void SetDateTime()
