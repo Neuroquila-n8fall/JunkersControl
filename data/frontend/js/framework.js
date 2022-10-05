@@ -25,7 +25,12 @@ function loadNavigation() {
             if (curLocation.length === 0) {
                 curLocation = "home";
             }
-            _(curLocation + "-link").classList.add("active");
+            try {
+                _(curLocation + "-link").classList.add("active");
+            } catch (error) {
+                console.log("Missing Nav-link to activate.");
+            }
+            
         }
     }
 
