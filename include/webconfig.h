@@ -80,4 +80,10 @@ extern void getAuxSensorsConfig(AsyncWebServerRequest *request);
 
 extern void configureAuxSensorsEndpoints();
 
+extern void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
+
+extern void getLedConfig(AsyncWebServerRequest *request);
+
+extern void configureLedConfigEndpoints();
+
 #endif
