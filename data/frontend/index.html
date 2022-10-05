@@ -63,6 +63,9 @@
                         </li>
                     </ul>
                 </div>
+                <div id="messages">
+
+                </div>
             </div>
             <div class="col-md-3">
             </div>
@@ -74,6 +77,7 @@
     <script type="text/javascript">
         loadNavigation();
         showStatus();
+        startEvents();
         // Refresh Status every 5 seconds
         window.setInterval(showStatus, 5000);
 
@@ -126,6 +130,34 @@
                     _("mqtt").classList.remove("bg-success");
                     _("mqtt").classList.add("bg-danger");
                 }
+            }
+
+            function addMessage(message) {
+                _("messages").innerHTML += `<div>${message}</div>`;
+            }
+
+            function startEvents(){
+              var es = new EventSource('/events');
+              es.onopen = function(e) {
+                addMessage("Events Opened");
+              };
+              es.onerror = function(e) {
+                if (e.target.readyState != EventSource.OPEN) {
+                  addMessage("Events Closed");
+                }
+              };
+              es.onmessage = function(e) {
+                addMessage("Event: " + e.data);
+              };
+              es.addEventListener('ota', function(e) {
+                addMessage("Event[ota]: " + e.data);
+              }, false);
+              es.addEventListener('log', function(e) {
+                addMessage("Logmessage: " + e.data);
+              }, false);
+              es.addEventListener('can', function(e) {
+                addMessage("CAN: " + e.data);
+              }, false);
             }
     </script>
 </body>

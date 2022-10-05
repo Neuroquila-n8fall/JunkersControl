@@ -65,6 +65,10 @@ void ConfigureAndStartWebserver()
     server->on("/", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/index.html", "text/html"); });
 
+    // Web Server Root URL
+    server->on("/cananalyzer", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/canalyzer.html", "text/html"); });
+
     server->serveStatic("/", LittleFS, "/");
 
     // Finally, start the server

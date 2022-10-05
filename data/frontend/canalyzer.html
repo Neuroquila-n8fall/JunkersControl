@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Can Analyzer</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>CAN Messages</h3>
+                </div>
+                <div class="row mt-5" id="can-msg-log">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>&#8651;</th>
+                                <th>ID</th>                                
+                                <th>1</th>
+                                <th>2</th>
+                                <th>3</th>
+                                <th>4</th>
+                                <th>5</th>
+                                <th>6</th>
+                                <th>7</th>
+                                <th>8</th>
+                            </tr>
+                        </thead>
+                        <tbody id="can-msg">
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/firmware.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        startEvents();
+        let messages = [];
+
+        function addMessage(message) {
+            console.log(message);
+                let json = JSON.parse(message);
+                messages.push(json);
+                let msgData = "";
+                try {                   
+                    json.data.forEach(e => {
+                    msgData += `<td><code>0x${decimalToHex(e,3).toUpperCase()}(${e})</code></td>`;
+                });
+                _("can-msg").innerHTML += `<tr>
+                                            <td>                                                    
+                                                ${json.rcv ? "&#11176;" : "&#11179;"}
+                                            </td>
+                                            <td>
+                                                <code>0x${decimalToHex(json.id,3).toUpperCase()}</code>
+                                            </td>
+                                                ${msgData}
+                                            </tr>`;
+                } catch (error) {
+                    
+                }
+
+            }
+
+            function decimalToHex(d, padding) {
+                var hex = Number(d).toString(16);
+                padding = typeof (padding) === "undefined" || padding === null ? padding = 2 : padding;
+
+                while (hex.length < padding) {
+                    hex = "0" + hex;
+                }
+            
+                return hex;
+            }
+
+            function startEvents(){
+              var es = new EventSource('/events');
+              es.addEventListener('can', function(e) {
+                addMessage(e.data);
+              }, false);
+            }
+    </script>
+</body>
