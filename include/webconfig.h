@@ -12,6 +12,8 @@
 
 extern AsyncWebServer *server;
 
+extern AsyncEventSource *eventSource;
+
 extern void StartApMode();
 
 extern void notFound(AsyncWebServerRequest *request);

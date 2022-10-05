@@ -1,6 +1,7 @@
 #include <webconfig.h>
 
 AsyncWebServer *server;
+AsyncEventSource *eventSource;
 
 volatile bool ShouldReboot = false;
 static size_t content_len;
@@ -31,6 +32,9 @@ void sendJson(JsonDocument &doc, AsyncWebServerRequest *request)
 void ConfigureAndStartWebserver()
 {
     server = new AsyncWebServer(80);
+    eventSource = new AsyncEventSource("/events");
+
+    server->addHandler(eventSource);
 
     server->onNotFound(notFound);
 
