@@ -74,5 +74,10 @@ extern void getCanbusConfig(AsyncWebServerRequest *request);
 
 extern void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
 
+extern void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
+
+extern void getAuxSensorsConfig(AsyncWebServerRequest *request);
+
+extern void configureAuxSensorsEndpoints();
 
 #endif

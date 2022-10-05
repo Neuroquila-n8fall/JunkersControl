@@ -48,6 +48,8 @@ void ConfigureAndStartWebserver()
 
     configureCanConfigEndpoints();
 
+    configureAuxSensorsEndpoints();
+
     server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
                {
                    request->send(LittleFS, "/frontend/reboot.html", "text/html");
@@ -154,7 +156,7 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         configuration.General.Sniffing = doc["sniffing"] == "true";
 
     configuration.General.Debug = configuration.General.Debug;
-    
+
     WriteConfiguration();
 
     request->send(200, "application/json", R"({"status":200, "msg":"Feature configuration has been saved."})");
@@ -419,7 +421,7 @@ void configureFirmwareEndpoints()
                { request->send(LittleFS, "/frontend/firmware.html", "text/html"); });
 }
 
-void handleDoUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final)
+void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
 {
     if (!index)
     {
@@ -543,7 +545,7 @@ void listFsFiles(AsyncWebServerRequest *request, String path /* = "/" */)
 }
 
 // handles uploads to the filserver
-void handleUpload(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final)
+void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
 {
     Serial.printf("UPLOAD: Index %i Len %i Final %i Filename %s\r\n", index, len, final, filename.c_str());
 
@@ -590,7 +592,7 @@ void configureCanConfigEndpoints()
     server->addHandler(rcvHandler);
 }
 
-void getCanbusConfig(AsyncWebServerRequest *request) 
+void getCanbusConfig(AsyncWebServerRequest *request)
 {
     // Take values directly from configuration
     StaticJsonDocument<1024> doc;
@@ -683,6 +685,157 @@ void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     WriteConfiguration();
 
     request->send(200, "application/json", R"({"status":200, "msg":"CAN Config have been saved."})");
+}
+
+#pragma endregion
+
+#pragma region "External Temperature Sensors"
+
+void configureAuxSensorsEndpoints()
+{
+    server->on("/auxsensors", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/auxsensors.html", "text/html"); });
+
+    server->on("/api/config/auxsensors", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getAuxSensorsConfig(request); });
+
+    // Aux Sensors POST
+    auto *rcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/auxsensors",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onAuxSensorsConfigReceive(request, json);
+            });
+
+    server->addHandler(rcvHandler);
+}
+
+void getAuxSensorsConfig(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    JsonArray AuxiliarySensors_Sensors = doc.createNestedArray();
+
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    {
+        JsonObject sensorEntry = AuxiliarySensors_Sensors.createNestedObject();
+        Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
+        sensorEntry["Label"] = curSensor.Label;
+        sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
+        JsonArray address = sensorEntry.createNestedArray("Address");
+        // Device address has a fixed size of 8
+        for (unsigned char curAddress : curSensor.Address)
+        {
+            char byteBuf[5];
+            sprintf(byteBuf, "0x%.2X", curAddress);
+            address.add(byteBuf);
+        }
+    }
+    sendJson(doc, request);
+}
+
+void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    /*
+        Expected JSON:
+        [
+            {
+                "Label": "Feed",
+                "IsReturnValue": false,
+                "Address":         
+                [
+                    "0x28", "0x76", "0x51", "0x91", "0x42", "0x20", "0x01", "0xE3"
+                ]                
+            },
+            {
+                "Label": "Return",
+                "IsReturnValue": true,
+                "Address":
+                [
+                    "0x28", "0x6F", "0x9C", "0xF6", "0x42", "0x20", "0x01", "0xF6"
+                ]
+            },
+            {
+                "Label": "Exhaust",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0x6D", "0x98", "0xF5", "0x42", "0x20", "0x01", "0x0F"
+                ]
+            },
+            {
+                "Label": "Ambient",
+                "IsReturnValue": false,
+                "Address":
+                [
+                    "0x28", "0xBF", "0x39", "0x10", "0x42", "0x20", "0x01", "0x93"
+                ]
+            }
+        ]
+    */
+    StaticJsonDocument<1024> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    int curSensor = 0;
+    bool tempReferenceSensorSet = false;
+
+    JsonArray sensorsArray = doc.as<JsonArray>();
+
+    const size_t sensorCount = sensorsArray.size();
+
+    // Resize the Temperature array
+    ceraValues.Auxiliary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
+
+    // Set initial values to zero.
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    {
+        ceraValues.Auxiliary.Temperatures[i] = 0.0F;
+    }
+
+    // Init Sensors: This might cause trouble if too many sensorsArray are added... we'll have to see where this is going.
+    configuration.TemperatureSensors.Sensors = (Sensor *)malloc(sensorCount * sizeof(Sensor));
+
+    // Set the amount of sensorsArray
+    configuration.TemperatureSensors.SensorCount = sensorCount;
+
+    for (JsonObject AuxiliarySensors_Sensor : sensorsArray)
+    {
+        Sensor newSensor{};
+        strlcpy(newSensor.Label, AuxiliarySensors_Sensor["Label"], sizeof(newSensor.Label)); // true
+        newSensor.UseAsReturnValueReference = AuxiliarySensors_Sensor["IsReturnValue"].as<bool>();
+        JsonArray AuxiliarySensors_Sensor_Address = AuxiliarySensors_Sensor["Address"];
+        int i = 0;
+        for (JsonVariant value : AuxiliarySensors_Sensor_Address)
+        {
+            byte addrByte = strtoul(value.as<const char *>(), NULL, 16);
+            newSensor.Address[i++] = addrByte;
+        }
+        configuration.TemperatureSensors.Sensors[curSensor++] = newSensor;
+        if (configuration.General.Debug)
+        {
+            if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
+            {
+                Log.printf("\e[0;33mWARN: Sensor #%i is set as temperature reference but another sensor has been already set.\e[0m\r\n", curSensor);
+            }
+            if (newSensor.UseAsReturnValueReference)
+            {
+                Log.println("\e[0;36mINFO: The following sensor will be used as a return temperature reference.\e[0m\r\n");
+                tempReferenceSensorSet = true;
+            }
+            Log.printf("\e[0;32mAdded Sensor #%i with Label '%s'\r\n\e[0m", curSensor, newSensor.Label);
+        }
+    }
+
+    WriteConfiguration();
+
+    request->send(200, "application/json", R"({"status":200, "msg":"Auxiliary Sensors have been saved."})");
 }
 
 #pragma endregion

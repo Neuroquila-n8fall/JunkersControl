@@ -34,23 +34,26 @@ function loadNavigation() {
     xhr.send();
 }
 
-function getDeepKeys(obj) {
-    var keys = [];
-    for (var key in obj) {
-        if (typeof obj[key] === "object" && !Array.isArray(obj[key])) {
-            var subkeys = getDeepKeys(obj[key]);
+/**
+ * Gets all keys of a json object
+ * 
+ * @param {Object} jsonObj Input json to look through
+ * @returns {Array<string>} An array of point separated keys as string
+ */
+function getDeepKeys(jsonObj) {
+    let keys = [];
+    for (var key in jsonObj) {
+        if (typeof jsonObj[key] === "object" && !Array.isArray(jsonObj[key])) {
+            var subkeys = getDeepKeys(jsonObj[key]);
             keys = keys.concat(subkeys.map(function (subkey) {
-                return key + "." + subkey;
+                return `${key}.${subkey}`;
             }));
-        } else if (Array.isArray(obj[key])) {
-            for (var i = 0; i < obj[key].length; i++) {
-                var subkeys = getDeepKeys(obj[key][i]);
-                keys = keys.concat(subkeys.map(function (subkey) {
-                    return key + "[" + i + "]" + "." + subkey;
-                }));
+        } else if (Array.isArray(jsonObj[key])) {
+            for (var i = 0; i < jsonObj[key].length; i++) {
+                var subkeys = getDeepKeys(jsonObj[key][i]);
+                keys = keys.concat(subkeys.map((subkey) => `${key}[${i}].${subkey}`));
             }
         } else {
-
             keys.push(key);
         }
     }
@@ -60,22 +63,22 @@ function getDeepKeys(obj) {
 /**
 * Converts a string path to a value that is existing in a json object.
 * 
-* @param {Object} jsonData Json data to use for searching the value.
+* @param {Object} jsonObj Json to use for searching the value.
 * @param {Object} path the path to use to find the value.
 * @returns {valueOfThePath|null}
 */
-function jsonPathToValue(jsonData, path) {
-    if (!(jsonData instanceof Object) || typeof (path) === "undefined") {
-        throw "Not valid argument:jsonData:" + jsonData + ", path:" + path;
+function jsonPathToValue(jsonObj, path) {
+    if (!(jsonObj instanceof Object) || typeof (path) === "undefined") {
+        throw `Not valid argument:jsonData:${jsonObj}, path:${path}`;
     }
     path = path.replace(/\[(\w+)\]/g, '.$1'); // convert indexes to properties
     path = path.replace(/^\./, ''); // strip a leading dot
-    var pathArray = path.split('.');
-    for (var i = 0, n = pathArray.length; i < n; ++i) {
-        var key = pathArray[i];
-        if (key in jsonData) {
-            if (jsonData[key] !== null) {
-                jsonData = jsonData[key];
+    const pathArray = path.split('.');
+    for (let i = 0, n = pathArray.length; i < n; ++i) {
+        const key = pathArray[i];
+        if (key in jsonObj) {
+            if (jsonObj[key] !== null) {
+                jsonObj = jsonObj[key];
             } else {
                 return null;
             }
@@ -83,9 +86,21 @@ function jsonPathToValue(jsonData, path) {
             return key;
         }
     }
-    return jsonData;
+    return jsonObj;
 }
 
+/**
+ * Converts a form into a nested json object. Form input fields need to have a 'name' attribute and nested values need to have a dot-separated name.
+ * Example:
+ * ```
+ * <form>
+ *  <input name="parent.subkey1"/>
+ *  <input name="parent.subkey2.subkey3"/>
+ * </form>
+ * ```
+ * @param {string} formId The Id of the form to process
+ * @returns {Object} A json object containing the forms data
+ */
 function serializeForm(formId) {
     const elements = document.querySelectorAll(`#${formId} input`);
     const data = {};

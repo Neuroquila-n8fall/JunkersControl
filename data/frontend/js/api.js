@@ -244,3 +244,5 @@ async function getConfigJson(apiEndpoint) {
     const response = await fetch(apiEndpoint);
     return await response.json();
 }
+
+
