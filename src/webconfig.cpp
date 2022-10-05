@@ -50,6 +50,8 @@ void ConfigureAndStartWebserver()
 
     configureAuxSensorsEndpoints();
 
+    configureLedConfigEndpoints();
+
     server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
                {
                    request->send(LittleFS, "/frontend/reboot.html", "text/html");
@@ -836,6 +838,67 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
     WriteConfiguration();
 
     request->send(200, "application/json", R"({"status":200, "msg":"Auxiliary Sensors have been saved."})");
+}
+
+#pragma endregion
+
+#pragma region "LED Configuration"
+
+void configureLedConfigEndpoints()
+{
+    server->on("/leds", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/leds.html", "text/html"); });
+
+    server->on("/api/config/leds", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getLedConfig(request); });
+
+    // Aux Sensors POST
+    auto *rcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/leds",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onLedConfigReceive(request, json);
+            });
+
+    server->addHandler(rcvHandler);
+}
+
+void getLedConfig(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<512> doc;
+    doc["wifi-led"] = configuration.LEDs.WifiLed;
+    doc["status-led"] = configuration.LEDs.StatusLed;
+    doc["mqtt-led"] = configuration.LEDs.MqttLed;
+    doc["heating-led"] = configuration.LEDs.HeatingLed;
+    sendJson(doc, request);
+}
+
+void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<512> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    if (!doc["wifi-led"].isNull())
+        configuration.LEDs.WifiLed = doc["wifi-led"];
+    if (!doc["status-led"].isNull())
+        configuration.LEDs.StatusLed = doc["status-led"];
+    if (!doc["mqtt-led"].isNull())
+        configuration.LEDs.MqttLed = doc["mqtt-led"];
+    if (!doc["heating-led"].isNull())
+        configuration.LEDs.HeatingLed = doc["heating-led"];
+
+    WriteConfiguration();
+
+    request->send(200, "application/json", R"({"status":200, "msg":"LED config has been saved."})");
+
 }
 
 #pragma endregion
