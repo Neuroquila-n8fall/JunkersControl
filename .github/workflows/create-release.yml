@@ -32,19 +32,19 @@ jobs:
       - name: Install platformIO libraries
         run: pio lib install
       - name: Build Production Image
-        run: pio run -e production -include version.h
+        run: pio run -e github
       - name: Archive Firmware
         uses: actions/upload-artifact@v3
         with:
           name: firmware.bin
-          path: .pio/build/production/firmware.bin
+          path: .pio/build/github/firmware.bin
       - name: Build Production FS Image
-        run: pio run -e production -t buildfs
+        run: pio run -e github -t buildfs
       - name: Archive Filesystem
         uses: actions/upload-artifact@v3
         with:
           name: littlefs.bin
-          path: .pio/build/production/littlefs.bin  
+          path: .pio/build/github/littlefs.bin  
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -62,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: .pio/build/production/firmware.bin
+          asset_path: .pio/build/github/firmware.bin
           asset_name: firmware.bin
           asset_content_type: application/octet-stream
       - name: Upload Release Asset Filesystem
@@ -72,6 +72,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: .pio/build/production/littlefs.bin
+          asset_path: .pio/build/github/littlefs.bin
           asset_name: littlefs.bin
           asset_content_type: application/octet-stream
