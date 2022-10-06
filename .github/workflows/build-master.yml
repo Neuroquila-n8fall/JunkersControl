@@ -1,6 +1,4 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
+name: Build
 
 # Controls when the workflow will run
 on:
@@ -35,5 +33,7 @@ jobs:
       # It is important to first install the libraries before compiling, since otherwise compilation might fail to find the just-installed libraries
       - name: Install platformIO libraries
         run: pio lib install
-      - name: Run PlatformIO
-        run: platformio run
+      - name: Build Production Firmware
+        run: pio run -e production
+      - name: Build Production Filesystem Image
+        run: pio run -e production -t buildfs       
