@@ -50,6 +50,7 @@ void setup()
   // Setup Serial
   Serial.begin(115200);
   Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
+  Serial.printf("\e[1;32mRunning Build: %s\r\n\e[0m", STR(VERSION));
 
   Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
 
