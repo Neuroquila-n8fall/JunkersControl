@@ -136,3 +136,11 @@ function serializeForm(formId) {
     }
     return data;
 }
+
+function rebootButton() {
+    _("statusdetails").innerHTML = "Invoking Reboot ...";
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", "/reboot", true);
+    xhr.send();
+    window.open("/reboot", "_self");
+}

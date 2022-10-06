@@ -1,13 +1,5 @@
 let CurrentPath = "/";
 
-function rebootButton() {
-    document.getElementById("statusdetails").innerHTML = "Invoking Reboot ...";
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", "/reboot", true);
-    xhr.send();
-    window.open("/reboot", "_self");
-}
-
 function listFiles(path) {
     let xmlhttp = new XMLHttpRequest();
     if (path) {
