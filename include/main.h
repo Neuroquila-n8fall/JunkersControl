@@ -36,6 +36,11 @@
 #define ENV "NOT_SET"
 #endif
 
+// Version
+#ifndef VERSION
+#define VERSION "LOCAL_BUILD"
+#endif
+
 //-- Preprocessor 
 #define ST(A) #A
 #define STR(A) ST(A)

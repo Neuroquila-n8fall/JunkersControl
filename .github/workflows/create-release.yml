@@ -15,6 +15,13 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: 'true'
+      - name: Create Version Header
+        run: |
+          cat <<EOF > version.h
+          #ifndef VERSION
+          #define VERSION ${{github.ref_name}}
+          #endif
+          EOF
       - name: Set up Python
         uses: actions/setup-python@v1
       - name: Install dependencies
@@ -25,7 +32,7 @@ jobs:
       - name: Install platformIO libraries
         run: pio lib install
       - name: Build Production Image
-        run: pio run -e production
+        run: pio run -e production -include version.h
       - name: Archive Firmware
         uses: actions/upload-artifact@v3
         with:
