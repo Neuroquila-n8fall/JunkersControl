@@ -12,7 +12,7 @@ mqtt_set_heizungsparameter:
         "FeedBaseSetpoint": {{ states(''input_number.heizung_fusspunkt'') | int(default=0)  }},
         "FeedCutOff": {{ states(''input_number.heizung_endpunkt'') | int(default=0)  }},
         "FeedMinimum": {{ states(''input_number.heizung_minimum'') | int(default=0)  }},
-        "AuxilaryTemperature": {{ states(''sensor.temperatur_und_luftfeuchte_aussen_actual_temperature'') | float(default=0)  }},
+        "AuxiliaryTemperature": {{ states(''sensor.temperatur_und_luftfeuchte_aussen_actual_temperature'') | float(default=0)  }},
         "AmbientTemperature": {{ state_attr(''climate.thermostat_og_kochen_und_essen'',''current_temperature'') | float(default=0) }},
         "TargetAmbientTemperature": {{ states(''input_number.heizung_zieltemperatur'') | float(default=0)  }},
         "OnDemandBoostDuration": {{ states(''input_number.heizung_boostdauer'') | int(default=0)  }},

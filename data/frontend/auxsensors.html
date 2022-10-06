@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Auxiliary Sensors Configuration</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>Auxiliary Sensors Configuration</h3>
+                </div>
+                <div class="row text-start">
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <strong>Info</strong><br/>
+                        Enter a name (label) for the sensor and enter its address into the fields. The format of the address is <strong>0x##</strong> which is the same format used by the library to report addresses.<br/>
+                        Example: <code>0x32</code> or <code>0x1F</code><br/>
+                        Refer to the <a href="https://github.com/milesburton/Arduino-Temperature-Control-Library/blob/master/examples/oneWireSearch/oneWireSearch.ino">Library Example</a> on how to scan for addresses.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <h4>Add Sensor</h4>
+                    <form id="add-sensor-form" onsubmit="addSensor(event)">
+                        <div class="mb-3 p-2 border border-1 rounded" id="add-sensor-block">
+                            <div class="input-group mb-3">
+                                <span class="input-group-text">Sensor Label</span>
+                                <input
+                                    name="add-sensor-label"
+                                    type="text"
+                                    class="form-control"
+                                    aria-label="Sensor Label"
+                                    value=""
+                                    required
+                                />                                
+                                <div class="input-group-text">
+                                    <input class="form-check-input mt-0" type="checkbox"
+                                    name="add-sensor.use-as-reference" id="add-sensor.use-as-reference"
+                                    value="add-sensor-isrefval">
+                                    <span class="ms-2">
+                                        Use as feed return reference
+                                    </span>
+                                </div>
+                            </div>
+                            <label class="form-label" id="add-sensor-address-label">
+                                Address
+                            </label>
+                            <div class="input-group input-group-sm mb-3" id="add-sensor-address">
+
+                            </div>
+                            <div class="d-flex">
+                                <div class="ms-auto p-2">
+                                    <button
+                                        type="submit"
+                                        class="btn btn-primary btn-sm"
+                                    >
+                                        Add Sensor
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <h4>Configured Sensors</h4>
+                    <form id="aux-form" onsubmit="saveSensors(event)">
+                        <fieldset id="form-fieldset">
+
+                        </fieldset>
+                    </form>                    
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/firmware.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        loadSensors(true);
+        addSensorAddressInputs();
+
+        function Sensor() {
+            this.Label = "";
+            this.IsReturnValue = false;
+            this.Address = [];
+        }
+        /*
+            Holds currently configured sensors
+        */
+        let sensors = [];
+
+        function removeSensor(formElement) {
+            const sensorId = formElement.split("-")[0];
+            const sensorIndex = sensors.findIndex(e => e.Label === sensorId);
+            console.log(sensorIndex);            
+            sensors.splice(sensorIndex, 1);
+            _(formElement).remove();
+        }
+
+        function isHex(str) {
+            return Boolean(str.match(/^0x[0-9a-f]+$/i))
+        }
+
+        function addSensor(event) {
+            event.preventDefault();
+            // Add new data into sensors
+            const formElements = _("add-sensor-form").elements;
+            let newSensor = new Sensor();
+            newSensor.Label = formElements["add-sensor-label"].value;
+            newSensor.IsReturnValue = formElements["add-sensor.use-as-reference"].value;
+            for (let i = 0; i < 8; i++) {
+                newSensor.Address.push(formElements[`add-sensor.${i}`].value);
+            }
+            sensors.push(newSensor);
+            loadSensors(false);
+            validateSensors();
+            _("add-sensor-form").reset();
+        }
+
+        function validateSensors() {
+            let hasFlag = false;
+            const formElements = _("aux-form").elements;
+            let isValid = true;
+            sensors.forEach((e) => {
+                //Make sure only one element has the "ReturnFeedReference" Flag
+                if(e.IsReturnValue && hasFlag)
+                {
+                    e.IsReturnValue = false;
+                }
+                if(e.IsReturnValue && !hasFlag)
+                {
+                    hasFlag = true;
+                }
+                for (let i = 0; i < 8; i++) {
+                    let curItem = e.Address[i];
+                    let curElement = formElements[`${e.Label}.${i}`];
+                    if(!isHex(curItem) || curElement.length < 4)
+                    {                        
+                        curElement.classList.remove("is-valid");
+                        curElement.classList.add("is-invalid");
+                        isValid = false;
+                    } else {
+                        curElement.classList.remove("is-invalid");
+                        curElement.classList.add("is-valid");
+                    }
+                }
+            })
+            return isValid;
+        }
+
+        /** 
+         * Sync formdata with sensors array
+         * */
+        function syncSensors() {
+            const formElements = _("aux-form").elements;
+            // This will only give us a top-level view of all sensors.
+            const formJson = serializeForm("aux-form");
+            sensors.forEach((sensor) => {
+                sensor.Label = formElements[`${sensor.Label}`].value;
+                let radio = _(`${sensor.Label}.use-as-reference`);
+                sensor.IsReturnValue = radio.checked;
+                for (let i = 0; i < 8; i++) {
+                    sensor.Address[i] = formElements[`${sensor.Label}.${i}`].value;
+                }
+            });
+        }
+
+        function validateAddressField(field) {
+            const element = _(field);
+            let curValue = element.value;
+            if(!isHex(curValue) || curValue.length < 4)
+            {                        
+                element.classList.remove("is-valid");
+                element.classList.add("is-invalid");
+            } else {
+                element.classList.remove("is-invalid");
+                element.classList.add("is-valid");
+            }
+        }
+
+        function addSensorAddressInputs() {
+            let addressBlock = "<!-- Address Input Fields -->";
+            for (let i = 0; i < 8; i++) {
+                addressBlock += `<input name="add-sensor.${i}" id="add-sensor.${i}" type="text" class="form-control" aria-label="${i}" value="0x0${i}" minlength="4" maxlength="4">`;
+            }
+            
+            _("add-sensor-address").innerHTML = addressBlock;
+        }
+
+        async function loadSensors(refresh) {
+            _("form-fieldset").disabled = true;
+            _("form-fieldset").innerHTML = `<div class="d-flex justify-content-center">
+                                                <div class="spinner-border" role="status" id="spinner">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                            </div>`;
+            if(refresh === true)
+            {
+                const response = await getConfigJson("/api/config/auxsensors"); 
+                sensors = response.at(0);
+            }
+
+            sensors.forEach(e => {
+                let address = e.Address;
+                let addressBlock = `<label class="form-label" id="${e.Label}-address-label">
+                                        Address
+                                    </label><div class="input-group input-group-sm mb-3" id="${e.Label}-address">`;
+                let i = 0;
+                address.forEach(a => {
+                    addressBlock += `<input
+                        name="${e.Label}.${i}" 
+                        id="${e.Label}.${i}" 
+                        type="text" 
+                        class="form-control" 
+                        aria-label="${i}" 
+                        value="${a}" 
+                        minlength="4" 
+                        maxlength="4" 
+                        oninput="validateAddressField('${e.Label}.${i}')"                       
+                        >`;
+                    i++;
+                })
+                addressBlock += "</div>";
+                let inputBlockContainer = `
+                <div class="mb-3 p-2 border border-1 rounded" id="${e.Label}-block">
+                    <div class="input-group mb-3">
+                        <span for="${e.Label}" class="input-group-text">Sensor Label</span>
+                        <input
+                            name="${e.Label}"
+                            type="text"
+                            class="form-control"
+                            aria-label="${e.Label}"
+                            value="${e.Label}"
+                            required
+                        />
+                        <div class="input-group-text">
+                            <input class="form-check-input mt-0" type="radio"
+                            name="use-as-reference" id="${e.Label}.use-as-reference"
+                            value="${e.Label}" ${e.IsReturnValue ? "checked" : ""}>
+                            <span class="ms-2" for="${e.Label}.use-as-reference">
+                                Use as feed return reference
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Address Input Fields -->
+                        ${addressBlock}                    
+                    <div class="d-flex">
+                        <div class="ms-auto p-2">
+                            <button
+                                type="button"
+                                class="btn btn-danger btn-sm"
+                                onclick="removeSensor('${e.Label}-block')"
+                            >
+                                Remove Sensor
+                            </button>
+                        </div>
+                    </div>
+                </div>                    
+                `;
+                _("form-fieldset").innerHTML += inputBlockContainer;
+            })
+            _("form-fieldset").innerHTML += `
+                                <div class="row" id="status"></div>
+                                <div class="mb-3 row">
+                                    <div class="col-sm-10">
+                                        <button name="submit" type="submit" class="btn btn-primary" id="save-config">
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                                id="config-saving" hidden></span>
+                                            <span id="save-config-label">Save Configuration</span>
+                                        </button>
+                                    </div>
+                                </div>`;
+            _("spinner").hidden = true;
+            _("form-fieldset").disabled = false;
+        }
+
+        async function saveSensors(event) {
+            // Prevent the form from submitting.
+            event.preventDefault();
+            event.disabled = true;
+            _("form-fieldset").disabled = true;
+            _("config-saving").hidden = false;
+            _("save-config-label").innerHTML = "Saving Configuration...";
+            _("save-config").disabled = true;
+            // First update the sensors array from form field values
+            const form = _("aux-form").elements;
+            syncSensors();
+            const isValid = validateSensors();
+            console.log(sensors);
+            if (isValid) {
+                const json = JSON.stringify(sensors);            
+                const response = await fetch('/api/config/auxsensors', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: json,
+                });
+                switch (response.status) {
+                    case 200:
+                        _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
+                                                <strong>Config Saved!</strong><br/>Configuration has been updated.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                                </div>`;
+                        break;
+                    case 400:
+                        _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                                <strong>Error</strong><br/>Configuration not saved because the received data was of a wrong format.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                                </div>`;
+                        break;
+                    default:
+                        _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                                <strong>Error</strong><br/>Received a status ${response.status} telling ${response.statusText}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                                </div>`;
+                        break;
+                }
+            
+            } else {
+                _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                                <strong>Error</strong><br/>Please verify that all sensors have a valid configuration. Addresses need to be written as hexadecimal notation <strong>0xA1</strong><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                                </div>`;
+            }
+            event.disabled = false;
+            _("config-saving").hidden = true;
+            _("save-config-label").innerHTML = "Save Configuration";
+            _("save-config").disabled = false;
+            _("form-fieldset").disabled = false;
+        }
+    </script>
+</body>

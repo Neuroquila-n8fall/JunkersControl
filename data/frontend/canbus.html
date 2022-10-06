@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER CAN-Bus</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>CAN-Bus Configuration</h3>
+                </div>
+                <div class="row text-start">
+                    <form id="canbus-form" onsubmit="saveCanbusData(event)">
+                        <fieldset id="form-fieldset">
+                            <label class="col-sm-6 col-form-label" for="quartz">CAN-Module Frequency</label>
+                            <div class="input-group mb-3">
+                                <input name="quartz" name="quartz" placeholder="Default: 16" type="number" required class="form-control"
+                                    autocomplete="quartz" value="16" required>
+                                <span class="input-group-text" id="basic-addon2">MHz</span>
+                                <span id="statusHelpBlock" class="form-text text-muted">Enter the frequency of the quartz (oscillator) which is used
+                                    by your CAN-Module. Usually it's 8MHz or 16MHz in some rare cases, though, 16MHz has been found to be more
+                                    stable but your mileage may vary.</span>
+                            </div>
+                            <!-- CAN Addresses -->
+                            <div class="mb-3 row">
+                                <h4>Addresses</h4>
+                                <div class="alert alert-info" role="alert">
+                                    Addresses have to be entered in their hexadecimal text representation. <br /> Example: <strong>0x209</strong>
+                                    <br /> You will find these addresses in the console output, when 'Sniffing' is enabled.
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <h5>Internal Heating Controller</h5>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Controller.FlameStatus">Flame Status</span>
+                                    <input name="Controller.FlameStatus" maxlength="5" type="text" class="form-control" placeholder="0x209" aria-label="Flame Status"
+                                        aria-describedby="lbl.Controller.FlameStatus" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Controller.Error">Errors</span>
+                                    <input name="Controller.Error" maxlength="5" type="text" class="form-control" placeholder="0x206" aria-label="Error"
+                                        aria-describedby="lbl.Controller.Error" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Controller.DateTime">Date &amp; Time</span>
+                                    <input name="Controller.DateTime" maxlength="5" type="text" class="form-control" placeholder="0x256" aria-label="DateTime"
+                                        aria-describedby="lbl.Controller.DateTime" required>
+                                </div>
+                                <h5>Heating</h5>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.FeedCurrent">Current Feed Temperature</span>
+                                    <input name="Heating.FeedCurrent" maxlength="5" type="text" class="form-control" placeholder="0x201" aria-label="Current Feed Temperature"
+                                        aria-describedby="lbl.Heating.FeedCurrent" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.FeedMax">Maximum Feed Temperature</span>
+                                    <input name="Heating.FeedMax" maxlength="5" type="text" class="form-control" placeholder="0x200" aria-label="Maximum Feed Temperature"
+                                        aria-describedby="lbl.Heating.FeedMax" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.FeedSetpoint">Feed Setpoint</span>
+                                    <input name="Heating.FeedSetpoint" maxlength="5" type="text" class="form-control" placeholder="0x252" aria-label="Feed Setpoint"
+                                        aria-describedby="lbl.Heating.FeedSetpoint" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.OutsideTemperature">Outside Temperature Sensor</span>
+                                    <input name="Heating.OutsideTemperature" maxlength="5" type="text" class="form-control" placeholder="0x207" aria-label="Outside Temperature Sensor"
+                                        aria-describedby="lbl.Heating.OutsideTemperature" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Pump">Pump Status</span>
+                                    <input name="Heating.Pump" maxlength="5" type="text" class="form-control" placeholder="0x20A" aria-label="Pump Status"
+                                        aria-describedby="lbl.Heating.Pump" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Season">Seasonal Operation Mode</span>
+                                    <input name="Heating.Season" maxlength="5" type="text" class="form-control" placeholder="0x20C" aria-label="Season"
+                                        aria-describedby="lbl.Heating.Season" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Operation">Operation Flag</span>
+                                    <input name="Heating.Operation" maxlength="5" type="text" class="form-control" placeholder="0x250" aria-label="Operation Flag"
+                                        aria-describedby="lbl.Heating.Operation" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Power">Heating Power</span>
+                                    <input name="Heating.Power" maxlength="5" type="text" class="form-control" placeholder="0x251" aria-label="Heating Power"
+                                        aria-describedby="lbl.Heating.Power" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Mode">Mode</span>
+                                    <input name="Heating.Mode" maxlength="5" type="text" class="form-control" placeholder="0x258" aria-label="Mode"
+                                        aria-describedby="lbl.Heating.Mode" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.Heating.Economy">Economy Flag</span>
+                                    <input name="Heating.Economy" maxlength="5" type="text" class="form-control" placeholder="0x253" aria-label="Economy Flag"
+                                        aria-describedby="lbl.Heating.Economy" required>
+                                </div>
+                                <h5>Hot Water</h5>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.SetpointTemperature">Setpoint</span>
+                                    <input name="HotWater.SetpointTemperature" maxlength="5" type="text" class="form-control" placeholder="0x203" aria-label="Setpoint"
+                                        aria-describedby="lbl.HotWater.SetpointTemperature" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.MaxTemperature">Maximum Temperature</span>
+                                    <input name="HotWater.MaxTemperature" maxlength="5" type="text" class="form-control" placeholder="0x204" aria-label="Maximum Temperature"
+                                        aria-describedby="lbl.HotWater.MaxTemperature" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.CurrentTemperature">Current Temperature</span>
+                                    <input name="HotWater.CurrentTemperature" maxlength="5" type="text" class="form-control" placeholder="0x205" aria-label="Current Temperature"
+                                        aria-describedby="lbl.HotWater.CurrentTemperature" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.Now">Hot Water 'Now' Flag</span>
+                                    <input name="HotWater.Now" maxlength="5" maxlength="5" type="text" class="form-control" placeholder="0x254" aria-label="Hot Water 'Now' Flag"
+                                        aria-describedby="lbl.HotWater.Now" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.BufferOperation">Buffer Mode Flag</span>
+                                    <input name="HotWater.BufferOperation" maxlength="5" type="text" class="form-control" placeholder="0x20B" aria-label="Buffer Mode Flag"
+                                        aria-describedby="lbl.HotWater.BufferOperation" required>
+                                </div>
+                                <h6>Continous Flow</h6>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.HotWater.ContinousFlow.SetpointTemperature">Temperature Setpoint</span>
+                                    <input name="HotWater.ContinousFlow.SetpointTemperature" maxlength="5" type="text" class="form-control" placeholder="0x255" aria-label="Temperature Setpoint"
+                                        aria-describedby="lbl.HotWater.ContinousFlow.SetpointTemperature" required>
+                                </div>
+                                <h5>Mixed Circuit</h5>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.MixedCircuit.Pump">Pump</span>
+                                    <input name="MixedCircuit.Pump" maxlength="5" type="text" class="form-control" placeholder="0x404" aria-label="Pump"
+                                        aria-describedby="lbl.MixedCircuit.Pump" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.MixedCircuit.FeedSetpoint">Feed Setpoint</span>
+                                    <input name="MixedCircuit.FeedSetpoint" maxlength="5" type="text" class="form-control" placeholder="0x405" aria-label="Feed Setpoint"
+                                        aria-describedby="lbl.MixedCircuit.FeedSetpoint" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.MixedCircuit.FeedCurrent">Current Feed Temperature</span>
+                                    <input name="MixedCircuit.FeedCurrent" maxlength="5" type="text" class="form-control" placeholder="0x440" aria-label="Current Feed Temperature"
+                                        aria-describedby="lbl.MixedCircuit.FeedCurrent" required>
+                                </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.MixedCircuit.Economy">Economy Flag</span>
+                                    <input name="MixedCircuit.Economy" maxlength="5" type="text" class="form-control" placeholder="0x407" aria-label="Economy Flag"
+                                        aria-describedby="lbl.MixedCircuit.Economy" required>
+                                </div>
+                                <div class="row" id="status">
+                                </div>
+                                <div class="mb-3 row">
+                                    <div class="col-sm-10">
+                                        <button name="submit" type="submit" class="btn btn-primary" id="save-config">
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                                id="config-saving" hidden></span>
+                                            <span id="save-config-label">Save Configuration</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+
+                <div class="col-md-3">
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/firmware.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        loadCanAddresses();
+
+        async function loadCanAddresses() {
+            const form = document.forms["canbus-form"];
+            const result = await getConfigJson("/api/config/canbus");
+            var keys = getDeepKeys(result);
+            keys.forEach(e => {
+                form.elements[e].value = jsonPathToValue(result, e);
+            })
+        } 
+
+        async function saveCanbusData(event) {
+            // Prevent the form from submitting.
+            event.preventDefault();
+            _("form-fieldset").disabled = true;
+            _("config-saving").hidden = false;
+            _("save-config-label").innerHTML = "Saving Configuration...";
+            _("save-config").disabled = true;
+            const formData = new FormData(event.target);
+            let result = serializeForm("canbus-form");
+            await sendCanbusConfig(JSON.stringify(result));
+            _("config-saving").hidden = true;
+            _("save-config-label").innerHTML = "Save Configuration";
+            _("save-config").disabled = false;
+            _("form-fieldset").disabled = false;
+        }
+
+    </script>
+</body>

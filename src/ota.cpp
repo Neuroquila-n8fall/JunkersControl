@@ -22,10 +22,10 @@ void ota()
         else // U_SPIFFS
         {
           type = "filesystem";
-          SPIFFS.end();
+          LittleFS.end();
         }
 
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using LittleFS.end()
         Serial.println("Start updating " + type);
       })
       .onEnd([]() {

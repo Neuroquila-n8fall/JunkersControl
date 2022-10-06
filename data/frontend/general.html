@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Configuration</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <div class="row mt-5">
+                    <h3>General Settings</h3>
+                </div>
+                <div class="row">
+                    <form onsubmit="sendGeneralConfig(event)" id="general-form">
+                        <fieldset id="form-fieldset">
+                        <div class="text-start">
+                            <div class="mb-3 row">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="heatingvalues">
+                                    <label class="form-check-label" for="heatingvalues">Enable processing and transmission of heating values</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="watervalues">
+                                    <label class="form-check-label" for="watervalues">Enable processing and transmission of water values</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="auxvalues">
+                                    <label class="form-check-label" for="auxvalues">Enable processing and transmission of external temperature sensors</label>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-2 col-form-label" for="tz">Timezone (NTP)</label>
+                                <div class="col-sm-10">
+                                    <select class="form-select" aria-label="Select Timezone" id="tz">
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-2 col-form-label" for="busmsgtimeout">Message Timeout</label>
+                                <div class="col-sm-10">
+                                    <input id="busmsgtimeout" name="busmsgtimeout" placeholder="Default: 30" type="number"
+                                        required class="form-control" autocomplete="busmsgtimeout" value="30" required>
+                                        <span id="statusHelpBlock" class="form-text text-muted">Time in seconds before control over the heating is assumed when no other controllers have been detected on the bus.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="debug">
+                                    <label class="form-check-label" for="debug">Enable debug messages on the consoles</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="sniffing">
+                                    <label class="form-check-label" for="sniffing">Output received CAN messages on consoles.</label>
+                                </div>
+                            </div>
+                            <div class="mb-3 row" id="status">
+                                <!-- Status Result Placeholder -->
+                            </div>
+                            <div class="mb-3 row">
+                                <div class="col-sm-10">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-general">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                        id="general-saving" hidden></span>
+                                        <span id="save-general-label">Save Settings</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-3">
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        getTz();
+        loadGeneralConfig();
+
+        async function loadGeneralConfig() {
+            let form = document.forms["general-form"];
+            const config = await getGeneralConfig();
+            for (let entry in config) {
+                let element = form.elements[entry];
+                if(element) {
+                    console.log(element.type);
+                    if(element.type.toLowerCase() === "checkbox") {
+                        element.checked = config[entry];
+                    }
+                    element.value = config[entry];
+                }
+                
+            }
+        }
+        
+        function getTz() {
+            let select = _("tz");
+            if (!Intl.supportedValuesOf) {
+            let opt = new Option("Your browser does not support Intl.supportedValuesOf().", null, true, true);
+            opt.disabled = true;
+            select.options.add(opt);
+            } else {
+            for (const timeZone of Intl.supportedValuesOf("timeZone")) {
+              select.options.add(new Option(timeZone));
+            }
+        }
+        }
+    </script>
+</body>

@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <telnet.h>
 #include <WiFi.h>
-#include <wifi_config.h>
 #include <configuration.h>
 
 const uint TelnetServerPort = 23;

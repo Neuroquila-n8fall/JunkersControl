@@ -48,8 +48,8 @@ void SetupAutodiscoveryForAuxSensors()
         String label = configuration.TemperatureSensors.Sensors[i].Label;
         label.replace(" ", "-");
         char *valTempl;
-        sprintf(valTempl, "{{ value_json.Auxilary.%s }}", label);
-        String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
+        sprintf(valTempl, "{{ value_json.Auxiliary.%s }}", label.c_str());
+        String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
         CreateAndPublishAutoDiscoverySensorJson(
             label.c_str(),
             configuration.HomeAssistant.TempUnit.c_str(),
@@ -61,19 +61,19 @@ void SetupAutodiscoveryForAuxSensors()
 void SetupAutodiscovery(const char *fileName)
 {
     // Init SPIFFS
-    if (!SPIFFS.begin())
+    if (!LittleFS.begin())
     {
         Log.println("SPIFFS Filesystem not ready.");
         return;
     }
 
-    if (!SPIFFS.exists(fileName))
+    if (!LittleFS.exists(fileName))
     {
         Log.println("HA Autodiscovery file could not be found. Please upload it first.");
         return;
     }
 
-    File file = SPIFFS.open(fileName);
+    File file = LittleFS.open(fileName);
 
     if (!file)
     {
@@ -93,19 +93,19 @@ void SetupAutodiscovery(const char *fileName)
         Log.println(error.c_str());
         return;
     }
-    if (DebugMode)
+    if (configuration.General.Debug)
         Log.println("///----- Reading HA AD Config -----");
     // Sensor Type Category Block: Sensor, Binary Sensor, ...
     for (JsonPair SensorCategory : sensors)
     {
-        if (DebugMode)
+        if (configuration.General.Debug)
             Log.println(SensorCategory.key().c_str());
         // Sensor Device Specific Category like Heating, Water, ...
         JsonObject CurCategoryObj = doc[SensorCategory.key().c_str()].as<JsonObject>();
 
         for (JsonPair InternalDevCategory : CurCategoryObj)
         {
-            if (DebugMode)
+            if (configuration.General.Debug)
                 Log.printf("\t%s\r\n", InternalDevCategory.key().c_str());
             // Specific Internal Device Category Config
             JsonArray CurSensorObject = CurCategoryObj[InternalDevCategory.key().c_str()].as<JsonArray>();
@@ -118,8 +118,8 @@ void SetupAutodiscovery(const char *fileName)
                     curKey = curPair.key().c_str();
                     break;
                 }
-                if (DebugMode)
-                    Log.printf("\t\t%s\r\n", curKey);
+                if (configuration.General.Debug)
+                    Log.printf("\t\t%s\r\n", curKey.c_str());
 
                 JsonObject CurrentSensor = SensorConfig[curKey];
                 String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + SensorCategory.key().c_str() + "/" + configuration.HomeAssistant.DeviceId + "/" + curKey + "/config";
@@ -142,19 +142,19 @@ void SetupAutodiscovery(const char *fileName)
                 // Sensor is assembled. We have to transmit this config to HA now in order to get it working
                 char buffer[768];
                 size_t n = serializeJson(CurrentSensor, buffer);
-                if (DebugMode)
+                if (configuration.General.Debug)
                 {
                     Log.println(discoveryTopic);
                     serializeJsonPretty(CurrentSensor, Serial);
-                };
+                }
                 client.publish(discoveryTopic.c_str(), buffer, n);
             }
         }
     }
 
-    if (DebugMode)
+    if (configuration.General.Debug)
         Log.println("----- HA AD Config END -----///");
 
-    // Close SPIFFS.
-    SPIFFS.end();
+    // Close LittleFS.
+    LittleFS.end();
 }

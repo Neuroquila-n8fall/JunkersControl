@@ -21,6 +21,8 @@
 #include <t_sensors.h>
 // NTP Timesync
 #include <timesync.h>
+// Webconfig & Server
+#include <webconfig.h>
 
 #include <ESPmDNS.h>
 
@@ -43,7 +45,7 @@ extern void SendMessage(CANMessage msg);
 extern void SetDateTime();
 extern void Reboot();
 extern CANMessage PrepareMessage(uint32_t id, int length = 8);
-extern void WriteMessage(CANMessage msg);
+extern void WriteMessage(CANMessage msg, bool received = true);
 extern bool SafeToSendMessage(bool dontWaitForController = true);
 
 extern void ShowHeartbeat(void *pvParameter);
@@ -61,13 +63,6 @@ extern void TrackBoostFunction(void *pvParameter);
 //This flag enables the control of the heating. It will be automatically reset to FALSE if another controller sends messages
 //  It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
 extern bool OverrideControl;
-
-//Controller Message Timeout
-//  After this timeout this controller will take over control.
-extern int controllerMessageTimeout;
-
-//Set this to true to view debug info
-extern bool DebugMode;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
@@ -98,6 +93,9 @@ extern unsigned long lastSentMessageTime;
 
 //-- CAN Error Counter
 extern volatile int CanSendErrorCount;
+
+//-- Setup Mode Flag
+extern volatile bool SetupMode;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Macros / Extensions

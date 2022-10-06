@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Firmware</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>Update Firmware & Filesystem</h3>
+                </div>
+                <div class="row">
+                    <div class="container text-start">
+                        <div class="alert alert-info" role="alert">
+                            Upload any <strong>.bin</strong> file to update the firmware.<br />
+                            <strong>IMPORTANT</strong> If you want to upload a filesystem image, make sure it is named
+                            <strong>littlefs.bin</strong>
+                        </div>
+
+                    </div>
+                    <form id="upload_form" enctype="multipart/form-data" method="post" onsubmit="startUpdate(event)">
+                        <div class="mb-5">
+                            <label for="file1" class="form-label">Upload File</label>
+                            <input class="form-control" type="file" id="file1" name="file1">
+                            <button type="submit" class="btn btn-primary mt-3">Start Update</button>
+                        </div>
+                    </form>
+                    <div class="container">
+                        <div class="progress progress-bar-striped progress-bar-animated" id="progress" hidden>
+                            <div class="progress-bar" role="progressbar" id="progressBar" aria-label="Upload Progress"
+                                style="display: none !important;" aria-valuenow="0" aria-valuemin="0"
+                                aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <span class="text-center" id="loaded_n_total"></span>
+                </div>
+                <div class="row" id="status">
+
+                </div>
+                <div class="col-md-3">
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/firmware.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+    </script>
+</body>

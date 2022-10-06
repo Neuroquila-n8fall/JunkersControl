@@ -1,0 +1,53 @@
+<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark justify-content-center">
+    <div class="container-fluid">
+
+        <a class="navbar-brand" href="/">
+            <!-- Icon created by Freepik -->
+            <img src="/frontend/img/smart-heating.png" alt="Cerasmarter" width="30" height="24">
+            Cerasmarter        
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText"
+            aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/" id="home-link">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/filemanager" id="filemanager-link">File Manager</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/update-firmware" id="update-firmware-link">Firmware Update</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        Configuration
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                        <li><a class="dropdown-item" href="/wifi" id="wifi-link">Wifi</a></li>
+                        <li><a class="dropdown-item" href="/mqtt" id="mqtt-link">MQTT</a></li>
+                        <li><a class="dropdown-item" href="/general" id="general-link">General Settings</a></li>
+                        <li><a class="dropdown-item" href="/canbus" id="canbus-link">CAN-Bus</a></li>
+                        <li><a class="dropdown-item" href="/auxsensors" id="auxsensors-link">Temperature Sensors</a>
+                        </li>
+                        <li><a class="dropdown-item" href="/leds" id="leds-link">LEDs</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarUtilDropdownMenuLink" role="button"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                        Utilities
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarUtilDropdownMenuLink">
+                        <li><a class="dropdown-item" href="/cananalyzer" id="cananalyzer-link">CAN Message Analyzer</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<div class="mb-5"></div>
