@@ -146,6 +146,14 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
 
 void loop()
 {
+  // Init reboot if requested
+  if (ShouldReboot) {
+    WiFi.disconnect();
+    server->end();
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    ESP.restart();
+  }
+
   // Stop executing when SetupMode is active.
   if (SetupMode)
   {
