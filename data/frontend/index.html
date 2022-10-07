@@ -125,7 +125,15 @@
                     _("can").classList.remove("bg-success");
                     _("can").classList.add("bg-danger");
                 }
-                _("canerrorcount").innerHTML = status["canerrorcount"];
+                let canErrorCount = status["canerrorcount"];
+                _("canerrorcount").innerHTML = canErrorCount;
+                if(canErrorCount === 0) {
+                    _("canerrorcount").classList.remove("bg-danger");
+                    _("canerrorcount").classList.add("bg-success");
+                } else {
+                    _("canerrorcount").classList.remove("bg-success");
+                    _("canerrorcount").classList.add("bg-danger");
+                }
                 _("mqtt").innerHTML = status["mqtt"] ? "Connected" : "Disconnected";
                 if(status["mqtt"]) {
                     _("mqtt").classList.remove("bg-danger");
