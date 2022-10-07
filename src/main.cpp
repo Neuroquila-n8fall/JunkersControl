@@ -506,7 +506,7 @@ void SetDateTime()
       msg.data[3] = 4;
       if (configuration.General.Debug)
       {
-        Log.printf("DEBUG: Date and Time DOW:%i H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
+        Log.printf("DEBUG: Date and Time DOW:%li H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
       }
 
       SendMessage(msg);
