@@ -148,6 +148,8 @@ void loop()
 {
   // Init reboot if requested
   if (ShouldReboot) {
+    // Wait a bit so the client is redirected properly...
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
     WiFi.disconnect();
     server->end();
     vTaskDelay(3000 / portTICK_PERIOD_MS);
