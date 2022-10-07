@@ -96,7 +96,7 @@
         loadNavigation();
         loadConfig();
 
-        _("led-form").addEventListener("onsubmit", saveConfig);
+        _("led-form").addEventListener('submit', saveConfig);
 
         async function loadConfig() {
             const form = document.forms["led-form"];

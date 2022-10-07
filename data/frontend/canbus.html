@@ -193,7 +193,7 @@
         loadNavigation();
         loadCanAddresses();
 
-        _("canbus-form").addEventListener("onsubmit", saveCanbusData);
+        _("canbus-form").addEventListener('submit', saveCanbusData);
 
         async function loadCanAddresses() {
             const form = document.forms["canbus-form"];
