@@ -69,13 +69,13 @@ Just a few examples:
 - Bugs, of course
 
 ## Intended Audience
-You might have to change things around so a little bit of coding experience will benefit you. Since the upgrade to a flexible configuration format, you will be able to tune the system to your needs without knowing much about software development.
+Since the upgrade to a flexible configuration format and the ability to configure things via a web UI, you will be able to tune the system to your needs without knowing much about software development.
 But you might find yourself in a situation where things don't work as expected. Feel free to open an issue so we can adapt things to your needs.
 
-Disclaimer:
+### Disclaimer:
 I have sourced the message ids from https://www.mikrocontroller.net/topic/81265 but only process those that are relevant to me.
 This means you should bring a little bit of patience and basic knowledge about your heating with you so you can actually make decisions about what IDs might be relevant to you or not.
-
+You should look at the CAN-Bus configuration on the web UI and the Can Analyzer to sort things out for your heating system.
 Also you should have Visual Studio Code ready and the extension [Platformio](https://platformio.org/) installed. We'll talk about that in detail in [Prerequisites](#prerequisites)
 
 
@@ -105,7 +105,11 @@ Again, when in doubt, ask a technician.
 
 ### MQTT
 Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
-The topics are described inside `/data/configuration.json`
+
+#### Where?
+The topics are described inside `/data/configuration.json` or `Configuration > MQTT` on the web UI.
+
+#### How?
 
 To send parameters to the heating controller, you just have to form a JSON and send it to the topic you defined in `/data/configuration.json`
 
@@ -279,9 +283,9 @@ Maybe you switch on a relay that triggers the voltage supply for the original co
 
 The oneWire and DallasTemperature libraries are included and used to fetch additional temperatures like the return temperature which isn't available on the bus.
 
-#### Configuration
+#### Where?
 
-Configured using `/data/configuration.json`. 
+Configured using `/data/configuration.json` or `Configuration > Temperature Sensors` on the web UI
 
 See [Auxiliary Sensors](assets/Configuration.md#auxiliary-sensors)
 
@@ -351,9 +355,13 @@ Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
 }
 ```
 
-### OTA Updates and Console
+## Updating
 
 The standard "Arduino OTA" procedure is included which means you can upload the code to your ESP32 without having to plug in the USB cable. See `platformio.ini` and modify the IP address accordingly.
+
+You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
+
+## Telnet Console
 
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
@@ -412,3 +420,5 @@ WIP
 - Pierre Molinaro and contributors of the ACAN2515 library: https://github.com/pierremolinaro/acan2515
 - Nick O'Leary and contributors of the PubSubClient library: https://github.com/knolleary/pubsubclient
 - Rop Gonggrijp and contributors of the ezTime library: https://github.com/ropg/ezTime
+- The maintainers of the ArduinoJSON library: https://arduinojson.org/
+- The maintainers of the Async ESP Webserver and AsyncTCP library: https://github.com/me-no-dev/ESPAsyncWebServer
