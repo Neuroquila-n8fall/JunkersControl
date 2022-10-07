@@ -50,7 +50,7 @@
                             <span class="badge bg-primary rounded-pill" id="sketch"></span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            CAN-Bus Status
+                            CAN-Bus Module
                             <span class="badge bg-primary rounded-pill" id="can"></span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -116,15 +116,24 @@
                 _("prog-sketch").setAttribute('aria-valuenow', occupiedSketchPercent);
                 _("prog-sketch").innerHTML = `${Math.round(occupiedSketchPercent)}%`;
                 _("sketch").innerHTML = `${humanReadableSize(status["sketchsize"])} out of ${humanReadableSize(status["freesketch"])} used`;
-                _("can").innerHTML = status["canstatus"] ? "Working" : "Error";
-                if(status["canstatus"]) {
+                let canStatus = status["canstatus"];
+                _("can").innerHTML = CanErrorCodes[canStatus];
+                if(canStatus === 0) {
                     _("can").classList.remove("bg-danger");
                     _("can").classList.add("bg-success");
                 } else {
                     _("can").classList.remove("bg-success");
                     _("can").classList.add("bg-danger");
                 }
-                _("canerrorcount").innerHTML = status["canerrorcount"];
+                let canErrorCount = status["canerrorcount"];
+                _("canerrorcount").innerHTML = canErrorCount;
+                if(canErrorCount === 0) {
+                    _("canerrorcount").classList.remove("bg-danger");
+                    _("canerrorcount").classList.add("bg-success");
+                } else {
+                    _("canerrorcount").classList.remove("bg-success");
+                    _("canerrorcount").classList.add("bg-danger");
+                }
                 _("mqtt").innerHTML = status["mqtt"] ? "Connected" : "Disconnected";
                 if(status["mqtt"]) {
                     _("mqtt").classList.remove("bg-danger");

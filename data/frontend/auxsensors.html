@@ -31,7 +31,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                     <h4>Add Sensor</h4>
-                    <form id="add-sensor-form" onsubmit="addSensor(event)">
+                    <form id="add-sensor-form">
                         <div class="mb-3 p-2 border border-1 rounded" id="add-sensor-block">
                             <div class="input-group mb-3">
                                 <span class="input-group-text">Sensor Label</span>
@@ -71,7 +71,7 @@
                         </div>
                     </form>
                     <h4>Configured Sensors</h4>
-                    <form id="aux-form" onsubmit="saveSensors(event)">
+                    <form id="aux-form">
                         <fieldset id="form-fieldset">
 
                         </fieldset>
@@ -85,9 +85,13 @@
     <script src="frontend/js/firmware.js"></script>
     <script src="frontend/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript">
+
         loadNavigation();
         loadSensors(true);
         addSensorAddressInputs();
+
+        _("add-sensor-form").addEventListener("onsubmit", addSensor);
+        _("aux-form").addEventListener("onsubmit", saveSensors);
 
         function Sensor() {
             this.Label = "";
@@ -163,8 +167,6 @@
          * */
         function syncSensors() {
             const formElements = _("aux-form").elements;
-            // This will only give us a top-level view of all sensors.
-            const formJson = serializeForm("aux-form");
             sensors.forEach((sensor) => {
                 sensor.Label = formElements[`${sensor.Label}`].value;
                 let radio = _(`${sensor.Label}.use-as-reference`);
@@ -234,7 +236,7 @@
                 let inputBlockContainer = `
                 <div class="mb-3 p-2 border border-1 rounded" id="${e.Label}-block">
                     <div class="input-group mb-3">
-                        <span for="${e.Label}" class="input-group-text">Sensor Label</span>
+                        <span class="input-group-text">Sensor Label</span>
                         <input
                             name="${e.Label}"
                             type="text"
@@ -247,7 +249,7 @@
                             <input class="form-check-input mt-0" type="radio"
                             name="use-as-reference" id="${e.Label}.use-as-reference"
                             value="${e.Label}" ${e.IsReturnValue ? "checked" : ""}>
-                            <span class="ms-2" for="${e.Label}.use-as-reference">
+                            <span class="ms-2">
                                 Use as feed return reference
                             </span>
                         </div>
@@ -292,8 +294,6 @@
             _("config-saving").hidden = false;
             _("save-config-label").innerHTML = "Saving Configuration...";
             _("save-config").disabled = true;
-            // First update the sensors array from form field values
-            const form = _("aux-form").elements;
             syncSensors();
             const isValid = validateSensors();
             console.log(sensors);

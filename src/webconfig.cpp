@@ -4,7 +4,6 @@ AsyncWebServer *server;
 AsyncEventSource *eventSource;
 
 volatile bool ShouldReboot = false;
-static size_t content_len;
 
 void StartApMode()
 {
@@ -922,22 +921,9 @@ void getSystemStatus(AsyncWebServerRequest *request)
     doc["heap"] = ESP.getHeapSize();
     doc["freesketch"] = ESP.getFreeSketchSpace();
     doc["sketchsize"] = ESP.getSketchSize();
-    doc["canstatus"] = CanSendErrorCount == 0;
+    doc["canstatus"] = CanConfigErrorCode;
     doc["canerrorcount"] = CanSendErrorCount;
     doc["mqtt"] = client.connected();
 
     sendJson(doc, request);
-}
-
-// Make size of files human readable
-String humanReadableSize(const size_t bytes)
-{
-    if (bytes < 1024)
-        return String(bytes) + " B";
-    else if (bytes < (1024 * 1024))
-        return String(bytes / 1024.0) + " KB";
-    else if (bytes < (1024 * 1024 * 1024))
-        return String(bytes / 1024.0 / 1024.0) + " MB";
-    else
-        return String(bytes / 1024.0 / 1024.0 / 1024.0) + " GB";
 }

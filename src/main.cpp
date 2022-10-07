@@ -146,6 +146,16 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
 
 void loop()
 {
+  // Init reboot if requested
+  if (ShouldReboot) {
+    // Wait a bit so the client is redirected properly...
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    WiFi.disconnect();
+    server->end();
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    ESP.restart();
+  }
+
   // Stop executing when SetupMode is active.
   if (SetupMode)
   {
@@ -229,7 +239,7 @@ void loop()
       // We can only "suggest" to set to a certain temperature or switching off the pump(s)
 
       // I have "borrowed" the concept of a step-chain from PLC programming since it appears
-      //   to have been incoorporated into the controller as well because values arrive in
+      //   to have been incorporated into the controller as well because values arrive in
       //   intervals of approximately 1 second.
 
       CANMessage msg;
@@ -498,7 +508,7 @@ void SetDateTime()
       msg.data[3] = 4;
       if (configuration.General.Debug)
       {
-        Log.printf("DEBUG: Date and Time DOW:%i H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
+        Log.printf("DEBUG: Date and Time DOW:%li H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
       }
 
       SendMessage(msg);

@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include <ACAN2515.h>
 
+//-- CAN-Library Configuration Error code
+extern volatile uint16_t CanConfigErrorCode;
+
 //——————————————————————————————————————————————————————————————————————————————
 //  MCP2515 Driver object
 //——————————————————————————————————————————————————————————————————————————————

@@ -31,7 +31,7 @@
                         </div>
 
                     </div>
-                    <form id="upload_form" enctype="multipart/form-data" method="post" onsubmit="startUpdate(event)">
+                    <form id="upload_form" enctype="multipart/form-data" method="post">
                         <div class="mb-5">
                             <label for="file1" class="form-label">Upload File</label>
                             <input class="form-control" type="file" id="file1" name="file1">
@@ -64,5 +64,7 @@
     <script src="frontend/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript">
         loadNavigation();
+
+        _("upload_form").addEventListener("onsubmit",startUpdate);
     </script>
 </body>

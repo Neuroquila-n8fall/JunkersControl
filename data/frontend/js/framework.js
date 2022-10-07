@@ -2,6 +2,24 @@ function _(el) {
     return document.getElementById(el);
 }
 
+const CanErrorCodes = [
+    "OK",
+    "No MCP2515",
+    "Too Far From Desired Bit Rate",
+    "Inconsistent Bit Rate Settings",
+    "INT Pin Is Not An Interrupt",
+    "ISR Is Null",
+    "Requested Mode TimeOut",
+    "Acceptance Filter Array Is NULL",
+    "One Filter Mask Requires One Or Two Acceptance Filters",
+    "Two Filter Masks Require Three To Six Acceptance Filters",
+    "Cannot Allocate Receive Buffer",
+    "Cannot Allocate Transmit Buffer 0",
+    "Cannot Allocate Transmit Buffer 1",
+    "Cannot Allocate Transmit Buffer 2",
+    "ISR Not Null And No Int Pin",
+]
+
 function humanReadableSize(bytes) {
     if (bytes < 1024)
         return bytes + " B";

@@ -23,6 +23,8 @@ static const byte MCP2515_SCK = 18;  // SCK input of MCP2515
 static const byte MCP2515_MOSI = 23; // SDI input of MCP2515
 static const byte MCP2515_MISO = 19; // SDO output of MCP2515
 
+volatile uint16_t CanConfigErrorCode;
+
 ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 
 double temp = 0.00F;
@@ -55,9 +57,9 @@ void setupCan()
   uint32_t frequency = configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL; // 16 MHz
   ACAN2515Settings settings(frequency, 10UL * 1000UL); // CAN bit rate 10 kb/s
 
-  const uint16_t errorCode = can.begin(settings, []
+  CanConfigErrorCode = can.begin(settings, []
                                        { can.isr(); });
-  if (errorCode == 0 && configuration.General.Debug)
+  if (CanConfigErrorCode == 0 && configuration.General.Debug)
   {
     Log.print("Bit Rate prescaler: ");
     Log.println(settings.mBitRatePrescaler);
@@ -80,10 +82,10 @@ void setupCan()
     Log.print(settings.samplePointFromBitStart());
     Log.println("%");
   }
-  if (errorCode != 0)
+  if (CanConfigErrorCode != 0)
   {
     Log.print("Configuration error 0x");
-    Log.println(errorCode, HEX);
+    Log.println(CanConfigErrorCode, HEX);
   }
 }
 
