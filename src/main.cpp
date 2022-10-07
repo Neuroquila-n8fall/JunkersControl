@@ -237,7 +237,7 @@ void loop()
       // We can only "suggest" to set to a certain temperature or switching off the pump(s)
 
       // I have "borrowed" the concept of a step-chain from PLC programming since it appears
-      //   to have been incoorporated into the controller as well because values arrive in
+      //   to have been incorporated into the controller as well because values arrive in
       //   intervals of approximately 1 second.
 
       CANMessage msg;
