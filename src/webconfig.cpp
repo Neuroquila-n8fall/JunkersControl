@@ -4,7 +4,6 @@ AsyncWebServer *server;
 AsyncEventSource *eventSource;
 
 volatile bool ShouldReboot = false;
-static size_t content_len;
 
 void StartApMode()
 {
