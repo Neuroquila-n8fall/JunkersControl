@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.9.3
+Emergency fix for web UI: I forgot to commit the working version of the frontend pages so the forms actually work.
+
 ## v0.9.2
 Some fixes and improvements have been made.
 For example the Reboot button didn't actually reboot the system.
