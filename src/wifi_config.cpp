@@ -27,12 +27,15 @@ void connectWifi()
     WiFi.disconnect();
     WiFi.setHostname(configuration.Wifi.Hostname);
     WiFi.mode(WIFI_STA);
-    
+
     Serial.println("WiFi not connected. Reconnecting...");
 
-    if(configuration.General.Debug)
-    Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID, configuration.Wifi.Password, configuration.Wifi.Hostname);
-    unsigned long prevConnectMillis = millis();
+    if(configuration.General.Debug) {
+      Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID,
+                    configuration.Wifi.Password, configuration.Wifi.Hostname);
+    }
+
+    auto prevConnectMillis = millis();
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
