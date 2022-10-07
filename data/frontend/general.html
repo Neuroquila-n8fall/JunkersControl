@@ -22,7 +22,7 @@
                     <h3>General Settings</h3>
                 </div>
                 <div class="row">
-                    <form onsubmit="sendGeneralConfig(event)" id="general-form">
+                    <form id="general-form">
                         <fieldset id="form-fieldset">
                         <div class="text-start">
                             <div class="mb-3 row">
@@ -50,7 +50,7 @@
                                 <label class="col-sm-2 col-form-label" for="busmsgtimeout">Message Timeout</label>
                                 <div class="col-sm-10">
                                     <input id="busmsgtimeout" name="busmsgtimeout" placeholder="Default: 30" type="number"
-                                        required class="form-control" autocomplete="busmsgtimeout" value="30" required>
+                                        class="form-control" autocomplete="busmsgtimeout" value="30" required>
                                         <span id="statusHelpBlock" class="form-text text-muted">Time in seconds before control over the heating is assumed when no other controllers have been detected on the bus.</span>
                                 </div>
                             </div>
@@ -92,6 +92,8 @@
         loadNavigation();
         getTz();
         loadGeneralConfig();
+
+        _("general-form").addEventListener("onsubmit", sendGeneralConfig);
 
         async function loadGeneralConfig() {
             let form = document.forms["general-form"];

@@ -36,7 +36,7 @@
                             <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
-                    <form id="led-form" onsubmit="saveConfig(event)">
+                    <form id="led-form">
                         <fieldset id="form-fieldset">
                             <div class="input-group mb-3">
                                 <span class="input-group-text col-sm-9" id="status-led-label">Status LED</span>
@@ -95,6 +95,8 @@
     <script type="text/javascript">
         loadNavigation();
         loadConfig();
+
+        _("led-form").addEventListener("onsubmit", saveConfig);
 
         async function loadConfig() {
             const form = document.forms["led-form"];

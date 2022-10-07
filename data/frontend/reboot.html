@@ -10,23 +10,26 @@
 </head>
 
 <body>
+<div class="container-fluid text-center">
     <div class="alert alert-secondary" role="alert">
         Rebooting, returning to main page in <span class="badge text-bg-primary" id="countdown">30</span> seconds
     </div>
-    <script type="text/javascript">
-        let seconds = 20;
+</div>
+<script type="text/javascript">
+    let seconds = 30;
 
-        function countdown() {
-            seconds = seconds - 1;
-            if (seconds < 0) {
-                window.location = "/";
-            } else {
-                document.getElementById("countdown").innerHTML = seconds;
-                window.setTimeout("countdown()", 1000);
-            }
+    function countdown() {
+        seconds = seconds - 1;
+        if (seconds < 0) {
+            window.location = "/";
+        } else {
+            document.getElementById("countdown").innerHTML = seconds;
+            window.setTimeout("countdown()", 1000);
         }
-        countdown();
-    </script>
+    }
+
+    countdown();
+</script>
 </body>
 
 </html>

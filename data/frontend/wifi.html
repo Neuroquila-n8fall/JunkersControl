@@ -22,7 +22,7 @@
                     <h3>Set Wifi Credentials</h3>
                 </div>
                 <div class="row">
-                    <form onsubmit="sendWifiConfig(event)" id="wifi-form">
+                    <form id="wifi-form">
                         <fieldset id="form-fieldset">
                         <div class="text-start">
                             <div class="mb-3 row">
@@ -86,7 +86,9 @@
         loadNavigation();
     </script>
     <script type="text/javascript">        
-        loadWifiConfig();     
+        loadWifiConfig();
+
+        _("wifi-form").addEventListener("onsubmit", sendWifiConfig);
 
         async function loadWifiConfig()
         {

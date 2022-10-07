@@ -23,11 +23,11 @@
                     <h3>CAN-Bus Configuration</h3>
                 </div>
                 <div class="row text-start">
-                    <form id="canbus-form" onsubmit="saveCanbusData(event)">
+                    <form id="canbus-form">
                         <fieldset id="form-fieldset">
                             <label class="col-sm-6 col-form-label" for="quartz">CAN-Module Frequency</label>
                             <div class="input-group mb-3">
-                                <input name="quartz" name="quartz" placeholder="Default: 16" type="number" required class="form-control"
+                                <input name="quartz" id="quartz" placeholder="Default: 16" type="number" class="form-control"
                                     autocomplete="quartz" value="16" required>
                                 <span class="input-group-text" id="basic-addon2">MHz</span>
                                 <span id="statusHelpBlock" class="form-text text-muted">Enter the frequency of the quartz (oscillator) which is used
@@ -128,7 +128,7 @@
                                 </div>
                                 <div class="input-group mb-3">
                                     <span class="input-group-text col-sm-10" id="lbl.HotWater.Now">Hot Water 'Now' Flag</span>
-                                    <input name="HotWater.Now" maxlength="5" maxlength="5" type="text" class="form-control" placeholder="0x254" aria-label="Hot Water 'Now' Flag"
+                                    <input name="HotWater.Now" maxlength="5" type="text" class="form-control" placeholder="0x254" aria-label="Hot Water 'Now' Flag"
                                         aria-describedby="lbl.HotWater.Now" required>
                                 </div>
                                 <div class="input-group mb-3">
@@ -192,6 +192,8 @@
     <script type="text/javascript">
         loadNavigation();
         loadCanAddresses();
+
+        _("canbus-form").addEventListener("onsubmit", saveCanbusData);
 
         async function loadCanAddresses() {
             const form = document.forms["canbus-form"];
