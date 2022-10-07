@@ -11,11 +11,15 @@
     - [Cerasmart-er](#cerasmart-er)
   - [Contribution](#contribution)
   - [Intended Audience](#intended-audience)
+    - [Disclaimer:](#disclaimer)
   - [A word of warning](#a-word-of-warning)
     - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
   - [Prerequisites](#prerequisites)
+  - [Installation (Quick Start)](#installation-quick-start)
   - [Features](#features)
     - [MQTT](#mqtt)
+      - [Where?](#where)
+      - [How?](#how)
       - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
       - [Examples & Detailed Explanation](#examples--detailed-explanation)
     - [Heating Parameters](#heating-parameters)
@@ -28,15 +32,16 @@
     - [Fallback and Failsafe](#fallback-and-failsafe)
     - [Automatic Controller Detection](#automatic-controller-detection)
     - [External Temperature Sensors](#external-temperature-sensors)
-      - [Configuration](#configuration)
+      - [Where?](#where-1)
     - [Dynamic Adaption](#dynamic-adaption)
     - [Calculate yourself](#calculate-yourself)
     - [Valve-based control](#valve-based-control)
-    - [OTA Updates and Console](#ota-updates-and-console)
+  - [Updating](#updating)
+  - [Telnet Console](#telnet-console)
   - [Home Assistant Integration](#home-assistant-integration)
   - [Hints](#hints)
   - [Getting Started](#getting-started)
-    - [Configuration](#configuration-1)
+    - [Configuration](#configuration)
   - [Dedicated PCB](#dedicated-pcb)
   - [Todo](#todo)
   - [Special Thanks](#special-thanks)
@@ -100,6 +105,36 @@ Again, when in doubt, ask a technician.
 8) A MQTT broker (i.e. Mosquitto)
 9) Visual Studio Code & [Platform.IO](https://platformio.org/) Add-On are recommended!
 10) Optional: DS18B20 Sensors
+
+## Installation (Quick Start)
+Either clone the repository and build/upload yourself using Platformio and your IDE of choice or download the binaries and use esptool as follows:
+Example for Windows environments:
+```shell
+esptool.exe --after no_reset --chip esp32 --baud 921600 --port <Serial port of your device> write_flash --verify 0x10000 firmware.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash 0x307000 littlefs.bin
+```
+
+The important part is the addresses `0x10000` for the firmware and `0x307000`for the filesystem.
+
+If everything went well you should see the following output on the console:
+```log
+Press the "BOOT" button within the next 5 seconds to enable Setup Mode!
+Setup Mode not enabled. You can enable it at every time by pressing the "BOOT" button once.
+[  5047][E][vfs_api.cpp:104] open(): /littlefs/configuration.json does not exist, no permits for creation
+Configuration file could not be found. Please upload it first.
+Unable to read configuration.
+Invalid WiFi configuration. Launching AP mode.
+WiFi AP launched. Find me @ 192.168.4.1
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+```
+
+Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json)
+
+If MDNS is working properly on your end, you will be able to open the web UI using http://cerasmarter/
 
 ## Features
 
