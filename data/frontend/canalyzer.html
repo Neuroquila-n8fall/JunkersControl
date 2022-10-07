@@ -90,8 +90,8 @@
         }
 
         async function loadKnownAddresses() {
-            var addresses = await getConfigJson("/api/config/canbus");
-            var keys = getDeepKeys(addresses);            
+            const addresses = await getConfigJson("/api/config/canbus");
+            const keys = getDeepKeys(addresses);
             keys.forEach(e => {
                 let value = jsonPathToValue(addresses, e);
                 knownAddresses.push(value);
@@ -126,7 +126,7 @@
         */
         function addToKnownAddress(id) {
             const msgId = `0x${id.toUpperCase()}`;
-            var found = unknownAddresses.findIndex((e) => e === msgId);
+            const found = unknownAddresses.findIndex((e) => e === msgId);
             unknownAddresses.slice(found, 1);
             _(`${id.toLowerCase()}-unknown`).remove();
             knownAddresses.push(`0x${id}`);
@@ -143,7 +143,7 @@
         */
         function addUnknownAddress(id) {
             const msgId = `0x${id.toUpperCase()}`;
-            var found = knownAddresses.findIndex((e) => e === msgId);
+            const found = knownAddresses.findIndex((e) => e === msgId);
             if(found > -1) {
                 unknownAddresses.slice(found, 1);
                 _(`${id.toLowerCase()}-enabled`).remove();
@@ -265,7 +265,7 @@
             }
 
             function decimalToHex(d, padding) {
-                var hex = Number(d).toString(16);
+                let hex = Number(d).toString(16);
                 padding = typeof (padding) === "undefined" || padding === null ? padding = 2 : padding;
 
                 while (hex.length < padding) {
@@ -276,10 +276,10 @@
             }
 
             function startEvents(){
-              var es = new EventSource('/events');
-              es.addEventListener('can', function(e) {
+                const es = new EventSource('/events');
+                es.addEventListener('can', function(e) {
                 addMessage(e.data);
-              }, false);
+                }, false);
             }
     </script>
 </body>
