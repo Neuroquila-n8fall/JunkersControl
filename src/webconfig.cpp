@@ -921,7 +921,7 @@ void getSystemStatus(AsyncWebServerRequest *request)
     doc["heap"] = ESP.getHeapSize();
     doc["freesketch"] = ESP.getFreeSketchSpace();
     doc["sketchsize"] = ESP.getSketchSize();
-    doc["canstatus"] = CanSendErrorCount == 0;
+    doc["canstatus"] = CanConfigErrorCode;
     doc["canerrorcount"] = CanSendErrorCount;
     doc["mqtt"] = client.connected();
 
