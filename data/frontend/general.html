@@ -93,7 +93,7 @@
         getTz();
         loadGeneralConfig();
 
-        _("general-form").addEventListener("onsubmit", sendGeneralConfig);
+        _("general-form").addEventListener('submit', sendGeneralConfig);
 
         async function loadGeneralConfig() {
             let form = document.forms["general-form"];

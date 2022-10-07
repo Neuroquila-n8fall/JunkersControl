@@ -194,8 +194,8 @@
         loadMqttConfig();
         loadMqttTopicsConfig();
 
-        _("mqtt-form").addEventListener("onsubmit", sendMqttConfig);
-        _("mqtt-topics-form").addEventListener("onsubmit", sendMqttTopicsConfig);
+        _("mqtt-form").addEventListener('submit', sendMqttConfig);
+        _("mqtt-topics-form").addEventListener('submit', sendMqttTopicsConfig);
 
         async function loadMqttConfig() {
             const form = document.forms["mqtt-form"];

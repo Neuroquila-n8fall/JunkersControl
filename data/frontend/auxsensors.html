@@ -90,8 +90,8 @@
         loadSensors(true);
         addSensorAddressInputs();
 
-        _("add-sensor-form").addEventListener("onsubmit", addSensor);
-        _("aux-form").addEventListener("onsubmit", saveSensors);
+        _("add-sensor-form").addEventListener('submit', addSensor);
+        _("aux-form").addEventListener('submit', saveSensors);
 
         function Sensor() {
             this.Label = "";
