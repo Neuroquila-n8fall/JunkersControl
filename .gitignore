@@ -8,6 +8,7 @@
 *scratchpad.md
 */scratchpad.md
 data/configuration.json
+/data_build/*
 /cmake-*/
 CMakeLists.txt
 CMakeListsPrivate.txt
