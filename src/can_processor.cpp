@@ -114,6 +114,8 @@ void processCan()
       // Switch off override if another controller sends messages on the network.
       OverrideControl = false;
 
+      eventSource->send(R"({"override": false})", "status");
+
       Log.println("Detected another controller on the network. Disabling Override");
     }
 

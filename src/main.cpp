@@ -217,6 +217,7 @@ void loop()
       if (!OverrideControl)
       {
         OverrideControl = true;
+        eventSource->send(R"({"override": true})", "status");
         Log.println("No other controller on the network. Enabling Override.");
       }
     }
