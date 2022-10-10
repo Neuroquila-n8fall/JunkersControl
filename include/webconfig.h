@@ -28,7 +28,15 @@ extern void getFsUsagePercent(AsyncWebServerRequest *request);
 
 extern void handleDoUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final);
 
+extern void getGeneralStatus(AsyncWebServerRequest *request);
+
 extern void getSystemStatus(AsyncWebServerRequest *request);
+
+extern void getHeatingStatus(AsyncWebServerRequest *request);
+
+extern void getWaterStatus(AsyncWebServerRequest *request);
+
+extern void getAuxStatus(AsyncWebServerRequest *request);
 
 extern void onWifiConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
 
@@ -57,6 +65,8 @@ extern void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &
 extern void configureGeneralEndpoints();
 
 extern void configureGeneralApiEndpoints();
+
+extern void onJsonParametersReceive(AsyncWebServerRequest *request, JsonVariant &json);
 
 extern void configureFilemanagerEndpoints();
 

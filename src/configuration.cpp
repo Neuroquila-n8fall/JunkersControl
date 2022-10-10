@@ -307,3 +307,44 @@ void WriteConfiguration()
     serializeJsonPretty(doc, Serial);
     file.close();
 }
+
+/// @brief This is designed to take in a json document containing some parameters and put them into the commanded values struct
+/// @param doc The JSON to process
+void processJsonCommandedValues(JsonDocument &doc) 
+{
+    // Heating Parameters
+    if (!doc["Enabled"].isNull())
+        commandedValues.Heating.Active = doc["Enabled"];
+    if (!doc["FeedSetpoint"].isNull())
+        commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
+    if (!doc["FeedBaseSetpoint"].isNull())
+        commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
+    if (!doc["FeedCutOff"].isNull())
+        commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
+    if (!doc["FeedMinimum"].isNull())
+        commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
+    if (!doc["AuxiliaryTemperature"].isNull())
+        commandedValues.Heating.AuxiliaryTemperature = doc["AuxiliaryTemperature"];
+    if (!doc["AmbientTemperature"].isNull())
+        commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
+    if (!doc["TargetAmbientTemperature"].isNull())
+        commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
+    if (!doc["Adaption"].isNull())
+        commandedValues.Heating.FeedAdaption = doc["Adaption"];
+    if (!doc["ValveScaling"].isNull())
+        commandedValues.Heating.ValveScaling = doc["ValveScaling"];
+    if (!doc["ValveScalingMaxOpening"].isNull())
+        commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
+    if (!doc["ValveScalingOpening"].isNull())
+        commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
+    if (!doc["DynamicAdaption"].isNull())
+        commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
+    if (!doc["OverrideSetpoint"].isNull())
+        commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
+    if (!doc["OnDemandBoostDuration"].isNull())
+        commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
+
+    // Water Parameter
+    if (!doc["Setpoint"].isNull())
+        commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
+}

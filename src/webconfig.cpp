@@ -91,9 +91,76 @@ void configureGeneralApiEndpoints()
                        listFsFiles(request);
                    } });
 
+    // Heating "SCADA" Page
+    server->on("/scada-heating", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/scada/heating.html", "text/html"); });
+
+    // Water "SCADA" Page
+    server->on("/scada-water", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/scada/water.html", "text/html"); });
+
+    // Aux "SCADA" Page
+    server->on("/scada-aux", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/scada/externalsensors.html", "text/html"); });
+
     // Info GET
     server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request)
                { getSystemStatus(request); });
+
+    // Get General Heating Status
+    server->on("/api/status/general", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getGeneralStatus(request); });
+
+    // Get Heating Status
+    server->on("/api/status/heating", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getHeatingStatus(request); });
+    
+    // Get Water Status
+    server->on("/api/status/water", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getWaterStatus(request); });
+
+    // Get Aux Status
+    server->on("/api/status/auxiliary", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getAuxStatus(request); });
+
+
+    // Heating Parameters POST
+    auto *heatingParametersRcvhandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/parameters/heating",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onJsonParametersReceive(request, json);
+            });
+
+    server->addHandler(heatingParametersRcvhandler);
+
+    // Water Parameters POST
+    auto *waterParametersRcvhandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/parameters/water",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onJsonParametersReceive(request, json);
+            });
+
+    server->addHandler(waterParametersRcvhandler);
+}
+
+void onJsonParametersReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    StaticJsonDocument<200> doc;
+    if (json.is<JsonArray>())
+    {
+        doc = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+        doc = json.as<JsonObject>();
+    }
+
+    // Set values
+    processJsonCommandedValues(doc);
 }
 
 #pragma region "General Config"
@@ -924,6 +991,62 @@ void getSystemStatus(AsyncWebServerRequest *request)
     doc["canstatus"] = CanConfigErrorCode;
     doc["canerrorcount"] = CanSendErrorCount;
     doc["mqtt"] = client.connected();
+
+    sendJson(doc, request);
+}
+
+void getGeneralStatus(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<128> doc;
+    doc["GasBurner"] = boolToString(ceraValues.General.FlameLit);
+    doc["Error"] = ceraValues.General.Error;
+
+    sendJson(doc, request);
+}
+
+void getHeatingStatus(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    doc["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+    doc["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
+    doc["FeedSetpoint"] = (OverrideControl) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
+    doc["Outside"] = ceraValues.General.OutsideTemperature;
+    doc["Pump"] = boolToString(ceraValues.Heating.PumpActive);
+    doc["Season"] = boolToString(ceraValues.Heating.Season);
+    doc["Working"] = boolToString(ceraValues.Heating.Active);
+    doc["Boost"] = boolToString(commandedValues.Heating.Boost);
+    doc["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
+    doc["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
+
+    sendJson(doc, request);
+}
+
+void getWaterStatus(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+    doc["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
+    doc["Current"] = ceraValues.Hotwater.TemperatureCurrent;
+    doc["Setpoint"] = ceraValues.Hotwater.SetPoint;
+    doc["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+    doc["Now"] = boolToString(ceraValues.Hotwater.Now);
+    doc["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
+
+    sendJson(doc, request);
+}
+
+void getAuxStatus(AsyncWebServerRequest *request)
+{
+    StaticJsonDocument<1024> doc;
+
+    JsonObject jsonObj = doc.to<JsonObject>();
+
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    {
+        Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
+        JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
+        sensorVal["Temperature"] = ceraValues.Auxiliary.Temperatures[i];
+        sensorVal["Reachable"] = boolToString(curSensor.reachable);
+    }
 
     sendJson(doc, request);
 }

@@ -19,6 +19,8 @@ extern String IntToHex(int value);
 
 extern unsigned long convertHexString(const char *src);
 
+extern void processJsonCommandedValues(JsonDocument &doc);
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
 //——————————————————————————————————————————————————————————————————————————————
