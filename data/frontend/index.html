@@ -117,32 +117,18 @@
                 _("prog-sketch").setAttribute('aria-valuenow', occupiedSketchPercent);
                 _("prog-sketch").innerHTML = `${Math.round(occupiedSketchPercent)}%`;
                 _("sketch").innerHTML = `${humanReadableSize(status["sketchsize"])} out of ${humanReadableSize(status["freesketch"])} used`;
+                
                 let canStatus = status["canstatus"];
                 _("can").innerHTML = CanErrorCodes[canStatus];
-                if(canStatus === 0) {
-                    _("can").classList.remove("bg-danger");
-                    _("can").classList.add("bg-success");
-                } else {
-                    _("can").classList.remove("bg-success");
-                    _("can").classList.add("bg-danger");
-                }
+                flipClass(_("can"), canStatus === 0, "bg-success", "bg-danger");
+
                 let canErrorCount = status["canerrorcount"];
                 _("canerrorcount").innerHTML = canErrorCount;
-                if(canErrorCount === 0) {
-                    _("canerrorcount").classList.remove("bg-danger");
-                    _("canerrorcount").classList.add("bg-success");
-                } else {
-                    _("canerrorcount").classList.remove("bg-success");
-                    _("canerrorcount").classList.add("bg-danger");
-                }
+                flipClass(_("canerrorcount"), canErrorCount === 0, "bg-success", "bg-danger");
+
                 _("mqtt").innerHTML = status["mqtt"] ? "Connected" : "Disconnected";
-                if(status["mqtt"]) {
-                    _("mqtt").classList.remove("bg-danger");
-                    _("mqtt").classList.add("bg-success");
-                } else {
-                    _("mqtt").classList.remove("bg-success");
-                    _("mqtt").classList.add("bg-danger");
-                }
+                flipClass(_("mqtt"), status["mqtt"], "bg-success", "bg-danger");
+
             }
     </script>
 </body>

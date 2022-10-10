@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Configuration</title>
+    <link rel="stylesheet" href="../../frontend/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../frontend/css/bootstrap-icons.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->                    
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <div class="row mt-5">
+                    <h3>Heating</h3>
+                </div>
+                <div class="row mt-5">
+                    <h4>Current or Active Values</h4>
+                </div>
+                <div class="row mt-5">
+                    <ul class="list-group" id="status-list">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Maximum Feed Temperature
+                            <span class="badge bg-primary" id="h-FeedMaximum">75°C</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Current Feed Temperature
+                            <span class="badge bg-primary" id="h-FeedCurrent">50°C</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Setpoint Feed Temperature
+                            <span class="badge bg-primary" id="h-FeedSetpoint">49°C</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Outside Temperature
+                            <span class="badge bg-primary" id="h-Outside">-8°C</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Pump
+                            <span class="badge bg-success" id="h-Pump">Running</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Season
+                            <span class="badge bg-info" id="h-Season">Winter</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Working
+                            <span class="badge bg-primary" id="h-Working">Operational</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Boost
+                            <span class="badge bg-secondary" id="h-Boost">Inactive</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Boost Time Remaining
+                            <span class="badge bg-primary" id="h-BoostTimeLeft">600</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Fast Heatup
+                            <span class="badge bg-secondary" id="h-FastHeatup">Inactive</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="row mt-5">
+                    <h4>Modify Parameters</h4>
+                </div>
+                <div class="row mt-5">
+                    <div class="input-group mb-3 justify-content-between text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="This will enable or disable the whole heating."><i class="bi bi-power me-2"></i>Enable</span>
+                        <div class="input-group-text bg-body col justify-content-center">
+                            <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" aria-label="Checkbox for following text input">
+                        </div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="Set the feed to a specific target temperature. Note: The heating will not try to achieve unrealistic values."><i class="bi bi-thermometer-half me-2"></i>Set Feed Temperature</span>
+                        <input type="number" class="form-control" min="10" max="100" aria-label="Feed Setpoint">
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="The measured temperature on the outside at which the heating should yield its maximum feed temperature"><i class="bi bi-skip-start me-2"></i>Set Feed Basepoint</span>
+                        <input type="number" class="form-control" min="-100" max="100" aria-label="Feed Basepoint">
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="The measured temperature on the outside at which the heating should stop"><i class="bi bi-skip-end me-2"></i>Set Feed Cutoff</span>
+                        <input type="number" class="form-control" min="-100" max="100" aria-label="Feed Cutoff">
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="The feed temperature will never go beyond this value. It should be set to 10° to allow the heating to shutdown completely when unused or not needed."><i class="bi bi-chevron-bar-down me-2"></i>Minimum Feed Temperature</span>
+                        <input type="number" class="form-control" min="-100" max="100" aria-label="Feed Cutoff">
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 justify-content-between text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="Enable adaption. Takes outside temperature readings into account, adds aditional heat when it's cold outside. Values are taken from Base- and Endpoint (Cutoff)"><i class="bi bi-plus-slash-minus me-2"></i>Adaption</span>
+                        <div class="input-group-text bg-body col justify-content-center">
+                            <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" aria-label="Checkbox for following text input">
+                        </div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                    <div class="input-group mb-3 justify-content-between text-start">
+                        <span class="input-group-text col-sm-9" id="enabled-label" data-bs-toggle="tooltip" data-bs-title="Enable valve-guided scaling. Provide teh valve opening percentage to scale the feed temperature accordingly. You can also understand this as a method of requesting X-Percent amount of maximum feed temperature."><i class="bi bi-slash-circle me-2"></i>Valve Scaling</span>
+                        <div class="input-group-text bg-body col justify-content-center">
+                            <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" aria-label="Checkbox for following text input">
+                        </div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="button"><i class="bi bi-arrow-return-right"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        updateHeatingData();
+        window.setInterval(updateHeatingData, 5000);
+
+        async function updateHeatingData() {
+            const hstatus = await getConfigJson("/api/status/heating");
+            _("h-FeedMaximum").innerHTML = `${hstatus.FeedMaximum} °C`;
+            _("h-FeedCurrent").innerHTML = `${hstatus.FeedCurrent} °C`;
+            _("h-FeedSetpoint").innerHTML = `${hstatus.FeedSetpoint} °C`;
+            _("h-Outside").innerHTML = `${hstatus.Outside} °C`;
+            const pumpStatus = hstatus.Pump === "true";
+            const pumpEl = _("h-Pump");
+            pumpEl.innerHTML = pumpStatus ? "Running" : "Stopped";
+            flipClass(pumpEl, pumpStatus, "bg-success", "bg-secondary");
+
+            const season = hstatus.Season === "true";
+            const seasonEl = _("h-Season");
+            seasonEl.innerHTML = season ? `<i class="bi bi-thermometer-sun"></i> Summer` : `<i class="bi bi-thermometer-snow"></i> Winter`
+            flipClass(seasonEl, season, "bg-success", "bg-info");
+
+            const working = hstatus.Working === "true";
+            const workingEl = _("h-Working");
+            workingEl.innerHTML = working ? "Operational" : "Stand-By";
+            flipClass(workingEl, working, "bg-success", "bg-secondary");
+
+            const boost = hstatus.Boost === "true";
+            const boostEl = _("h-Boost");
+            boostEl.innerHTML = boost ? "Active" : "Inactive";
+            flipClass(boostEl, boost, "bg-success", "bg-secondary");
+
+            const boostTimeLeft = hstatus.BoostTimeLeft;
+            // This will output the time which is left in HH:MM:SS format.
+            const formattedTimeLeft = new Date(boostTimeLeft * 1000).toISOString().substring(11, 19);
+            _("h-BoostTimeLeft").innerHTML = formattedTimeLeft;
+
+            const fastHeatup = hstatus.FastHeatup === "true";
+            const fastHeatupEl = _("h-FastHeatup");
+            fastHeatupEl.innerHTML = fastHeatup ? "Active" : "Inactive";
+            flipClass(fastHeatupEl, fastHeatup, "bg-success", "bg-secondary");
+
+        }
+
+    </script>
+</body>

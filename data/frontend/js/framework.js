@@ -55,6 +55,14 @@ function loadNavigation() {
     xhr.open("GET", "frontend/navigation.html", true);
     xhr.setRequestHeader('Content-type', 'text/html');
     xhr.send();
+    showHeatingStatus();
+    initTooltips();
+    window.setInterval(showHeatingStatus, 10000);
+}
+
+function initTooltips() {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
 }
 
 /**
@@ -161,4 +169,32 @@ function rebootButton() {
     xhr.open("GET", "/reboot", true);
     xhr.send();
     window.open("/reboot", "_self");
+}
+
+async function showHeatingStatus() {
+    const hstatus = await getConfigJson("/api/status/heating");
+    const gstatus = await getConfigJson("/api/status/general");
+    const statusIcons = `
+    <i class="ms-3 navbar-text fs-4 bi bi-fan ${hstatus.Pump === "true" ? "text-success" : "text-secondary"}" title="Pump"></i>
+    <i class="ms-3 navbar-text fs-4 bi bi-fire ${gstatus.GasBurner === "true" ? "text-danger" : "text-secondary"}" title="Flame Lit"></i>
+    <i class="ms-3 navbar-text fs-4 bi ${gstatus.Error === 0 ? "bi-check2-circle" : "bi-exclamation-octagon-fill"} ${gstatus.Error === 0 ? "text-success" : "text-danger"}" title="Error State"></i>
+    `;
+    _("heating-status").innerHTML = statusIcons;
+}
+
+/**
+ * Flip classes on element based on a boolean state
+ * @param {Object} el DOM-Element to manipulate
+ * @param {Boolean} state Boolean state 
+ * @param {string} a Class to activate when `state` is `true`
+ * @param {string} b Class to activate when `state` is `false`
+ * */
+function flipClass(el, state, a, b) {
+    if (state) {
+        el.classList.remove(b);
+        el.classList.add(a);
+    } else {
+        el.classList.remove(a);
+        el.classList.add(b);
+    }
 }

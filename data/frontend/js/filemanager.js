@@ -31,7 +31,7 @@ function listFiles(path) {
                         table += `<td><button class="btn btn-primary btn-sm" onclick="downloadDeleteButton('${prop}${fileName}', 'download')">Download</button>`;
                         table += `<td><button class="ml-2 btn btn-danger btn-sm" onclick="deleteFile('${prop}${fileName}')">Delete</button></tr>`;
                     } else {
-                        table += `<tr><td><div class="badge rounded-pill bg-secondary me-3">dir</div><a href="#" onclick="listFiles('${prop}${fileName}/')">${fileName}</a></td>`;
+                        table += `<tr><td><i class="bi bi-folder me-2"></i><a href="#" onclick="listFiles('${prop}${fileName}/')">${fileName}</a></td>`;
                         table += `<td/><td/><td/></tr>`;
                     }
 
@@ -39,13 +39,13 @@ function listFiles(path) {
                 table += `</tbody></table>`;
                 let breadCrumbs = `<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                  <li class="breadcrumb-item"><a href="#" onclick="listFiles()">Root</a></li>`;
+                  <li class="breadcrumb-item"><a href="#" onclick="listFiles()"><i class="bi bi-folder me-2"></i>Root</a></li>`;
                 let itemPath = "";
                 for (let item in currentPath) {
                     const segment = currentPath[item];
                     if (segment.trim().length !== 0) {
                         itemPath += `/${segment}`;
-                        breadCrumbs += `<li class="breadcrumb-item"><a href="#" onclick="listFiles('${itemPath}/')">${segment}</a></li>`
+                        breadCrumbs += `<li class="breadcrumb-item"><a href="#" onclick="listFiles('${itemPath}/')"><i class="bi bi-folder me-2"></i>${segment}</a></li>`
                     }
                 }
                 breadCrumbs += `</ol></nav>`;

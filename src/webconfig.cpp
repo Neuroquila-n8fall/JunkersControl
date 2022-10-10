@@ -64,9 +64,9 @@ void ConfigureAndStartWebserver()
     server->on("/", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/index.html", "text/html"); });
 
-    // Web Server Root URL
+    // Can Analyzer 
     server->on("/cananalyzer", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/canalyzer.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/utilities/canalyzer.html", "text/html"); });
 
     server->serveStatic("/", LittleFS, "/");
 
@@ -101,7 +101,7 @@ void configureGeneralApiEndpoints()
 void configureGeneralEndpoints()
 {
     server->on("/general", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/general.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/general.html", "text/html"); });
 
     server->on("/api/config/general", HTTP_GET, [](AsyncWebServerRequest *request)
                { getGeneralConfig(request); });
@@ -179,7 +179,7 @@ void configureWifiEndpoints()
 {
     // WiFi config Page
     server->on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/wifi.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/wifi.html", "text/html"); });
 
     // Wifi Networks GET
     server->on("/api/wifi/networks", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -286,7 +286,7 @@ void configureMqttEndpoints()
 {
     // MQTT config Page
     server->on("/mqtt", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/mqtt.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/mqtt.html", "text/html"); });
 
     // MQTT Config GET
     server->on("/api/config/mqtt", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -427,7 +427,7 @@ void configureFirmwareEndpoints()
         handleDoUpdate);
 
     server->on("/update-firmware", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/firmware.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/utilities/firmware.html", "text/html"); });
 }
 
 void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
@@ -503,7 +503,7 @@ void configureFilemanagerEndpoints()
       } });
 
     server->on("/filemanager", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/filemanager.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/utilities/filemanager.html", "text/html"); });
 }
 
 void getFsUsagePercent(AsyncWebServerRequest *request)
@@ -584,7 +584,7 @@ void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t
 void configureCanConfigEndpoints()
 {
     server->on("/canbus", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/canbus.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/canbus.html", "text/html"); });
 
     server->on("/api/config/canbus", HTTP_GET, [](AsyncWebServerRequest *request)
                { getCanbusConfig(request); });
@@ -703,7 +703,7 @@ void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 void configureAuxSensorsEndpoints()
 {
     server->on("/auxsensors", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/auxsensors.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/auxsensors.html", "text/html"); });
 
     server->on("/api/config/auxsensors", HTTP_GET, [](AsyncWebServerRequest *request)
                { getAuxSensorsConfig(request); });
@@ -854,7 +854,7 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
 void configureLedConfigEndpoints()
 {
     server->on("/leds", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(LittleFS, "/frontend/leds.html", "text/html"); });
+               { request->send(LittleFS, "/frontend/config/leds.html", "text/html"); });
 
     server->on("/api/config/leds", HTTP_GET, [](AsyncWebServerRequest *request)
                { getLedConfig(request); });
