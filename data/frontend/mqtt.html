@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER MQTT Configuration</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>MQTT Configuration</h3>
+                </div>
+                <div class="row">
+                    <h4>Server Configuration</h4>
+                </div>
+                <div class="row">
+                    <form id="mqtt-form">
+                        <div class="text-start">
+                            <div class="mb-3 row">
+                                <label class="col-sm-2 col-form-label" for="mqtt-server">Server</label>
+                                <div class="col-sm-10">
+                                    <input id="mqtt-server" name="mqtt-server"
+                                        placeholder="The IP address of your MQTT broker" type="text"
+                                        class="form-control" autocomplete="mqtt-server" required>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-2 col-form-label" for="mqtt-port">Port</label>
+                                <div class="col-sm-10">
+                                    <input id="mqtt-port" name="mqtt-port" placeholder="Default: 1883" type="number"
+                                        class="form-control" autocomplete="mqtt-port" value="1883" required>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="mqtt-user" class="col-sm-2 col-form-label">User</label>
+                                <div class="col-sm-10">
+                                    <input id="mqtt-user" name="mqtt-user" type="text" class="form-control"
+                                        autocomplete="mqtt-user">
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="mqtt-password" class="col-sm-2 col-form-label">Password</label>
+                                <div class="col-sm-10">
+                                    <input id="mqtt-password" name="mqtt-password" type="password" class="form-control"
+                                        autocomplete="mqtt-password">
+                                </div>
+                            </div>
+                            <div class="container">
+                                <span id="mqtt-status"></span>
+                            </div>
+                            <div class="mb-3 row justify-content-end">
+                                <div class="col-sm-10">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-config">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                            id="config-saving" hidden></span>
+                                        <span id="save-config-label">Save MQTT Config</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="row">
+                    <h4>Topics Configuration</h4>
+                </div>
+                <div class="row">
+                    <form id="mqtt-topics-form">
+                        <div class="text-start">
+                            <div class="mb-3 row">
+                                <label for="status" class="col-sm-2 col-form-label">Status</label>
+                                <div class="col-sm-10">
+                                    <input id="status" name="status" placeholder="cerasmarter/status" type="text"
+                                        class="form-control" required aria-describedby="statusHelpBlock">
+                                    <span id="statusHelpBlock" class="form-text text-muted">This topic is used for
+                                        publishing general heating status like error code and flame status.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="statusrequest" class="col-sm-2 col-form-label">Request Status</label>
+                                <div class="col-sm-10">
+                                    <input id="statusrequest" name="statusrequest" placeholder="cerasmarter/status/get"
+                                        type="text" class="form-control" aria-describedby="statusrequestHelpBlock"
+                                        required>
+                                    <span id="statusrequestHelpBlock" class="form-text text-muted">Topic subscribed for
+                                        triggering a status update on other topics</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="heatingparameters" class="col-sm-2 col-form-label">Heating
+                                    Parameters</label>
+                                <div class="col-sm-10">
+                                    <input id="heatingparameters" name="heatingparameters"
+                                        placeholder="cerasmarter/heating/parameters" type="text" class="form-control"
+                                        required aria-describedby="heatingparametersHelpBlock">
+                                    <span id="heatingparametersHelpBlock" class="form-text text-muted">Topic subscribed
+                                        for setting heating parameters</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="heatingvalues" class="col-sm-2 col-form-label">Heating Values</label>
+                                <div class="col-sm-10">
+                                    <input id="heatingvalues" name="heatingvalues"
+                                        placeholder="cerasmarter/heating/values" type="text" class="form-control"
+                                        aria-describedby="heatingvaluesHelpBlock" required>
+                                    <span id="heatingvaluesHelpBlock" class="form-text text-muted">Topic for publishing
+                                        heating values like feed temperature</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="waterparameters" class="col-sm-2 col-form-label">Water Parameters</label>
+                                <div class="col-sm-10">
+                                    <input id="waterparameters" name="waterparameters"
+                                        placeholder="cerasmarter/water/parameters" type="text" class="form-control"
+                                        aria-describedby="waterparametersHelpBlock" required>
+                                    <span id="waterparametersHelpBlock" class="form-text text-muted">Topic subscribed
+                                        for setting water parameters</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="watervalues" class="col-sm-2 col-form-label">Water Values</label>
+                                <div class="col-sm-10">
+                                    <input id="watervalues" name="watervalues" placeholder="cerasmarter/water/values"
+                                        type="text" class="form-control" aria-describedby="watervaluesHelpBlock"
+                                        required>
+                                    <span id="watervaluesHelpBlock" class="form-text text-muted">Topic for publishing
+                                        water related values and temperatures</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="auxvalues" class="col-sm-2 col-form-label">Auxiliary Temperature
+                                    Sensors</label>
+                                <div class="col-sm-10">
+                                    <input id="auxvalues" name="auxvalues" placeholder="cerasmarter/auxiliary/values"
+                                        type="text" class="form-control" aria-describedby="auxvaluesHelpBlock" required>
+                                    <span id="auxvaluesHelpBlock" class="form-text text-muted">Topic where temperature
+                                        readings of externally connected sensors are published</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="boost" class="col-sm-2 col-form-label">Boost</label>
+                                <div class="col-sm-10">
+                                    <input id="boost" name="boost" placeholder="cerasmarter/boost/set" type="text"
+                                        class="form-control" aria-describedby="boostHelpBlock" required>
+                                    <span id="boostHelpBlock" class="form-text text-muted">Topic to activate the boost
+                                        feature</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label for="fastheatup" class="col-sm-2 col-form-label">Fast Heatup</label>
+                                <div class="col-sm-10">
+                                    <input id="fastheatup" name="fastheatup" placeholder="cerasmarter/fastheatup/set"
+                                        type="text" class="form-control" aria-describedby="fastheatupHelpBlock"
+                                        required>
+                                    <span id="fastheatupHelpBlock" class="form-text text-muted">Topic to activate the
+                                        fast heatup feature</span>
+                                </div>
+                            </div>
+
+                            <div class="container">
+                                <span id="mqtt-topics-status"></span>
+                            </div>
+                            <div class="mb-3 row justify-content-end">
+                                <div class="col-sm-10">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-topics">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                            id="topics-saving" hidden></span>
+                                        <span id="save-topics-label">Save Topics</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        loadMqttConfig();
+        loadMqttTopicsConfig();
+
+        _("mqtt-form").addEventListener('submit', sendMqttConfig);
+        _("mqtt-topics-form").addEventListener('submit', sendMqttTopicsConfig);
+
+        async function loadMqttConfig() {
+            const form = document.forms["mqtt-form"];
+            form.disabled = true;
+            const config = await getMqttConfig();
+            for (let entry in config) {
+                form.elements[entry].value = config[entry];
+            }
+            form.disabled = false;
+        }
+
+        async function loadMqttTopicsConfig() {
+            const form = document.forms["mqtt-topics-form"];
+            form.disabled = true;
+            const config = await getMqttTopicsConfig();
+            for (let entry in config) {
+                form.elements[entry].value = config[entry];
+            }
+            form.disabled = false;
+        }
+    </script>
+</body>

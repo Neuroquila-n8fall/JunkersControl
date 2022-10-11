@@ -21,7 +21,7 @@ void reconnectMqtt()
 {
   if (!WiFi.isConnected())
   {
-    Serial.println("Can't connect to MQTT broker. [No Network]");
+    Log.println("Can't connect to MQTT broker. [No Network]");
     return;
   }
 
@@ -29,18 +29,20 @@ void reconnectMqtt()
   while (!client.connected())
   {
 
-    Serial.print("Attempting MQTT connection...");
+    Log.print("Attempting MQTT connection...");
 
     String clientId = generateClientId();
     // Attempt to connect
     if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
     {
-      Serial.println("connected");
+      Log.println("connected");
 
       // Subscribe to parameters.
       client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
       client.subscribe(configuration.Mqtt.Topics.WaterParameters);
       client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+      client.subscribe(configuration.Mqtt.Topics.Boost);
+      client.subscribe(configuration.Mqtt.Topics.FastHeatup);
       if (configuration.HomeAssistant.Enabled)
       {
         SetupAutodiscovery(HaSensorsFileName);
@@ -50,9 +52,9 @@ void reconnectMqtt()
     }
     else
     {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      Log.print("failed, rc=");
+      Log.print(client.state());
+      Log.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
@@ -79,7 +81,7 @@ void setupMqttClient()
   client.setKeepAlive(10);
 }
 
-String boolToJsonValue(bool src)
+String boolToString(bool src)
 {
   return (src) ? "true" : "false";
 }
@@ -87,9 +89,7 @@ String boolToJsonValue(bool src)
 // Callback for MQTT subscribed topics
 void callback(char *topic, byte *payload, unsigned int length)
 {
-  // NOTE ON STRING USAGE: We're not risking heavy fragmentation since we're on an ESP32
-
-  // Append string terminator for safety
+  ShowActivityLed();
   payload[length] = '\0';
   // Check if the payload translates to a valid string.
   PayloadBuf = String((char *)payload);
@@ -147,27 +147,35 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      WriteToConsoles("[Status Request] Error Processing JSON: ");
-      WriteToConsoles(error.c_str());
-      WriteToConsoles("\r\n");
+      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
     /* Example JSON:
         {
             "HeatingTemperatures": true,
             "WaterTemperatures": true,
-            "AuxilaryTemperatures": true,
+            "AuxiliaryTemperatures": true,
             "Status": true
         }
     */
-    bool HeatingTemperatures = doc["HeatingTemperatures"];   // false
-    bool WaterTemperatures = doc["WaterTemperatures"];       // false
-    bool AuxilaryTemperatures = doc["AuxilaryTemperatures"]; // true
-    bool Status = doc["Status"];                             // false
+
+    bool HeatingTemperatures = false;
+    bool WaterTemperatures = false;
+    bool AuxiliaryTemperatures = false;
+    bool Status = false;
+
+    if (!doc["HeatingTemperatures"].isNull())
+      HeatingTemperatures = doc["HeatingTemperatures"]; // false
+    if (!doc["WaterTemperatures"].isNull())
+      WaterTemperatures = doc["WaterTemperatures"]; // false
+    if (!doc["AuxiliaryTemperatures"].isNull())
+      AuxiliaryTemperatures = doc["AuxiliaryTemperatures"]; // true
+    if (!doc["Status"].isNull())
+      Status = doc["Status"]; // false
 
     if (HeatingTemperatures)
     {
-      PublishHeatingTemperatures();
+      PublishHeatingTemperaturesAndStatus();
     }
 
     if (WaterTemperatures)
@@ -175,9 +183,9 @@ void callback(char *topic, byte *payload, unsigned int length)
       PublishWaterTemperatures();
     }
 
-    if (AuxilaryTemperatures)
+    if (AuxiliaryTemperatures)
     {
-      PublishAuxilaryTemperatures();
+      PublishAuxiliaryTemperatures();
     }
 
     if (Status)
@@ -189,7 +197,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Receiving Heating Parameters
   if (strcmp(topic, configuration.Mqtt.Topics.HeatingParameters) == 0)
   {
-
     /*
     Example Json:
     {
@@ -198,7 +205,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       "FeedBaseSetpoint": -10,
       "FeedCutOff": 22,
       "FeedMinimum": 10,
-      "AuxilaryTemperature": 11.6,
+      "AuxiliaryTemperature": 11.6,
       "AmbientTemperature": 0,
       "TargetAmbientTemperature": 21,
       "OnDemandBoost": false,
@@ -215,53 +222,45 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     const int docSize = 384;
     StaticJsonDocument<docSize> doc;
-    bool setFeedImmediately = false;
     DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
     {
-      WriteToConsoles("[Heating Parameters] Error Processing JSON: ");
-      WriteToConsoles(error.c_str());
-      WriteToConsoles("\r\n");
+      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
 
     // Request Enable/Disable Heating and set the status of the heating accordingly
-    commandedValues.Heating.Active = doc["Enabled"];
-
-    commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
-    commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
-    commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
-    commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
-    commandedValues.Heating.AuxilaryTemperature = doc["AuxilaryTemperature"];
-    commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
-    commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
-
-    if (doc["OnDemandBoost"] != commandedValues.Heating.Boost)
-    {
-      commandedValues.Heating.Boost = doc["OnDemandBoost"];
-      commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
-      setFeedImmediately = true;
-    }
-
-    commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
-    if (doc["FastHeatup"] != commandedValues.Heating.FastHeatup)
-    {
-      setFeedImmediately = true;
-      // Set reference Temperature
-      commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
-    }
-
-    commandedValues.Heating.FastHeatup = doc["FastHeatup"];
-    commandedValues.Heating.FeedAdaption = doc["Adaption"];
-    commandedValues.Heating.ValveScaling = doc["ValveScaling"];
-    commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
-    commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
-    commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
-    commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
-
-    if (setFeedImmediately)
-      SetFeedTemperature();
+    if (!doc["Enabled"].isNull())
+      commandedValues.Heating.Active = doc["Enabled"];
+    if (!doc["FeedSetpoint"].isNull())
+      commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
+    if (!doc["FeedBaseSetpoint"].isNull())
+      commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
+    if (!doc["FeedCutOff"].isNull())
+      commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
+    if (!doc["FeedMinimum"].isNull())
+      commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
+    if (!doc["AuxiliaryTemperature"].isNull())
+      commandedValues.Heating.AuxiliaryTemperature = doc["AuxiliaryTemperature"];
+    if (!doc["AmbientTemperature"].isNull())
+      commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
+    if (!doc["TargetAmbientTemperature"].isNull())
+      commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
+    if (!doc["Adaption"].isNull())
+      commandedValues.Heating.FeedAdaption = doc["Adaption"];
+    if (!doc["ValveScaling"].isNull())
+      commandedValues.Heating.ValveScaling = doc["ValveScaling"];
+    if (!doc["ValveScalingMaxOpening"].isNull())
+      commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
+    if (!doc["ValveScalingOpening"].isNull())
+      commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
+    if (!doc["DynamicAdaption"].isNull())
+      commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
+    if (!doc["OverrideSetpoint"].isNull())
+      commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
+    if (!doc["OnDemandBoostDuration"].isNull())
+      commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
 
     // Receiving Water Parameters
     if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
@@ -280,29 +279,41 @@ void callback(char *topic, byte *payload, unsigned int length)
 
       if (error)
       {
-        WriteToConsoles("[Water Parameters] Error Processing JSON: ");
-        WriteToConsoles(error.c_str());
-        WriteToConsoles("\r\n");
+        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
         return;
       }
 
-      
-      commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
+      if (!doc["Setpoint"].isNull())
+        commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
     }
+  }
+
+  // On-Demand Boost
+  if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
+  {
+    int i = s.toInt();
+    commandedValues.Heating.Boost = i == 1;
+    commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+    SetFeedTemperature();
+  }
+
+  // Fast Heatup
+  if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
+  {
+    int i = s.toInt();
+    commandedValues.Heating.FastHeatup = i == 1;
+    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+    SetFeedTemperature();
   }
 }
 
 void PublishStatus()
 {
+  ShowActivityLed();
   /* Example JSON
   {
       "GasBurner": true,
-      "Pump": true,
       "Error": 0..255,
-      "Season": true,
-      "Working": true,
-      "Boost": true,
-      "FastHeatup": true
   }
   */
   StaticJsonDocument<384> doc;
@@ -314,8 +325,12 @@ void PublishStatus()
     jsonObj = doc.createNestedObject("General");
   }
 
-  jsonObj["GasBurner"] = boolToJsonValue(ceraValues.General.FlameLit);
+  jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -331,24 +346,22 @@ void PublishStatus()
   {
     client.publish(configuration.Mqtt.Topics.Status, buffer, n);
   }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND STATUS]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
-  }
 }
 
-void PublishHeatingTemperatures()
+void PublishHeatingTemperaturesAndStatus()
 {
+  ShowActivityLed();
   /* Example JSON
   {
       "FeedMaximum": 75.10,
       "FeedCurrent": 30.10,
       "FeedSetpoint": 10.10,
-      "Outside": 15.10
+      "Outside": 15.10,
+      "Season": true,
+      "Working": true,
+      "Boost": true,
+      "BoostTimeLeft": 600,
+      "FastHeatup": true
   }
   */
 
@@ -363,13 +376,18 @@ void PublishHeatingTemperatures()
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
-  jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
+  jsonObj["FeedSetpoint"] = (OverrideControl) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
-  jsonObj["Pump"] = boolToJsonValue(ceraValues.Heating.PumpActive);
-  jsonObj["Season"] = boolToJsonValue(ceraValues.Heating.Season);
-  jsonObj["Working"] = boolToJsonValue(ceraValues.Heating.Active);
-  jsonObj["Boost"] = boolToJsonValue(commandedValues.Heating.Boost);
-  jsonObj["FastHeatup"] = boolToJsonValue(commandedValues.Heating.FastHeatup);
+  jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
+  jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
+  jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
+  jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
+  jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -385,18 +403,11 @@ void PublishHeatingTemperatures()
   {
     client.publish(configuration.Mqtt.Topics.HeatingValues, buffer, n);
   }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND HEATING]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
-  }
 }
 
 void PublishWaterTemperatures()
 {
+  ShowActivityLed();
   // TODO: Gather HW temperatures
   /* Example JSON
     {
@@ -422,8 +433,12 @@ void PublishWaterTemperatures()
   jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
   jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
   jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
-  jsonObj["Now"] = boolToJsonValue(ceraValues.Hotwater.Now);
-  jsonObj["Buffer"] = boolToJsonValue(ceraValues.Hotwater.BufferMode);
+  jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
+  jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -440,18 +455,11 @@ void PublishWaterTemperatures()
 
     client.publish(configuration.Mqtt.Topics.WaterValues, buffer, n);
   }
-
-  if (Debug)
-  {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND HOTWATER]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
-  }
 }
 
-void PublishAuxilaryTemperatures()
+void PublishAuxiliaryTemperatures()
 {
+  ShowActivityLed();
   /*
   {
       "Feed": 30.10,
@@ -467,14 +475,20 @@ void PublishAuxilaryTemperatures()
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("Auxilary");
+    jsonObj = doc.createNestedObject("Auxiliary");
   }
 
   for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
   {
     Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
-    jsonObj[curSensor.Label] = ceraValues.Auxilary.Temperatures[i];
+    JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
+    sensorVal["Temperature"] = ceraValues.Auxiliary.Temperatures[i];
+    sensorVal["Reachable"] = boolToString(curSensor.reachable);
   }
+
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
 
   // Publish Data on MQTT
   char buffer[768];
@@ -483,19 +497,34 @@ void PublishAuxilaryTemperatures()
   // Send to HA state topic or the configured topic, when HA is disabled.
   if (configuration.HomeAssistant.Enabled)
   {
-    String topic = configuration.HomeAssistant.StateTopic + "Auxilary/state";
+    String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
     client.publish(topic.c_str(), buffer, n);
   }
   else
   {
-    client.publish(configuration.Mqtt.Topics.AuxilaryValues, buffer, n);
+    client.publish(configuration.Mqtt.Topics.AuxiliaryValues, buffer, n);
   }
+}
 
-  if (Debug)
+void PublishLog(const char *msg, const char *func, LogLevel level)
+{
+  const size_t size = 1024;
+  StaticJsonDocument<size> doc;
+  JsonObject root = doc.to<JsonObject>();
+  root["lvl"] = level;
+  root["fnc"] = func;
+  root["msg"] = msg;
+  char buf[size];
+
+  size_t n = serializeJson(doc, buf);
+
+  client.publish("cerasmarter/log", buf, n);
+}
+
+void ShowActivityLed()
+{
+  if (MqttActivityHandle == NULL)
   {
-    serializeJsonPretty(doc, buffer);
-    WriteToConsoles("//START\r\n[MQTT - SEND AUX]\r\n");
-    WriteToConsoles(buffer);
-    WriteToConsoles("//END\r\n");
+    xTaskCreate(ShowMqttActivity, "MQTT Activity", 2000, NULL, 1, &MqttActivityHandle);
   }
 }

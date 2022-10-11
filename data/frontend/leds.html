@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER LED Configuration</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+</head>
+
+<body>
+    <div id="navigation-container">
+        <!-- Navigation Placeholder -->
+    </div>
+    <div class="container text-center">
+        <div class="row">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+                <!-- Content -->
+                <div class="row mt-5">
+                    <h3>LED Configuration</h3>
+                </div>
+                <div class="mb-3 row text-start">
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <strong>Info</strong><br/>
+                        Here you can specify GPIOs for signalling. 
+                        These are designed to be used as LED outputs and are not driven by a PWM signal. 
+                        Be aware though, that some of them switch on and off depending on status and may even show a pattern. 
+                        Refer to the description below the fields for more info.                        
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border" role="status" id="spinner">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <form id="led-form">
+                        <fieldset id="form-fieldset">
+                            <div class="input-group mb-3">
+                                <span class="input-group-text col-sm-9" id="status-led-label">Status LED</span>
+                                <input name="status-led" maxlength="5" type="number" class="form-control" placeholder="27"
+                                    aria-label="Status LED" aria-describedby="status-led-label" required>
+                                <label class="form-text text-muted">
+                                    The status LED will show the overall status of the device. It will show a heartbeat pattern, when
+                                    the main
+                                    application routine is working as expected.
+                                </label>
+                            </div>
+                            <div class="input-group mb-3">
+                                <span class="input-group-text col-sm-9" id="wifi-led-label">Wi-Fi LED</span>
+                                <input name="wifi-led" maxlength="5" type="number" class="form-control" placeholder="26"
+                                    aria-label="Wi-Fi LED" aria-describedby="wifi-led-label" required>
+                                <label class="form-text text-muted">
+                                    The Wi-Fi LED will show you if the device is connected to wireless lan.
+                                </label>
+                            </div>
+                            <div class="input-group mb-3">
+                                <span class="input-group-text col-sm-9" id="mqtt-led-label">MQTT LED</span>
+                                <input name="mqtt-led" maxlength="5" type="number" class="form-control" placeholder="14"
+                                    aria-label="MQTT LED" aria-describedby="mqtt-led-label" required>
+                                <label class="form-text text-muted">
+                                    The MQTT LED will not only show you if the device is connected to a MQTT broker but also activity when a message is sent or received.
+                                </label>
+                            </div>
+                            <div class="input-group mb-3">
+                                <span class="input-group-text col-sm-9" id="heating-led-label">Heating LED</span>
+                                <input name="heating-led" maxlength="5" type="number" class="form-control" placeholder="25"
+                                    aria-label="Heating LED" aria-describedby="heating-led-label" required>
+                                <label class="form-text text-muted">
+                                    The heating LED displays if the heating is currently set to active. In addition it will start to blink if the CAN-Bus isn't transmitting messages.
+                                </label>
+                            </div>
+                            <div class="row" id="status">
+                            </div>
+                            <div class="mb-3 row">
+                                <div class="col-sm-10">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-config">
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                                            id="config-saving" hidden></span>
+                                        <span id="save-config-label">Save Configuration</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="frontend/js/framework.js"></script>
+    <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript">
+        loadNavigation();
+        loadConfig();
+
+        _("led-form").addEventListener('submit', saveConfig);
+
+        async function loadConfig() {
+            const form = document.forms["led-form"];
+            _("form-fieldset").disabled = true;
+            const config = await getConfigJson("/api/config/leds");
+            for (let entry in config) {
+                form.elements[entry].value = config[entry];
+            }
+            _("form-fieldset").disabled = false;
+            _("spinner").hidden = true;
+        }
+
+        async function saveConfig(event) {
+            event.preventDefault();
+            _("form-fieldset").disabled = true;
+            _("config-saving").hidden = false;
+            _("save-config-label").innerHTML = "Saving Configuration...";
+            _("save-config").disabled = true;
+
+            const formData = new FormData(event.target);
+            const formEntries = Object.fromEntries(formData.entries());
+            const json = JSON.stringify(formEntries);
+
+            const response = await fetch('/api/config/leds', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: json,
+            });
+            switch (response.status) {
+                case 200:
+                    _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <strong>Config Saved!</strong><br/>Configuration has been updated.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>`;
+                    break;
+                case 400:
+                    _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong>Error</strong><br/>Configuration not saved because the received data was of a wrong format.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>`;
+                    break;
+                default:
+                    _("status").innerHTML = `<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong>Error</strong><br/>Received a status ${response.status} telling ${response.statusText}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>`;
+                    break;
+            }
+
+            event.disabled = false;
+            _("config-saving").hidden = true;
+            _("save-config-label").innerHTML = "Save Configuration";
+            _("save-config").disabled = false;
+            _("form-fieldset").disabled = false;
+        }
+    </script>
+</body>

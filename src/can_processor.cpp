@@ -8,9 +8,7 @@
 #include <timesync.h>
 #include <configuration.h>
 
-//-- Preprocessor 
-#define ST(A) #A
-#define STR(A) ST(A)
+
 //-- Set CS Pin via Build Flag
 #ifndef MCP2515_CS
 #define MCP2515_CS 5
@@ -25,6 +23,8 @@ static const byte MCP2515_SCK = 18;  // SCK input of MCP2515
 static const byte MCP2515_MOSI = 23; // SDI input of MCP2515
 static const byte MCP2515_MISO = 19; // SDO output of MCP2515
 
+volatile uint16_t CanConfigErrorCode;
+
 ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 
 double temp = 0.00F;
@@ -32,24 +32,23 @@ double temp = 0.00F;
 // Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
 {
-  CANMessage msg = PrepareMessage(0x252);
-
-  char printbuf[255];
-  int feedSetpoint = 0;
+  CANMessage msg = PrepareMessage(configuration.CanAddresses.Heating.FeedSetpoint,1);
+  int feedSetpoint;
 
   // Get raw Setpoint
-
   commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
+
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
-  msg.data[0] = feedSetpoint;
-  if (Debug)
+  if (configuration.General.Debug)
   {
-    sprintf(printbuf, "DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
-    String message(printbuf);
-    WriteToConsoles(message + "\r\n");
+    Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
   }
+
+  msg.data[0] = feedSetpoint;
+
+  SendMessage(msg);
 }
 
 void setupCan()
@@ -58,35 +57,35 @@ void setupCan()
   uint32_t frequency = configuration.CanModuleConfig.CAN_Quartz * 1000UL * 1000UL; // 16 MHz
   ACAN2515Settings settings(frequency, 10UL * 1000UL); // CAN bit rate 10 kb/s
 
-  const uint16_t errorCode = can.begin(settings, []
+  CanConfigErrorCode = can.begin(settings, []
                                        { can.isr(); });
-  if (errorCode == 0 && Debug)
+  if (CanConfigErrorCode == 0 && configuration.General.Debug)
   {
-    Serial.print("Bit Rate prescaler: ");
-    Serial.println(settings.mBitRatePrescaler);
-    Serial.print("Propagation Segment: ");
-    Serial.println(settings.mPropagationSegment);
-    Serial.print("Phase segment 1: ");
-    Serial.println(settings.mPhaseSegment1);
-    Serial.print("Phase segment 2: ");
-    Serial.println(settings.mPhaseSegment2);
-    Serial.print("SJW: ");
-    Serial.println(settings.mSJW);
-    Serial.print("Triple Sampling: ");
-    Serial.println(settings.mTripleSampling ? "yes" : "no");
-    Serial.print("Actual bit rate: ");
-    Serial.print(settings.actualBitRate());
-    Serial.println(" bit/s");
-    Serial.print("Exact bit rate ? ");
-    Serial.println(settings.exactBitRate() ? "yes" : "no");
-    Serial.print("Sample point: ");
-    Serial.print(settings.samplePointFromBitStart());
-    Serial.println("%");
+    Log.print("Bit Rate prescaler: ");
+    Log.println(settings.mBitRatePrescaler);
+    Log.print("Propagation Segment: ");
+    Log.println(settings.mPropagationSegment);
+    Log.print("Phase segment 1: ");
+    Log.println(settings.mPhaseSegment1);
+    Log.print("Phase segment 2: ");
+    Log.println(settings.mPhaseSegment2);
+    Log.print("SJW: ");
+    Log.println(settings.mSJW);
+    Log.print("Triple Sampling: ");
+    Log.println(settings.mTripleSampling ? "yes" : "no");
+    Log.print("Actual bit rate: ");
+    Log.print(settings.actualBitRate());
+    Log.println(" bit/s");
+    Log.print("Exact bit rate ? ");
+    Log.println(settings.exactBitRate() ? "yes" : "no");
+    Log.print("Sample point: ");
+    Log.print(settings.samplePointFromBitStart());
+    Log.println("%");
   }
-  if (errorCode != 0)
+  if (CanConfigErrorCode != 0)
   {
-    Serial.print("Configuration error 0x");
-    Serial.println(errorCode, HEX);
+    Log.print("Configuration error 0x");
+    Log.println(CanConfigErrorCode, HEX);
   }
 }
 
@@ -98,28 +97,24 @@ void processCan()
   {
     unsigned long curMillis = millis();
 
-    if (Debug || configuration.General.Sniffing)
+    if (configuration.General.Debug || configuration.General.Sniffing)
     {
       WriteMessage(Message);
     }
 
-    // Buffer for sending console output. 100 chars should be enough for now:
-    //[25-Aug-18 14:32:53.282]\tCAN: [0000] Data: FF (255)\tFF (255)\tFF (255)\tFF (255)\tFF (255)
-    char printBuf[100];
-
     // Check for other controllers on the network by watching out for messages that are greater than 0x250
-    if (Message.id > 0x250 && Message.id < 0x400)
+    if (Message.id > 0x250 && Message.id < 0x260)
     {
       controllerMessageTimer = curMillis;
 
       // Bail out if we're already disabled.
-      if (!Override)
+      if (!OverrideControl)
         return;
 
       // Switch off override if another controller sends messages on the network.
-      Override = false;
+      OverrideControl = false;
 
-      WriteToConsoles("Detected another controller on the network. Disabling Override\r\n");
+      Log.println("Detected another controller on the network. Disabling Override");
     }
 
     /*************************************
@@ -134,11 +129,10 @@ void processCan()
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
      **************************************/
 
-    unsigned int rawTemp = 0;
-    char errorCode[2];
+    unsigned int rawTemp;
 
     // Take note of the last time we received a message from the boiler
-    if (Message.id < 0x250 || Message.id > 0x400)
+    if (Message.id < 0x250 || Message.id > 0x260)
     {
       lastHeatingMessageTime = millis();
     }
@@ -214,12 +208,26 @@ void processCan()
       // Concat bytes 0 and 1 and divide the resulting INT by 100
       rawTemp = (Message.data[0] << 8) + Message.data[1];
       temp = rawTemp / 100.0;
+      
+      // Temperature Delta is too high
+      if(abs(ceraValues.General.OutsideTemperature - temp) > 30 && ceraValues.General.HasReceivedOT)
+      {
+        Log.printf("Detected a massive spike in Outside Temperature readings. Was %.2f is now %.2f. Check if the cabling is correct of both CAN Bus and Temperature Sensor!", ceraValues.General.OutsideTemperature, temp);
+        return;
+      }
+
       // Temperatures above 200 are considered invalid.
       if (temp > 200.0)
       {
-        WriteToConsoles("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
+        Log.println("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
         return;
-      };
+      }
+
+      if (!ceraValues.General.HasReceivedOT)
+      {
+        ceraValues.General.HasReceivedOT = true;
+      }
+
       ceraValues.General.OutsideTemperature = temp;
     }
 

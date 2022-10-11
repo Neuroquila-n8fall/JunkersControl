@@ -1,18 +1,27 @@
 # JunkersControl
-
+[![CI](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml/badge.svg)](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml)
+## NOTE: Documentation is mostly accurate right now.
+**Feel free to open an issue if something is unclear.**
 ## Table of contents
 - [JunkersControl](#junkerscontrol)
+  - [NOTE: Documentation is mostly accurate right now.](#note-documentation-is-mostly-accurate-right-now)
   - [Table of contents](#table-of-contents)
+  - [Community](#community)
   - [Purpose and Aim](#purpose-and-aim)
     - [Cerasmart-er](#cerasmart-er)
   - [Contribution](#contribution)
   - [Intended Audience](#intended-audience)
+    - [Disclaimer:](#disclaimer)
   - [A word of warning](#a-word-of-warning)
     - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
   - [Prerequisites](#prerequisites)
+  - [Installation (Quick Start)](#installation-quick-start)
   - [Features](#features)
     - [MQTT](#mqtt)
+      - [Where?](#where)
+      - [How?](#how)
       - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
+      - [Examples & Detailed Explanation](#examples--detailed-explanation)
     - [Heating Parameters](#heating-parameters)
     - [Night/Economy Mode](#nighteconomy-mode)
       - [Option #1 (MQTT):](#option-1-mqtt)
@@ -23,20 +32,24 @@
     - [Fallback and Failsafe](#fallback-and-failsafe)
     - [Automatic Controller Detection](#automatic-controller-detection)
     - [External Temperature Sensors](#external-temperature-sensors)
-      - [Configuration](#configuration)
+      - [Where?](#where-1)
     - [Dynamic Adaption](#dynamic-adaption)
     - [Calculate yourself](#calculate-yourself)
     - [Valve-based control](#valve-based-control)
-    - [OTA Updates and Console](#ota-updates-and-console)
+  - [Updating](#updating)
+  - [Telnet Console](#telnet-console)
+  - [Home Assistant Integration](#home-assistant-integration)
   - [Hints](#hints)
-  - [Configuration / Setup](#configuration--setup)
+  - [Getting Started](#getting-started)
+    - [Configuration](#configuration)
   - [Dedicated PCB](#dedicated-pcb)
   - [Todo](#todo)
   - [Special Thanks](#special-thanks)
 
 ![Alt_Text](/assets/example_ha_dashboard.jpg)
 
-#NOTE: Documentation is being updated for recent changes.
+## Community
+You can reach out to us on [Discord](https://discord.gg/9Wrndbqu7t) where we can discuss and help eachother.
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -61,8 +74,14 @@ Just a few examples:
 - Bugs, of course
 
 ## Intended Audience
-Since every setup is different you have to customize the data processing for yourself. I have sourced the message ids from https://www.mikrocontroller.net/topic/81265 but only process those that are relevant to me.
-This means you should bring a little bit of coding experience with you.
+Since the upgrade to a flexible configuration format and the ability to configure things via a web UI, you will be able to tune the system to your needs without knowing much about software development.
+But you might find yourself in a situation where things don't work as expected. Feel free to open an issue so we can adapt things to your needs.
+
+### Disclaimer:
+I have sourced the message ids from https://www.mikrocontroller.net/topic/81265 but only process those that are relevant to me.
+This means you should bring a little bit of patience and basic knowledge about your heating with you so you can actually make decisions about what IDs might be relevant to you or not.
+You should look at the CAN-Bus configuration on the web UI and the Can Analyzer to sort things out for your heating system.
+Also you should have Visual Studio Code ready and the extension [Platformio](https://platformio.org/) installed. We'll talk about that in detail in [Prerequisites](#prerequisites)
 
 
 ## A word of warning
@@ -82,16 +101,50 @@ Again, when in doubt, ask a technician.
 4) Direct access to the heating itself in case of problems.
 5) No, really, you shouldn't mess with things that aren't **yours**
 6) Ideally an ESP32 Kit but if you are just interested in the CAN-Stuff you can of course throw away all the MQTT and WiFi and just use a bog standard arduino.
-7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen")
+7) A MCP2515 + TJA1050 Can-Bus module (i.e. branded "NiRen"). Other boards with different controllers and transceivers may work too.
 8) A MQTT broker (i.e. Mosquitto)
-9) Visual Studio Code & Platform.IO Add-On are recommended!
+9) Visual Studio Code & [Platform.IO](https://platformio.org/) Add-On are recommended!
 10) Optional: DS18B20 Sensors
+
+## Installation (Quick Start)
+Either clone the repository and build/upload yourself using Platformio and your IDE of choice or download the binaries and use esptool as follows:
+Example for Windows environments:
+```shell
+esptool.exe --after no_reset --chip esp32 --baud 921600 --port <Serial port of your device> write_flash --verify 0x10000 firmware.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash 0x307000 littlefs.bin
+```
+
+The important part is the addresses `0x10000` for the firmware and `0x307000`for the filesystem.
+
+If everything went well you should see the following output on the console:
+```log
+Press the "BOOT" button within the next 5 seconds to enable Setup Mode!
+Setup Mode not enabled. You can enable it at every time by pressing the "BOOT" button once.
+[  5047][E][vfs_api.cpp:104] open(): /littlefs/configuration.json does not exist, no permits for creation
+Configuration file could not be found. Please upload it first.
+Unable to read configuration.
+Invalid WiFi configuration. Launching AP mode.
+WiFi AP launched. Find me @ 192.168.4.1
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+Can't connect to MQTT broker. [No Network]
+```
+
+Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json)
+
+If MDNS is working properly on your end, you will be able to open the web UI using http://cerasmarter/
 
 ## Features
 
 ### MQTT
 Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
-The topics are described inside `/data/configuration.json`
+
+#### Where?
+The topics are described inside `/data/configuration.json` or `Configuration > MQTT` on the web UI.
+
+#### How?
 
 To send parameters to the heating controller, you just have to form a JSON and send it to the topic you defined in `/data/configuration.json`
 
@@ -112,8 +165,8 @@ The `MQTT` section has everything and this is where you define the topics:
             "WaterValues": "cerasmarter/water/values",
             // Send values here to steer the hot water circuit and functions
             "WaterParameters": "cerasmarter/water/parameters",
-            // Topic for receiving temperatures from auxilary sensors
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            // Topic for receiving temperatures from auxiliary sensors
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             // Topic for receiving status information
             "Status": "cerasmarter/status",
             // Send values here to receive values on demand
@@ -132,7 +185,7 @@ The `MQTT` section has everything and this is where you define the topics:
   "FeedBaseSetpoint": -10,
   "FeedCutOff": 22,
   "FeedMinimum": 10,
-  "AuxilaryTemperature": 11.6,
+  "AuxiliaryTemperature": 11.6,
   "AmbientTemperature": 0,
   "TargetAmbientTemperature": 21,
   "OnDemandBoost": false,
@@ -160,6 +213,7 @@ Because we are now looking at the environment temperature(s) and we know what th
 The base point now represents the outside temperature at which the heating should use the maximum possible feed temperature as dialed in by the heating circuit dial on the heating itself
 The end point is basically the temperature at which the heating should switch off.
 ![Linear distibution](/assets/Temperature_Mapping_Explained.jpg)
+
 *In this graph the base point is -10°C and the end point is 20°C meaning at -10°C we need the full power to keep our home warm whereas 20°C is when we don't need it anymore*
 
 See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" temperature 
@@ -197,6 +251,7 @@ Due to the natural lag of a heating system you should fire this function before 
 ### Fast Heatup
 Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTemperature`) to a given target value (`commandedValues.Heating.TargetAmbientTemperature`) and sets the feed temperature to maximum (`ceraValues.Heating.FeedMaximum`) as long as the temperature hasn't reached the target value. It will slowly decrease the feed temperature down from maximum as the target is approached. 
 ![Fast Heatup Demo](/assets/fastheatup_demo.jpg)
+
 *This is how the fast heatup function works visually*
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
@@ -263,11 +318,11 @@ Maybe you switch on a relay that triggers the voltage supply for the original co
 
 The oneWire and DallasTemperature libraries are included and used to fetch additional temperatures like the return temperature which isn't available on the bus.
 
-#### Configuration
+#### Where?
 
-Configured using `/data/configuration.json`. 
+Configured using `/data/configuration.json` or `Configuration > Temperature Sensors` on the web UI
 
-See [Auxilary Sensors](assets/Configuration.md#auxilary-sensors)
+See [Auxiliary Sensors](assets/Configuration.md#auxiliary-sensors)
 
 ### Dynamic Adaption
 
@@ -335,15 +390,22 @@ Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
 }
 ```
 
-### OTA Updates and Console
+## Updating
 
 The standard "Arduino OTA" procedure is included which means you can upload the code to your ESP32 without having to plug in the USB cable. See `platformio.ini` and modify the IP address accordingly.
 
+You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
+
+## Telnet Console
+
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
+## Home Assistant Integration
+This project was originally specifically designed to be run alongside Home Assistant and efforts have been taken to make the setup as hassle-free as possible but the so-called autodiscovery is still in the works. In the meantime you may find the necessary scripts, values and other stuff inside the [Home Assistant Folder](Home%20Assistant)
+
 ## Hints
-- If you just wanna read then you have to set the variable `Override` to `false`. This way nothing will be sent on the bus but you can read everything.
-- For debug purposes the `Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
+- If you just wanna read then usually you have nothing to modify. The program will see other controllers on the bus and will go into "read-only" mode by itself. If you're not wanting to take any risks, you have to set the variable `OverrideControl` in [main.cpp](src/main.cpp) to `false`. This way nothing will be sent on the bus udner any circumstances but you can read everything.
+- For debug purposes the `configuration.General.Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
@@ -352,7 +414,7 @@ Debug info can be retrieved using a very basic telnet implementation. Simply con
 1) Copy [Configuration.json](assets/Templates/Configurations/configuration.json) to the `data` folder.
 2) Use this `configuration.json` to configure the project to your requirements.
 3) Upload the project
-4) Now It will format the SPIFFS filesystem.
+4) Now it will format the SPIFFS filesystem.
 5) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
 6) It will now read this config and will reach operational status
 
@@ -365,6 +427,8 @@ See the [Configuration](assets/Configuration.md) guide for details.
 ## Dedicated PCB
 
 WIP
+
+**Update 09-2022**: The bus is very picky about the choice of hardware. Multiple prototypes have been built and tested and further investigation is in progress. Another limitation is the amount of current the built-in power supply can deliver. This is slowing down hardware development even more.
 
 ## Todo
 - [x] Find a suitable CAN module and library that is able to handle 10kbit/s using the ESP32
@@ -381,9 +445,15 @@ WIP
 - [x] Testing as a standalone solution
 - [x] Example Configuration for Home Assistant
 - [ ] Dedicated PCB with all components in place and power supply through the controller
+- [ ] Take more intelligent decisions for feed temperatures
+- [ ] Revamp fallback mode to make use of eztime
+- [ ] Make fallback mode more flexible and configurable
+- [ ] Restructure code into reusable classes
 
 ## Special Thanks
 - The people at the mikrocontroller.net forums
 - Pierre Molinaro and contributors of the ACAN2515 library: https://github.com/pierremolinaro/acan2515
 - Nick O'Leary and contributors of the PubSubClient library: https://github.com/knolleary/pubsubclient
 - Rop Gonggrijp and contributors of the ezTime library: https://github.com/ropg/ezTime
+- The maintainers of the ArduinoJSON library: https://arduinojson.org/
+- The maintainers of the Async ESP Webserver and AsyncTCP library: https://github.com/me-no-dev/ESPAsyncWebServer

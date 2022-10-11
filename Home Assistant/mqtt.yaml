@@ -1,0 +1,124 @@
+mqtt:
+  broker: 1.2.3.4
+  port: 1883
+  username: mqtt
+  password: mqttpass
+  sensor:
+    - name: "Cerasmarter Errorlog Message"
+      unique_id: "CerasmarterErrorLog"
+      state_topic: "cerasmarter/log"
+      value_template: >-
+        {% set value = value_json.lvl | int %} 
+        {% if value == 0 %}
+        {% set errLvl = "Error" %}
+        {% elif value == 1 %}
+        {% set errLvl = "Warning" %}
+        {% elif value == 2 %}
+        {% set errLvl = "Info" %}
+        {% elif value == 3 %}
+        {% set errLvl = "Debug" %}
+        {% elif value == 4 %}
+        {% set errLvl = "Verbose" %}
+        {% endif %}   
+        [{{ errLvl }}][{{value_json.fnc}}]:{{value_json.msg}}
+    ### Heating Temperatures 'cerasmarter/heating/parameters'
+    - name: "Aktuelle Vorlauftemperatur Heizung"
+      unique_id: "HeatingInformation_Temperatures_FeedCurrent"
+      state_topic: "cerasmarter/heating/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.FeedCurrent }}"
+    - name: "Maximale Vorlauftemperatur Heizung"
+      unique_id: "HeatingInformation_Temperatures_FeedMaximum"
+      state_topic: "cerasmarter/heating/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.FeedMaximum }}"
+    - name: "Soll-Vorlauftemperatur Heizung"
+      unique_id: "HeatingInformation_Temperatures_FeedSetpoint"
+      state_topic: "cerasmarter/heating/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.FeedSetpoint }}"
+    - name: "Außentemperaturfühler Heizung"
+      unique_id: "HeatingInformation_Temperatures_Outside"
+      state_topic: "cerasmarter/heating/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.Outside }}"
+    - name: "Heizung Boost"
+      unique_id: "HeatingInformation_Status_Boost"
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.Boost }}"
+      force_update: true
+    - name: "Heizung Boost Restdauer"
+      unique_id: "HeatingInformation_Status_BoostRemaining"
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.BoostTimeLeft }}"
+      unit_of_measurement: "Sekunden"
+      force_update: true
+    - name: "Heizung Heizbetrieb"
+      unique_id: "HeatingInformation_Status_Working"
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.Working }}"
+      force_update: true
+    - name: "Heizung Schnellaufheizung"
+      unique_id: "HeatingInformation_Status_FastHeatup"
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.FastHeatup }}"
+      force_update: true
+    - name: "Heizung Pumpe"
+      unique_id: HeatingInformation_Status_Pump
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.Pump }}"
+      force_update: true
+    - name: "Heizung Saisonaler Betriebsmodus"
+      unique_id: "HeatingInformation_Status_Season"
+      state_topic: "cerasmarter/heating/values"
+      value_template: "{{ value_json.Season }}"
+      force_update: true
+    ### Auxiliary Sensors 'cerasmarter/auxiliary/parameters'
+    - name: "Externe Vorlauftemperatur"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_Feed"
+      state_topic: "cerasmarter/auxiliary/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.Feed.Temperature }}"
+    - name: "Externe Rücklauftemperatur"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_Return"
+      state_topic: "cerasmarter/auxiliary/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.Return.Temperature }}"
+    - name: "Externe Abgastemperatur"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_Exhaust"
+      state_topic: "cerasmarter/auxiliary/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.Exhaust.Temperature }}"
+    - name: "Externe Umgebungstemperatur"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_Ambient"
+      state_topic: "cerasmarter/auxiliary/values"
+      unit_of_measurement: "°C"
+      value_template: "{{ value_json.Ambient.Temperature }}"
+    ### Auxiliary Sensors 'cerasmarter/auxiliary/parameters'
+    - name: "Externe Vorlauftemperatur Status"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_FeedReachable"
+      state_topic: "cerasmarter/auxiliary/values"
+      value_template: "{{ iif(value_json.Feed.Reachable == 'true', 'yes', 'no', 'unknown') }}"
+    - name: "Externe Rücklauftemperatur Status"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_ReturnReachable"
+      state_topic: "cerasmarter/auxiliary/values"
+      value_template: "{{ iif(value_json.Return.Reachable == 'true', 'yes', 'no', 'unknown') }}"
+    - name: "Externe Abgastemperatur Status"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_ExhaustReachable"
+      state_topic: "cerasmarter/auxiliary/values"
+      value_template: "{{ iif(value_json.Exhaust.Reachable == 'true', 'yes', 'no', 'unknown') }}"
+    - name: "Externe Umgebungstemperatur Status"
+      unique_id: "HeatingInformation_AuxiliaryTemperatures_AmbientReachable"
+      state_topic: "cerasmarter/auxiliary/values"
+      value_template: "{{ iif(value_json.Ambient.Reachable == 'true', 'yes', 'no', 'unknown') }}"
+    ### Status 'cerasmarter/status'
+    - name: "Heizung Brenner"
+      unique_id: "HeatingInformation_Status_GasBurner"
+      state_topic: "cerasmarter/status"
+      value_template: "{{ value_json.GasBurner }}"
+      force_update: true
+    - name: "Heizung Fehler"
+      unique_id: "HeatingInformation_Status_Error"
+      state_topic: "cerasmarter/status"
+      value_template: "{{ value_json.Error }}"
+      force_update: true

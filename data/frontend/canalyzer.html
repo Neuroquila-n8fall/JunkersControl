@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CERASMARTER Can Analyzer</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+</head>
+
+<body>
+<div id="navigation-container">
+    <!-- Navigation Placeholder -->
+</div>
+<div class="container text-center">
+    <div class="row">
+        <div class="col-md-3 text-start">
+            <div class="row mt-5">
+                <h4>Options and Utilities</h4>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ignoreKnown">
+                    <label class="form-check-label" for="ignoreKnown">Ignore Known Addresses</label>
+                </div>
+            </div>
+            <div>
+                <h5>Known Addresses</h5>
+                <div class="row mt-3" id="known-addresses">
+                    <!-- Known Address Switches -->
+                </div>
+            </div>
+            <div>
+                <h5>Unknown Addresses</h5>
+                <div class="row mt-3" id="unknown-addresses">
+                    <!-- Unknown Address Buttons -->
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <!-- Content -->
+            <div class="row mt-5">
+                <h3>Watch CAN Messages</h3>
+            </div>
+            <div class="row mt-5 overflow-auto border border-1 rounded align-content-start" id="can-msg-log"
+                 style="height: 500px">
+                <table class="table table-bordered align-top">
+                    <thead class="sticky-top bg-light">
+                    <tr class="sticky-top bg-light">
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">
+                            &#8651;
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">ID
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">1
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">2
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">3
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">4
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">5
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">6
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">7
+                        </th>
+                        <th class="sticky-top"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">8
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody id="can-msg">
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-3">
+        </div>
+    </div>
+</div>
+
+<script src="frontend/js/framework.js"></script>
+<script src="frontend/js/api.js"></script>
+<script src="frontend/js/firmware.js"></script>
+<script src="frontend/js/bootstrap.bundle.min.js"></script>
+<script type="text/javascript">
+    loadNavigation();
+    startEvents();
+    loadKnownAddresses();
+    let messages = [];
+    let knownAddresses = [];
+    let unknownAddresses = [];
+    let previousMessage = [];
+
+    const msgLog = _("can-msg");
+
+    function Message() {
+        this.id = "",
+            this.len = 0,
+            this.data = []
+    }
+
+    async function loadKnownAddresses() {
+        const addresses = await getConfigJson("/api/config/canbus");
+        const keys = getDeepKeys(addresses);
+        keys.forEach(e => {
+            let value = jsonPathToValue(addresses, e);
+            knownAddresses.push(value);
+        })
+        knownAddresses.sort();
+        knownAddresses.forEach((e) => {
+            _("known-addresses").innerHTML += `<div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="${e.toLowerCase()}-enabled" checked>
+                        <label class="form-check-label" for="${e}-enabled">${e}</label>
+                    </div>`;
+        })
+    }
+
+    function onSwitchAllAddresses() {
+        knownAddresses.forEach((e) => {
+            _(`${e}-label`).checked = _("ignoreKnown").checked;
+        });
+    }
+
+    function canIdKnown(id) {
+        return knownAddresses.some((x) => x.toUpperCase() === id.toUpperCase());
+    }
+
+    function canIdIsInUnknown(id) {
+        return unknownAddresses.some((x) => x.toUpperCase() === id.toUpperCase());
+    }
+
+    /**
+     * Add ID to known addresses, removing existing buttons from the unknown group
+     * @param {string} id The ID without prefix '0x'
+     * @returns {undefined} Nothing
+     */
+    function addToKnownAddress(id) {
+        const msgId = `0x${id.toUpperCase()}`;
+        const found = unknownAddresses.findIndex((e) => e === msgId);
+        unknownAddresses.slice(found, 1);
+        _(`${id.toLowerCase()}-unknown`).remove();
+        knownAddresses.push(`0x${id}`);
+        _("known-addresses").innerHTML += `<div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="0x${id.toLowerCase()}-enabled" checked>
+                        <label class="form-check-label" for="${id}-enabled">${msgId}</label>
+                    </div>`
+    }
+
+    /**
+     * Add ID to unknown addresses, removing existing switches from the known group
+     * @param {string} id The ID without prefix '0x'
+     * @returns {undefined} Nothing
+     */
+    function addUnknownAddress(id) {
+        const msgId = `0x${id.toUpperCase()}`;
+        const found = knownAddresses.findIndex((e) => e === msgId);
+        if (found > -1) {
+            unknownAddresses.slice(found, 1);
+            _(`${id.toLowerCase()}-enabled`).remove();
+        }
+        unknownAddresses.push(`0x${id.toUpperCase()}`);
+        _("unknown-addresses").innerHTML += `<div class="mb-3" id="${id.toLowerCase()}-unknown">
+                <button type="button" class="btn btn-primary btn-sm" onClick="addToKnownAddress('${id}')">+</button>
+                <code>0x${id.toUpperCase()}</code>
+                </div>`
+    }
+
+    function checkPreviousMessage(message) {
+        // Check if a message on the specified ID has been already received
+        if (previousMessage.some((x) => x.id === message.id)) {
+            const found = previousMessage.findIndex((i) => i.id === message.id);
+            const prevMsgCopy = previousMessage[found];
+            previousMessage[found] = message;
+            // Report that copy back
+            return prevMsgCopy;
+        } else {
+            // Message ID hasn't been received yet. Add to array and return the received message.
+            previousMessage.push(message);
+            return message;
+        }
+
+    }
+
+    // Returns an array of differences between data bytes from a and b
+    function compareValues(a, b) {
+        let resultArr = [];
+        // Pick the bigger array as the reference or
+        // just go with a and b if they are of equal size
+        const biggerArr = a.length >= b.length ? a : b;
+        for (let i = 0; i < biggerArr.length; i++) {
+            const first = a[i];
+            const second = b[i];
+            // ... in case the other array is smaller...
+            if (!second) {
+                resultArr.push(first);
+            } else {
+                resultArr.push(second - first);
+            }
+        }
+        return resultArr;
+    }
+
+    function addMessage(message) {
+        let json = JSON.parse(message);
+        let msgId = decimalToHex(json.id, 3);
+
+        // Ignore all known addresses, if option is active
+        if (_("ignoreKnown").checked && canIdKnown(`0x${msgId}`)) {
+            return;
+        }
+
+        // Ignore unchecked IDs
+        if (canIdKnown(`0x${msgId}`)) {
+            const msgSwitch = _(`0x${msgId.toLowerCase()}-enabled`);
+            if (!msgSwitch) {
+                console.warn(`ID ${msgId} found but Switch is missing.`);
+            } else {
+                if (!msgSwitch.checked) {
+                    return;
+                }
+            }
+
+        } else {
+            if (!canIdIsInUnknown(`0x${msgId}`)) {
+                addUnknownAddress(msgId);
+            }
+        }
+
+        messages.push(json);
+        // Track changes
+        const prevMsg = checkPreviousMessage(json);
+
+        const diffInValues = compareValues(prevMsg.data, json.data);
+
+        let msgData = "";
+        const hasDifferentValues = diffInValues.some((x) => x !== 0);
+        try {
+            json.data.forEach(e => {
+                msgData += `<td><code>0x${decimalToHex(e, 3).toUpperCase()}(${e})</code></td>`;
+            });
+            _("can-msg").innerHTML += `<tr ${hasDifferentValues ? "class=\"table-warning\"" : ""}>
+                                            <td>                                                    
+                                                ${json.rcv ? "&#11176;" : "&#11179;"}
+                                            </td>
+                                            <td>
+                                                ${canIdKnown(`0x${msgId}`) ? "" : "*"}
+                                                <code>0x${msgId.toUpperCase()}</code>
+                                            </td>
+                                                ${msgData}
+                                            </tr>`;
+            if (hasDifferentValues) {
+                let diffMsg = "";
+
+                function numberWithPrefix(int) {
+                    let result = int > 0 ? "+" : "";
+                    result += int;
+                    return result;
+                }
+
+                diffInValues.forEach((d) => {
+                    diffMsg += `<td><code>${d === 0 ? "" : numberWithPrefix(d) + "(dec)"}</code></td>`;
+                })
+                _("can-msg").innerHTML += `<tr class="table-info">
+                                            <td colspan="2">
+                                                &Delta;
+                                            </td>                                                
+                                                ${diffMsg}
+                                            </tr>`;
+            }
+        } catch (error) {
+            console.error(`Error displaying message with id 0x${msgId}: ${error}`)
+        }
+        //make the last element (a message) to scroll into view, smoothly!
+        msgLog.lastElementChild.scrollIntoView({behavior: 'smooth'});
+    }
+
+    function decimalToHex(d, padding) {
+        let hex = Number(d).toString(16);
+        padding = typeof (padding) === "undefined" || padding === null ? padding = 2 : padding;
+
+        while (hex.length < padding) {
+            hex = "0" + hex;
+        }
+
+        return hex;
+    }
+
+    function startEvents() {
+        const es = new EventSource('/events');
+        es.addEventListener('can', function (e) {
+            addMessage(e.data);
+        }, false);
+    }
+</script>
+</body>

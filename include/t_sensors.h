@@ -22,7 +22,7 @@ extern OneWire oneWire;
 extern DallasTemperature sensors;
 
 
-//-- Auxilary Sensor Values (OneWire Sensors)
+//-- Auxiliary Sensor Values (OneWire Sensors)
 extern double aux_feedTemperature;
 extern double aux_returnTemperature;
 extern double aux_ambientTemperature;
@@ -81,7 +81,7 @@ extern DeviceAddress ambient_sens;
 //——————————————————————————————————————————————————————————————————————————————
 
 //Read Temperatures and send the results using MQTT
-extern void ReadTemperatures();
+extern void ReadTemperatures(void *pvParameters);
 
 //Initialize Sensors
 extern void initSensors();

@@ -1,7 +1,7 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <telnet.h>
 #include <main.h>
@@ -13,6 +13,12 @@
 
 extern bool ReadConfiguration();
 
+extern void WriteConfiguration();
+
+extern String IntToHex(int value);
+
+extern unsigned long convertHexString(const char *src);
+
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
 //——————————————————————————————————————————————————————————————————————————————
@@ -22,6 +28,7 @@ struct Sensor
     char Label[255];
     bool UseAsReturnValueReference;
     DeviceAddress Address;
+    bool reachable;
 };
 
 struct Configuration
@@ -30,13 +37,13 @@ struct Configuration
     {
         char SSID[255];     // "ssid"
         char Password[255]; // "pass"
-        char Hostname[255]; // "CERASMARTER"
+        char Hostname[255] = "CERASMARTER"; // "CERASMARTER"
     } Wifi;
 
     struct Mqtt_
     {
         char Server[15];    // "192.168.1.123"
-        int Port;           // "Default: 1883"
+        int Port = 1883;           // "Default: 1883"
         char User[255];     // "user"
         char Password[255]; // "pass"
 
@@ -46,23 +53,25 @@ struct Configuration
             char HeatingParameters[255];
             char WaterValues[255];
             char WaterParameters[255];
-            char AuxilaryValues[255];
-            char Status[255]; // "cerasmarter/status"
+            char AuxiliaryValues[255];
+            char Status[255]; 
             char StatusRequest[255];
+            char Boost[255];
+            char FastHeatup[255];
         } Topics;
 
     } Mqtt;
 
     struct Features_
     {
-        bool Features_HeatingParameters;  // true
-        bool Features_WaterParameters;    // false
-        bool Features_AuxilaryParameters; // false
+        bool HeatingParameters;  // true
+        bool WaterParameters;    // false
+        bool AuxiliaryParameters; // false
     } Features;
 
     struct General_
     {
-        char Time_Timezone[255]; // Timezone to be used for NTP, i.e. Europe/Berlin
+        char Timezone[255]; // Timezone to be used for NTP, i.e. Europe/Berlin
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
         bool Debug;            // Output debug messages, true|false
@@ -104,6 +113,8 @@ struct Configuration
             uint16_t Season;
             uint16_t Operation;
             uint16_t Power;
+            uint16_t Mode;
+            uint16_t Economy;
         } Heating;
 
         struct General_
@@ -142,5 +153,6 @@ struct Configuration
 
 extern const char *configFileName;
 extern Configuration configuration;
+
 
 #endif // CONFIGURATION_H

@@ -44,6 +44,8 @@ struct CeraValues
     bool Active = true;
     //-- Analog value of heating power
     int HeatingPower = 0;
+    //-- Economy Setting
+    bool Economy = false;
   } Heating;
   //-- General Values, i.e. Flame, Error, ...
   struct General_
@@ -52,6 +54,8 @@ struct CeraValues
     bool FlameLit = false;
     //-- Readings of the temperature sensor on the outside
     double OutsideTemperature = 0.00F;
+    //-- Received OutsideTemperature
+    bool HasReceivedOT = false;
     //-- Errorcode, if any, defaults to 0x0 as "operational"
     uint8_t Error = 0x000;
   } General;
@@ -59,7 +63,7 @@ struct CeraValues
   struct HotWater_
   {
     //-- Setpoint (Target Temperature) for DHW
-    int SetPoint = 40.0F;
+    double SetPoint = 40.0F;
     //-- The currently reported temperature of the DHW circuit
     double TemperatureCurrent = 0.00F;
     //-- Whether this installation utilizes a buffer(or battery)
@@ -128,11 +132,11 @@ struct CeraValues
     int Minutes = 0;
   } Time;
 
-  struct Auxilary_
+  struct Auxiliary_
   {
-    double *Temperatures;
+    float *Temperatures;
     double FeedReturnTemperatureReference;
-  } Auxilary;
+  } Auxiliary;
 };
 
 extern CeraValues ceraValues;
@@ -143,6 +147,5 @@ extern CeraValues ceraValues;
 
 extern double CalculateFeedTemperature();
 extern int ConvertFeedTemperature(double temperature);
-extern void SetFeedTemperature();
 
 #endif

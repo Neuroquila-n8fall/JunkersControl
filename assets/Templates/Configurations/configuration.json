@@ -14,15 +14,17 @@
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
     },
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxilaryParameters": false
+        "AuxiliaryValues": false
     },
     "Time": {
         "Timezone": "Europe/Berlin"
@@ -31,6 +33,14 @@
         "BusMessageTimeout": 30,
         "Debug": false,
         "Sniffing": false
+    },
+    "HomeAssistant":
+    {
+        "AutoDiscoveryPrefix": "homeassistant",
+        "OffDelay": 30,
+        "Enabled": false,
+        "DeviceId": "cerasmarter_1",
+        "TempUnit": "°C"
     },
     "CAN": {
         "Quartz": 16,
@@ -48,7 +58,9 @@
                 "Pump": "0x20A",
                 "Season": "0x20C",
                 "Operation": "0x250",
-                "Power": "0x251"
+                "Power": "0x251",
+                "Mode": "0x258",
+                "Economy": "0x253"
             },
             "HotWater": {
                 "SetpointTemperature": "0x203",
@@ -68,9 +80,8 @@
             }
         }
     },
-    "AuxilarySensors":
+    "AuxiliarySensors":
     {
-        "Count": 4,
         "Sensors":
         [
             {

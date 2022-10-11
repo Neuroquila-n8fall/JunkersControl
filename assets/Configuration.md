@@ -33,7 +33,7 @@ This block configures the connection to your MQTT broker
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
             "StatusRequest": "cerasmarter/status/get"
         }
@@ -58,7 +58,7 @@ These should be self-explanatory.
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterValues": "cerasmarter/water/values",
             "WaterParameters": "cerasmarter/water/parameters",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
             "StatusRequest": "cerasmarter/status/get"
         }
@@ -71,7 +71,7 @@ These topics are used by the program to send data.
 ```json
             "HeatingValues": "cerasmarter/heating/values",
             "WaterValues": "cerasmarter/water/values",
-            "AuxilaryParameters": "cerasmarter/auxilary/values",
+            "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
 ```
 
@@ -99,7 +99,7 @@ This topic is used for requesting data on-demand. See [Status Request Explanatio
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxilaryParameters": false
+        "AuxiliaryValues": false
     },
 ```
 
@@ -314,12 +314,12 @@ Your CAN-Module might have a 8MHz or 16MHz oscillator (quartz) installed. Adjust
 
 This is where things get a little bit complicated. The addresses defined here might be different to what your system sends. If something is off and you found the correct ID using [Sniffing Setting](#sniffing) you can adjust it using these blocks.
 
-### Auxilary Sensors
+### Auxiliary Sensors
 
-You can setup your own set of external sensors to be sent on the mqtt topic [Auxilary Temperatures](Examples/MQTT_Message_Exchange/Send/README.md#auxilary-sensors)
+You can setup your own set of external sensors to be sent on the mqtt topic [Auxiliary Temperatures](Examples/MQTT_Message_Exchange/Send/README.md#auxiliary-sensors)
 
 ```json
-    "AuxilarySensors":
+    "AuxiliarySensors":
     {
         "Count": 4,
         "Sensors":
@@ -387,7 +387,7 @@ The completed sensor block looks like this:
 
 Full example with 4 sensors:
 ```json
-    "AuxilarySensors":
+    "AuxiliarySensors":
     {
         "Count": 4,
         "Sensors":
