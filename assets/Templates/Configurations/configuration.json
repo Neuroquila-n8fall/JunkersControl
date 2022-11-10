@@ -24,7 +24,8 @@
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxiliaryValues": false
+        "AuxiliaryValues": false,
+        "OverrideOT": false
     },
     "Time": {
         "Timezone": "Europe/Berlin"
