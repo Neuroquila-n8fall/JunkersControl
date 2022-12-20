@@ -129,7 +129,7 @@ void processCan()
      * Endpoint = Outside temperature at which the heating should deliver the lowest possible feed temperature. Also known as "cut-off" temperature (depends on who you are talking with about this topic ;))
      **************************************/
 
-    int rawTemp;
+    
 
     // Take note of the last time we received a message from the boiler
     if (Message.id < 0x250 || Message.id > 0x260)
@@ -205,6 +205,7 @@ void processCan()
     // Value: (Data[0] & Data[1]) / 100.0
     if (Message.id == configuration.CanAddresses.Heating.OutsideTemperature)
     {
+      int rawTemp;
       // Concat payload and divide the resulting INT by 100
       for (int i = 0; i < sizeof(Message.data); i++)
       {
