@@ -205,13 +205,8 @@ void processCan()
     // Value: (Data[0] & Data[1]) / 100.0
     if (Message.id == configuration.CanAddresses.Heating.OutsideTemperature)
     {
-      int rawTemp;
       // Concat payload and divide the resulting INT by 100
-      for (int i = 0; i < sizeof(Message.data); i++)
-      {
-        rawTemp <<= 8;
-        rawTemp |= Message.data[i];
-      }      
+      short rawTemp = (Message.data[0] << 8) + Message.data[1];  
       temp = rawTemp / 100.0;
       
       // Temperature Delta is too high
