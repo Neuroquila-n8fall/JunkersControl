@@ -345,7 +345,7 @@ void processCan()
     // Value: Data / 2.0
     if (Message.id == configuration.CanAddresses.MixedCircuit.FeedSetpoint)
     {
-      temp = Message.data[0] / 2.0;
+      temp = Message.data[1] / 2.0;
       ceraValues.MixedCircuit.FeedSetpoint = temp;
     }
 
