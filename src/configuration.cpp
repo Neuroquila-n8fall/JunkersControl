@@ -81,6 +81,7 @@ bool ReadConfiguration()
     configuration.Features.HeatingParameters = Features["HeatingParameters"]; // true
     configuration.Features.WaterParameters = Features["WaterParameters"];     // false
     configuration.Features.AuxiliaryParameters = Features["AuxiliaryValues"];   // false
+    configuration.Features.UseAuxiliaryOutsideTempReference = Features["OverrideOT"];
 
     JsonObject TimeSettings = doc["Time"];
     strlcpy(configuration.General.Timezone, TimeSettings["Timezone"], sizeof(configuration.General.Timezone)); // true
@@ -227,6 +228,7 @@ void WriteConfiguration()
     Features["HeatingParameters"] = configuration.Features.HeatingParameters;
     Features["WaterParameters"] = configuration.Features.WaterParameters;
     Features["AuxiliaryValues"] = configuration.Features.AuxiliaryParameters;
+    Features["OverrideOT"] = configuration.Features.UseAuxiliaryOutsideTempReference;
 
     doc["Time"]["Timezone"] = configuration.General.Timezone;
 

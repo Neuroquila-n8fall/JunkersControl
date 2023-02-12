@@ -191,6 +191,7 @@ void getGeneralConfig(AsyncWebServerRequest *request)
     doc["heatingvalues"] = configuration.Features.HeatingParameters;
     doc["watervalues"] = configuration.Features.WaterParameters;
     doc["auxvalues"] = configuration.Features.AuxiliaryParameters;
+    doc["overrideot"] = configuration.Features.UseAuxiliaryOutsideTempReference;
     doc["tz"] = configuration.General.Timezone;
     doc["busmsgtimeout"] = configuration.General.BusMessageTimeout;
     doc["debug"] = configuration.General.Debug;
@@ -218,6 +219,9 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 
     if (!doc["auxvalues"].isNull())
         configuration.Features.AuxiliaryParameters = doc["auxvalues"] == "true";
+
+    if (!doc["overrideot"].isNull())
+        configuration.Features.UseAuxiliaryOutsideTempReference = doc["overrideot"] == "true";
 
     if (!doc["tz"].isNull())
         strlcpy(configuration.General.Timezone, doc["tz"], sizeof(configuration.General.Timezone));

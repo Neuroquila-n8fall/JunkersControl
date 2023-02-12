@@ -69,6 +69,7 @@ struct Configuration
         bool HeatingParameters;  // true
         bool WaterParameters;    // false
         bool AuxiliaryParameters; // false
+        bool UseAuxiliaryOutsideTempReference; //True: Use the value from "commandedValues.Heating.AuxiliaryTemperature" instead of the reading from the heating sensor.
     } Features;
 
     struct General_
