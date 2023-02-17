@@ -365,5 +365,14 @@ void processCan()
       temp = Message.data[0] / 2.0;
       ceraValues.MixedCircuit.FeedCurrent = temp;
     }
+    
+    //[MC] - [Controller] - Mixed-Circuit Mix Valve Open
+    // Data Type: INT
+    // Value: Data 
+    if (Message.id == configuration.CanAddresses.MixedCircuit.MixValveOpen)
+    {
+      temp = Message.data[1];
+      ceraValues.MixedCircuit.MixValveOpen = temp;
+    }   
   }
 }
