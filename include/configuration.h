@@ -142,6 +142,7 @@ struct Configuration
             uint16_t Pump;
             uint16_t FeedSetpoint;
             uint16_t FeedCurrent;
+            uint16_t MixValveOpen;
             uint16_t Economy;
         } MixedCircuit;
 
