@@ -86,6 +86,8 @@ struct CeraValues
     double FeedSetpoint = 0.00F;
     //-- Current Feed Temperature
     double FeedCurrent = 0.00F;
+    //-- Mix Valve Opening in Percent
+    double MixValveOpen = 100.0F;
   } MixedCircuit;
 
   //-- Fallback Values
