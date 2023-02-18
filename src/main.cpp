@@ -202,8 +202,10 @@ void loop()
   SetDateTime();
 
   //——————————————————————————————————————————————————————————————————————————————
-  // Actions performed every second
+  // Actions performed every second 
+  //--> Auskommentiert, weil TA270 angeschlossen und dies zu Störungen führt 
   //——————————————————————————————————————————————————————————————————————————————
+  /*
   runEverySeconds(1)
   {
     // Ensure that we are connected to MQTT
@@ -221,7 +223,8 @@ void loop()
       }
     }
   }
-
+  */
+  runEverySeconds(1) {reconnectMqtt(); OverrideControl = false;} // Ersatzmaßnahme fürs Auskommentieren
   //——————————————————————————————————————————————————————————————————————————————
   // Control Actions
   //——————————————————————————————————————————————————————————————————————————————
