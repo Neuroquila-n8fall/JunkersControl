@@ -58,6 +58,8 @@ struct Configuration
             char StatusRequest[255];
             char Boost[255];
             char FastHeatup[255];
+            char MixedCircuitValues[255];
+            char MixedCircuitParameters[255];
         } Topics;
 
     } Mqtt;
