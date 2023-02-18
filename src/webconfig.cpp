@@ -638,6 +638,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
+    CAN_Addresses_MixedCircuit["MixValveOpen"] = IntToHex(configuration.CanAddresses.MixedCircuit.MixValveOpen);
     CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
 
     sendJson(doc, request);
@@ -693,6 +694,7 @@ void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     configuration.CanAddresses.MixedCircuit.Pump = convertHexString(CAN_Addresses_MixedCircuit["Pump"].as<const char *>());                 // "0x404"
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = convertHexString(CAN_Addresses_MixedCircuit["FeedSetpoint"].as<const char *>()); // "0x405"
     configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char *>());   // "0x440"
+    configuration.CanAddresses.MixedCircuit.MixValveOpen = convertHexString(CAN_Addresses_MixedCircuit["MixValveOpen"].as<const char *>());   // "0x441"
     configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char *>());           // "0x407"
 
     WriteConfiguration();
