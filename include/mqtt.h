@@ -64,6 +64,14 @@ struct CommandedValues
         int SetPoint = 40.0F;
     } HotWater;
 
+    struct MixedCircuit_
+    {
+        bool PumpActive = false;
+        bool Economy = false;
+        double FeedSetpoint = 40.0F;
+        double FeedCurrent = 40.0F; 
+        double MixValveOpen = 100;
+    } MixedCircuit;
 };
 
 extern CommandedValues commandedValues;
