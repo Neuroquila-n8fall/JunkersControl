@@ -413,6 +413,55 @@ void PublishWaterTemperatures()
   }
 }
 
+void PublishMixedCircuitTemperaturesAndStatus()
+{
+  ShowActivityLed();
+  /* Example JSON
+    {
+      "PumpActive": true,
+      "Economy": false,
+      "FeedSetpoint": 10.10,
+      "FeedCurrent": 20.00,
+      "MixValveOpen": true,
+    }
+  */
+
+  StaticJsonDocument<384> doc;
+  JsonObject jsonObj = doc.to<JsonObject>();
+
+  // Create a parent block for HA
+  if (configuration.HomeAssistant.Enabled)
+  {
+    jsonObj = doc.createNestedObject("MixedCircuit");
+  }
+
+  jsonObj["PumpActive"] = boolToString(ceraValues.MixedCircuit.PumpActive);
+  jsonObj["Economy"] = boolToString(ceraValues.MixedCircuit.Economy);
+  jsonObj["FeedSetpoint"] = ceraValues.MixedCircuit.FeedSetpoint;
+  jsonObj["FeedCurrent"] = ceraValues.MixedCircuit.FeedCurrent;
+  jsonObj["MixValveOpen"] = ceraValues.MixedCircuit.MixValveOpen;
+  
+  // Mute Flag Set. Don't send message.
+  if (MUTE_MQTT == 1)
+    return;
+
+  // Publish Data on MQTT
+  char buffer[768];
+  size_t n = serializeJson(doc, buffer);
+
+  // Send to HA state topic or the configured topic, when HA is disabled.
+  if (configuration.HomeAssistant.Enabled)
+  {
+    String topic = configuration.HomeAssistant.StateTopic + "MixedCircuit/state";
+    client.publish(topic.c_str(), buffer, n);
+  }
+  else
+  {
+
+    client.publish(configuration.Mqtt.Topics.MixedCircuitValues, buffer, n);
+  }
+}
+
 void PublishAuxiliaryTemperatures()
 {
   ShowActivityLed();
