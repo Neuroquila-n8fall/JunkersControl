@@ -14,7 +14,10 @@ CeraValues ceraValues;
 //   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
 double CalculateFeedTemperature()
 {
-
+    // Use the reference temperature for outside by user preference.
+    double outsideTemperature = configuration.Features.UseAuxiliaryOutsideTempReference ? commandedValues.Heating.AuxiliaryTemperature : ceraValues.General.OutsideTemperature;
+    String overrideOt = configuration.Features.UseAuxiliaryOutsideTempReference ? "YES" : "NO";
+    Log.printf("Use External Temperature Reference: %s. OT is %.2f", overrideOt, outsideTemperature);
     // Map the current ambient temperature to the desired feed temperature:
     //         Ambient Temperature input, Endpoint i.e. 25°, Base Point i.e. -15°, Minimum Temperature at 25° i.e. 10°, Maximum Temperature at -15° i.e. maximum feed temperature the heating is capable of.
     if (!commandedValues.Heating.Active)
@@ -66,7 +69,7 @@ double CalculateFeedTemperature()
 
             // Map outside temperature beginning at basepoint to endpoint, to 0 and the adaption value
             // This means that at commandedValues.Heating.BasepointTemperature the adaption will equal commandedValues.Heating.FeedAdaption and 0 when OutsideTemperature equals commandedValues.Heating.EndpointTemperature
-            double dynamicAdaption = map_Generic(ceraValues.General.OutsideTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.EndpointTemperature, 0, commandedValues.Heating.FeedAdaption);
+            double dynamicAdaption = map_Generic(outsideTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.EndpointTemperature, 0, commandedValues.Heating.FeedAdaption);
             // This will map the current opening from the possible range (0 to commandedValues.Heating.MaxValveOpening) to the defined temperature range, starting from the "anti freeze" temp added with the adaption value.
             scaledTemp = map_Generic(commandedValues.Heating.ValveOpening, 0, commandedValues.Heating.MaxValveOpening, commandedValues.Heating.MinimumFeedTemperature + dynamicAdaption, ceraValues.Heating.FeedMaximum);
             if (configuration.General.Debug)
@@ -92,7 +95,7 @@ double CalculateFeedTemperature()
     }
 
     // Map Value
-    double linearTemp = map_Generic(ceraValues.General.OutsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum);
+    double linearTemp = map_Generic(outsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum);
 
     // Dynamic Adaption Feature. Only active when fast heatup is inactive!
     if (commandedValues.Heating.DynamicAdaption && !commandedValues.Heating.FastHeatup)
@@ -185,7 +188,7 @@ double CalculateFeedTemperature()
 
     if (configuration.General.Debug)
     {
-        Log.printf("DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f\r\n", ceraValues.General.OutsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
+        Log.printf("DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f\r\n", outsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
     }
     return halfRounded;
 }

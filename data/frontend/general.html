@@ -39,6 +39,12 @@
                                     <input class="form-check-input" type="checkbox" role="switch" id="auxvalues">
                                     <label class="form-check-label" for="auxvalues">Enable processing and transmission of external temperature sensors</label>
                                 </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="overrideot">
+                                    <label class="form-check-label" for="overrideot">Use your own outside temperature reference instead of that of the heating.</label>
+                                    <span id="overrideOtHelpBlock" class="form-text text-muted">This will use the value from 'AuxiliaryTemperature' found on the heating parameters topic 
+                                        instead of the readings from the thermistor that may or may not be attached to your heating.</span>
+                                </div>
                             </div>
                             <div class="mb-3 row">
                                 <label class="col-sm-2 col-form-label" for="tz">Timezone (NTP)</label>
