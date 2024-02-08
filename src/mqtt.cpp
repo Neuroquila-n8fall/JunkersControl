@@ -13,6 +13,8 @@
 PubSubClient client(espClient);
 
 CommandedValues commandedValues;
+String TopicBuf;
+String PayloadBuf;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
@@ -45,6 +47,7 @@ void reconnectMqtt()
       {
         SetupAutodiscovery(HaSensorsFileName);
         SetupAutodiscovery(HaBinarySensorsFileName);
+        SetupAutodiscovery(HaNumbersFileName);
       }
     }
     else
