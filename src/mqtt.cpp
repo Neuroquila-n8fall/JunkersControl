@@ -91,51 +91,53 @@ void callback(char *topic, byte *payload, unsigned int length)
 {
   ShowActivityLed();
   payload[length] = '\0';
-  // Check if the payload translates to a valid string.
-  PayloadBuf = String((char *)payload);
-  if (!PayloadBuf)
+  String payloadBuf = String((char *)payload);
+  if (!payloadBuf)
   {
     return;
   }
-
-  TopicBuf = topic;
-
-  // Command Topics for HA auto discovery.
-  if (TopicBuf.endsWith(F("/set")))
-  {
-    WriteToConsoles("Received SET Topic: ");
-    WriteToConsoles(TopicBuf);
-    WriteToConsoles("\r\n");
-    // Remove prefixes
-    TopicBuf.replace(configuration.HomeAssistant.AutoDiscoveryPrefix + "/","");
-    TopicBuf.replace(configuration.HomeAssistant.DeviceId + "/","");
-    // Try to get the category
-    String category = TopicBuf.substring(0,TopicBuf.indexOf('/'));
-    category.replace("/","");
-    // Remove Category from string
-    TopicBuf.replace(category,"");
-    TopicBuf.replace(F("/set"),"");
-    String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length());
-    parameterName.replace(F("/"),"");
-
-    WriteToConsoles("Received Values for Category: ");
-    WriteToConsoles(category);
-    WriteToConsoles(" Parameter Name: ");
-    WriteToConsoles(parameterName);
-    WriteToConsoles(" Payload: ");
-    WriteToConsoles(PayloadBuf);
-    WriteToConsoles("\r\n");
-    
-    // Setting Values coming from HA.
-    // NOTE: This is all hardcoded on purpose as we have no means of determining which variable is targeted
-    if(category == "Heating")
-    {
-      if(parameterName == "BoostDuration")
-      {
-
-      }
-    }
-  }
+  
+  /*
+  NOTE: This is supposed to be in the HA branch.
+  */
+  //TopicBuf = topic;
+//
+  //// Command Topics for HA auto discovery.
+  //if (TopicBuf.endsWith(F("/set")))
+  //{
+  //  WriteToConsoles("Received SET Topic: ");
+  //  WriteToConsoles(TopicBuf);
+  //  WriteToConsoles("\r\n");
+  //  // Remove prefixes
+  //  TopicBuf.replace(configuration.HomeAssistant.AutoDiscoveryPrefix + "/","");
+  //  TopicBuf.replace(configuration.HomeAssistant.DeviceId + "/","");
+  //  // Try to get the category
+  //  String category = TopicBuf.substring(0,TopicBuf.indexOf('/'));
+  //  category.replace("/","");
+  //  // Remove Category from string
+  //  TopicBuf.replace(category,"");
+  //  TopicBuf.replace(F("/set"),"");
+  //  String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length());
+  //  parameterName.replace(F("/"),"");
+//
+  //  WriteToConsoles("Received Values for Category: ");
+  //  WriteToConsoles(category);
+  //  WriteToConsoles(" Parameter Name: ");
+  //  WriteToConsoles(parameterName);
+  //  WriteToConsoles(" Payload: ");
+  //  WriteToConsoles(PayloadBuf);
+  //  WriteToConsoles("\r\n");
+  //  
+  //  // Setting Values coming from HA.
+  //  // NOTE: This is all hardcoded on purpose as we have no means of determining which variable is targeted
+  //  if(category == "Heating")
+  //  {
+  //    if(parameterName == "BoostDuration")
+  //    {
+//
+  //    }
+  //  }
+  //}
   
 
   // Status Requested
@@ -147,7 +149,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
+      Log.printf("[Status Request] Error Processing JSON: %payloadBuf\r\n", error.c_str());
       return;
     }
     /* Example JSON:
@@ -226,7 +228,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
+      Log.printf("[Heating Parameters] Error Processing JSON: %payloadBuf\r\n", error.c_str());
       return;
     }
 
@@ -279,7 +281,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
       if (error)
       {
-        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
+        Log.printf("[Water Parameters] Error Processing JSON: %payloadBuf\r\n", error.c_str());
         return;
       }
 
@@ -291,7 +293,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   // On-Demand Boost
   if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
   {
-    int i = s.toInt();
+    int i = payloadBuf.toInt();
     commandedValues.Heating.Boost = i == 1;
     commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
     SetFeedTemperature();
@@ -300,7 +302,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Fast Heatup
   if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
   {
-    int i = s.toInt();
+    int i = payloadBuf.toInt();
     commandedValues.Heating.FastHeatup = i == 1;
     commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
     SetFeedTemperature();
