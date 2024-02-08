@@ -7,6 +7,7 @@
 
 extern const char *HaSensorsFileName;
 extern const char *HaBinarySensorsFileName;
+extern const char *HaNumbersFileName;
 
 extern void SetupAutodiscovery(const char* fileName);
 extern void sendMQTTTemperatureDiscoveryMsg();

@@ -13,6 +13,8 @@
 PubSubClient client(espClient);
 
 CommandedValues commandedValues;
+String TopicBuf;
+String PayloadBuf;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
@@ -45,6 +47,7 @@ void reconnectMqtt()
       {
         SetupAutodiscovery(HaSensorsFileName);
         SetupAutodiscovery(HaBinarySensorsFileName);
+        SetupAutodiscovery(HaNumbersFileName);
       }
     }
     else
@@ -88,11 +91,52 @@ void callback(char *topic, byte *payload, unsigned int length)
 {
   ShowActivityLed();
   payload[length] = '\0';
-  String s = String((char *)payload);
-  if (!s)
+  // Check if the payload translates to a valid string.
+  PayloadBuf = String((char *)payload);
+  if (!PayloadBuf)
   {
     return;
   }
+
+  TopicBuf = topic;
+
+  // Command Topics for HA auto discovery.
+  if (TopicBuf.endsWith(F("/set")))
+  {
+    WriteToConsoles("Received SET Topic: ");
+    WriteToConsoles(TopicBuf);
+    WriteToConsoles("\r\n");
+    // Remove prefixes
+    TopicBuf.replace(configuration.HomeAssistant.AutoDiscoveryPrefix + "/","");
+    TopicBuf.replace(configuration.HomeAssistant.DeviceId + "/","");
+    // Try to get the category
+    String category = TopicBuf.substring(0,TopicBuf.indexOf('/'));
+    category.replace("/","");
+    // Remove Category from string
+    TopicBuf.replace(category,"");
+    TopicBuf.replace(F("/set"),"");
+    String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length());
+    parameterName.replace(F("/"),"");
+
+    WriteToConsoles("Received Values for Category: ");
+    WriteToConsoles(category);
+    WriteToConsoles(" Parameter Name: ");
+    WriteToConsoles(parameterName);
+    WriteToConsoles(" Payload: ");
+    WriteToConsoles(PayloadBuf);
+    WriteToConsoles("\r\n");
+    
+    // Setting Values coming from HA.
+    // NOTE: This is all hardcoded on purpose as we have no means of determining which variable is targeted
+    if(category == "Heating")
+    {
+      if(parameterName == "BoostDuration")
+      {
+
+      }
+    }
+  }
+  
 
   // Status Requested
   if (strcmp(topic, configuration.Mqtt.Topics.StatusRequest) == 0)

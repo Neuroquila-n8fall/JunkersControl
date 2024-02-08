@@ -1,6 +1,5 @@
-# This script sets all parameters by sending a json formatted file to the broker
-mqtt_set_heizungsparameter:
-  alias: Heizungsparameter setzen
+mqtt_set_heatingparameters:
+  alias: Set Parameters for Heating
   icon: mdi:send
   sequence:
   - service: mqtt.publish
