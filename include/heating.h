@@ -35,7 +35,7 @@ struct CeraValues
     //-- Max. possible water temperature -or- target temperature when running in heating Buffer mode
     double BufferWaterTemperatureMaximum = 0.0F;
     //-- Current Water Temperature (Buffer Mode)
-    double BufferWaterTemperatureCurrent = 0.0F;
+    double BufferWaterCurrentTemperature = 0.0F;
     //-- Circulation Pump Active
     bool PumpActive = false;
     //-- Seasonal Mode: True = Summer | False = Winter
@@ -65,7 +65,7 @@ struct CeraValues
     //-- Setpoint (Target Temperature) for DHW
     double SetPoint = 40.0F;
     //-- The currently reported temperature of the DHW circuit
-    double TemperatureCurrent = 0.00F;
+    double CurrentTemperature = 0.00F;
     //-- Whether this installation utilizes a buffer(or battery)
     bool BufferMode = false;
     //-- Hot Water "now" setting (means: Instant heatup but is referred to as "now" on TAxxx and the manual).

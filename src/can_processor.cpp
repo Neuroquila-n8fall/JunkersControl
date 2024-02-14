@@ -170,7 +170,7 @@ void processCan()
     if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
     {
       temp = Message.data[0] / 2.0;
-      ceraValues.Heating.BufferWaterTemperatureCurrent = temp;
+      ceraValues.Heating.BufferWaterCurrentTemperature = temp;
     }
 
     //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
@@ -188,7 +188,7 @@ void processCan()
     if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
     {
       temp = Message.data[1] / 2.0;
-      ceraValues.Hotwater.TemperatureCurrent = temp;
+      ceraValues.Hotwater.CurrentTemperature = temp;
     }
 
     //[Controller] - Error Byte

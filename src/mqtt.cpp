@@ -386,7 +386,7 @@ void PublishWaterTemperatures()
   }
 
   jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
-  jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
+  jsonObj["Current"] = ceraValues.Hotwater.CurrentTemperature;
   jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
   jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
   jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
