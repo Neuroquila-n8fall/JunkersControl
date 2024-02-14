@@ -15,7 +15,7 @@
 #endif
 //-- Set INT Pin via Build Flag
 #ifndef MCP2515_INT
-#define MCP2515_INT 17
+#define MCP2515_INT 26
 #endif
 
 
