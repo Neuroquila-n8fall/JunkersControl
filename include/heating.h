@@ -33,9 +33,9 @@ struct CeraValues
     //-- Minimum Feed Temperature as reported by the boiler
     double FeedMinimum = 10.0F;
     //-- Max. possible water temperature -or- target temperature when running in heating Buffer mode
-    double BufferWaterTemperatureMaximum = 0.0F;
+    double BufferWaterTemperatureMaximum = 0.00F;
     //-- Current Water Temperature (Buffer Mode)
-    double BufferWaterCurrentTemperature = 0.0F;
+    double BufferWaterCurrentTemperature = 0.00F;
     //-- Circulation Pump Active
     bool PumpActive = false;
     //-- Seasonal Mode: True = Summer | False = Winter

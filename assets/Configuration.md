@@ -251,7 +251,7 @@ Following the timestamp when the message has been received, you will find the ID
                 "SetpointTemperature": "0x203",
                 "MaxTemperature": "0x204",
                 "CurrentTemperature": "0x205",
-                "Now": "0x254",
+                "Now": "0x205",
                 "BufferOperation": "0x20B",
                 "ContinousFlow": {
                     "SetpointTemperature": "0x255"
