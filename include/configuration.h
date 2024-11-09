@@ -42,7 +42,7 @@ struct Configuration
 
     struct Mqtt_
     {
-        char Server[15];    // "192.168.1.123"
+        char Server[16];    // "192.168.123.123"
         int Port = 1883;           // "Default: 1883"
         char User[255];     // "user"
         char Password[255]; // "pass"
