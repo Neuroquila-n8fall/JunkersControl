@@ -39,7 +39,7 @@ void CreateAndPublishAutoDiscoverySensorJson(
     doc["val_tpl"] = value_template;
 
     size_t n = serializeJson(doc, buffer);
-    client.publish(configuration.HomeAssistant.StateTopic.c_str(), buffer, n);
+    client.publish(discoveryTopic.c_str(), buffer, n, true);
 }
 
 void SetupAutodiscoveryForAuxSensors()
