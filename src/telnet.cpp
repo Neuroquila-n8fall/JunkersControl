@@ -19,13 +19,14 @@ void CheckForConnections()
     {
       Serial.println("Telnet Connection rejected");
       //Reject connection.
-      TelnetServer.available().stop();
+      WiFiClient rejectedClient = TelnetServer.accept();
+      rejectedClient.stop();
     }
     else
     {
       Serial.println("Telnet Connection accepted");
       //Accept
-      TelnetRemoteClient = TelnetServer.available();
+      TelnetRemoteClient = TelnetServer.accept();
       TelnetRemoteClient.println("——————————————————————————");
       TelnetRemoteClient.printf("You are connected to: %s (%s)\r\n", configuration.Wifi.Hostname, WiFi.localIP().toString().c_str());
       TelnetRemoteClient.println("——————————————————————————");

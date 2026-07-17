@@ -1,77 +1,76 @@
+name: Create Release
+
 on:
   push:
     tags:
-      - 'v*'
-      
+      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to package
+        required: true
+        type: string
 
-name: Create Release
+permissions:
+  contents: write
 
 jobs:
   create_release:
-    name: Create Release
+    name: Build and create draft release
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Check out release tag
+        uses: actions/checkout@v4
         with:
-          submodules: 'true'
-      - name: Create Version Header
-        run: |
-          cat <<EOF > version.h
-          #ifndef VERSION
-          #define VERSION ${{github.ref_name}}
-          #endif
-          EOF
+          ref: ${{ env.RELEASE_TAG }}
+
       - name: Set up Python
-        uses: actions/setup-python@v1
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install platformio
-      # It is important to first install the libraries before compiling, since otherwise compilation might fail to find the just-installed libraries
-      - name: Install platformIO libraries
-        run: pio lib install
-      - name: Build Production Image
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install PlatformIO
+        run: python -m pip install --upgrade pip platformio
+
+      - name: Create version header
+        shell: bash
+        run: printf '#ifndef VERSION\n#define VERSION %s\n#endif\n' "$RELEASE_TAG" > version.h
+
+      - name: Verify release contains no device configuration
+        shell: bash
+        run: test ! -e data/configuration.json
+
+      - name: Build production firmware
         run: pio run -e github
-      - name: Archive Firmware
-        uses: actions/upload-artifact@v3
-        with:
-          name: firmware.bin
-          path: .pio/build/github/firmware.bin
-      - name: Build Production FS Image
+
+      - name: Build production filesystem
         run: pio run -e github -t buildfs
-      - name: Archive Filesystem
-        uses: actions/upload-artifact@v3
+
+      - name: Verify filesystem staging contains only the configuration template
+        shell: bash
+        run: cmp assets/Templates/Configurations/configuration.json data_build/configuration.json
+
+      - name: Archive release binaries
+        uses: actions/upload-artifact@v4
         with:
-          name: littlefs.bin
-          path: .pio/build/github/littlefs.bin  
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+          name: JunkersControl-${{ env.RELEASE_TAG }}
+          path: |
+            .pio/build/github/firmware.bin
+            .pio/build/github/littlefs.bin
+          if-no-files-found: error
+
+      - name: Create draft GitHub release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: true
-          prerelease: false
-      - name: Upload Release Asset Firmware
-        id: upload-release-asset-fw 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: .pio/build/github/firmware.bin
-          asset_name: firmware.bin
-          asset_content_type: application/octet-stream
-      - name: Upload Release Asset Filesystem
-        id: upload-release-asset-fs 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: .pio/build/github/littlefs.bin
-          asset_name: littlefs.bin
-          asset_content_type: application/octet-stream
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$RELEASE_TAG" \
+            ".pio/build/github/firmware.bin#Firmware" \
+            ".pio/build/github/littlefs.bin#LittleFS filesystem" \
+            --draft \
+            --verify-tag \
+            --title "Release $RELEASE_TAG" \
+            --notes-from-tag

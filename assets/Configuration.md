@@ -2,7 +2,17 @@
 
 ## Template
 
-Find the [Configuration Template](Templates/Configurations/configuration.json) and copy it to the `data` folder first!
+Start with the [Configuration Template](Templates/Configurations/configuration.json), customize it, and upload it as `/configuration.json` through the web file manager. Then click **Reload Configuration** to validate and activate the uploaded file.
+
+Do not store a real configuration in the repository's `data` folder. Device configurations commonly contain WiFi and MQTT credentials. The filesystem pipeline copies the credential-free template into the image as `/configuration.json` instead.
+
+## Saving, uploading, and reloading
+
+Configuration forms in the web UI save directly to `/configuration.json`. Saves use a temporary file, verification, and a backup so an incomplete write does not replace the last valid configuration.
+
+Uploading a complete `/configuration.json` does not merge it with the current in-memory values. Use **Reload Configuration** in the file manager after the upload. If the file is invalid, the controller keeps the current configuration and reports the error.
+
+Before replacing the LittleFS filesystem, download `/configuration.json`. Upload the backup and reload it after the filesystem update.
 
 ### Wifi
 
@@ -16,7 +26,7 @@ This block is for configuring the Wifi network your controller should connect to
     },
 ```
 
-Note: The `Hostname` setting is bugged due to some problem with the framework. The device will be called `esp-<mac>` until the problem has been solved.
+The hostname is applied before the WiFi connection is started. If local hostname resolution is unavailable on your network, connect using the address assigned by DHCP.
 
 ### MQTT
 
@@ -111,18 +121,34 @@ This block is for time related configuration
 
 ```json
     "Time": {
-        "Timezone": "Europe/Berlin"
-    },
+        "Timezone": "Europe/Berlin",
+        "PosixTimezone": "CET-1CEST,M3.5.0,M10.5.0/3"
+    }
 ```
 
-###### Timezone
+`Timezone` identifies the configured region. `PosixTimezone` supplies local UTC-offset and daylight-saving rules without a network lookup, allowing the fail-safe schedule to keep local time after internet loss.
+
+### Offline fail-safe
 
 ```json
-        "Timezone": "Europe/Berlin"
+    "FailSafe": {
+        "Enabled": true,
+        "CommandTimeoutSeconds": 300,
+        "StartHour": 5,
+        "StartMinute": 30,
+        "StopHour": 23,
+        "StopMinute": 30,
+        "HeatWhenTimeUnknown": true,
+        "BasepointTemperature": -10.0,
+        "EndpointTemperature": 31.0,
+        "MinimumFeedTemperature": 10.0,
+        "MaximumFeedTemperature": 55.0
+    }
 ```
 
-This lets you configure the timezone you're in.
-See [List of Timezones on Wikipedia](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+The command timeout is a lease on remote heating control. It is refreshed only by a valid heating, boost, or fast-heatup command. When it expires, the controller clears remote overrides and follows the daily start/stop window using the configured curve and hard maximum. MQTT reconnection does not end fail-safe mode; a fresh valid command does.
+
+The schedule uses boiler-reported time first, then locally synchronized time. With no valid clock it applies `HeatWhenTimeUnknown`: `true` holds the minimum feed temperature, while `false` disables heating.
 
 ### General Settings
 
@@ -161,7 +187,7 @@ Example Output:
 [18-Sep-22 10:24:46.540] - CAN: [0x20D] Data:   0x18 (24)
 [18-Sep-22 10:24:47.540] - CAN: [0x209] Data:   0x00 (0)
 [18-Sep-22 10:24:48.040] - CAN: [0x20A] Data:   0x00 (0)
-DEBUG STEP CHAIN #2: Heating is ON, Fallback is NO, Feed Setpoint is 10.00, INT representation (half steps) is 20
+DEBUG STEP CHAIN #2: Heating is ON, Fail-safe is NO, Feed Setpoint is 10.00, INT representation (half steps) is 20
 [18-Sep-22 10:24:51.040] - CAN: [0x201] Data:   0x25 (37)
 [18-Sep-22 10:24:52.540] - CAN: [0x20D] Data:   0x18 (24)
 [18-Sep-22 10:24:53.540] - CAN: [0x209] Data:   0x00 (0)
@@ -178,7 +204,7 @@ DEBUG STEP CHAIN #0: Heating Economy: 1
 [18-Sep-22 10:25:05.540] - CAN: [0x209] Data:   0x00 (0)
 [18-Sep-22 10:25:06.040] - CAN: [0x20A] Data:   0x00 (0)
 DEBUG: Date and Time DOW:7 H:10 M:25
-DEBUG STEP CHAIN #2: Heating is ON, Fallback is NO, Feed Setpoint is 10.00, INT representation (half steps) is 20
+DEBUG STEP CHAIN #2: Heating is ON, Fail-safe is NO, Feed Setpoint is 10.00, INT representation (half steps) is 20
 [18-Sep-22 10:25:09.040] - CAN: [0x201] Data:   0x25 (37)
 [18-Sep-22 10:25:10.240] - CAN: [0x204] Data:   0x14 (20)
 [18-Sep-22 10:25:10.540] - CAN: [0x20D] Data:   0x18 (24)

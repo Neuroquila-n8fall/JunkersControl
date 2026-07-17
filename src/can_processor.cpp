@@ -7,6 +7,7 @@
 #include <telnet.h>
 #include <timesync.h>
 #include <configuration.h>
+#include <failsafe.h>
 
 
 //-- Set CS Pin via Build Flag
@@ -36,7 +37,7 @@ void SetFeedTemperature()
   int feedSetpoint;
 
   // Get raw Setpoint
-  commandedValues.Heating.CalculatedFeedSetpoint = CalculateFeedTemperature();
+  commandedValues.Heating.CalculatedFeedSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
 
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
@@ -93,7 +94,9 @@ void setupCan()
 void processCan()
 {
   CANMessage Message;
-  if (can.receive(Message))
+  // Drain the receive queue on every pass. Network maintenance must never
+  // leave old boiler states sitting behind a single-frame-per-loop bottleneck.
+  while (can.receive(Message))
   {
     unsigned long curMillis = millis();
 
@@ -107,14 +110,12 @@ void processCan()
     {
       controllerMessageTimer = curMillis;
 
-      // Bail out if we're already disabled.
-      if (!OverrideControl)
-        return;
-
-      // Switch off override if another controller sends messages on the network.
-      OverrideControl = false;
-
-      Log.println("Detected another controller on the network. Disabling Override");
+      if (OverrideControl)
+      {
+        // Switch off override if another controller sends messages on the network.
+        OverrideControl = false;
+        Log.println("Detected another controller on the network. Disabling Override");
+      }
     }
 
     /*************************************
@@ -318,6 +319,10 @@ void processCan()
       ceraValues.Time.DayOfWeek = Message.data[0];
       ceraValues.Time.Hours = Message.data[1];
       ceraValues.Time.Minutes = Message.data[2];
+      ceraValues.Time.HasValidTime = Message.data[0] >= 1 && Message.data[0] <= 7 &&
+                                     Message.data[1] <= 23 && Message.data[2] <= 59;
+      if (ceraValues.Time.HasValidTime)
+        ceraValues.Time.LastUpdateMillis = millis();
     }
 
     //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)

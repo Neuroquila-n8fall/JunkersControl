@@ -12,12 +12,9 @@ bool AlarmIsSet = false;
 //Sync using NTP, if clock is off
 void SyncTimeIfRequired()
 {
-  //Sync Time if required
-  timeStatus_t timeStat = timeStatus();
-  if (timeStat != timeSet)
-  {
-    waitForSync();
-  }
+  // ezTime progresses through events() in the cooperative main loop. Never
+  // call waitForSync() here: without internet its default timeout is infinite
+  // and would stop CAN processing.
 }
 
 //Returns TRUE if the clock is on point and false if it requires calibration

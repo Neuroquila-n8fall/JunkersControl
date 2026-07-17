@@ -24,7 +24,7 @@ void CreateAndPublishAutoDiscoverySensorJson(
     // This is the discovery topic for this specific sensor
     String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/sensor/" + configuration.HomeAssistant.DeviceId + "/temperature/config";
 
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     char buffer[256];
 
     doc["name"] = name;
@@ -61,13 +61,6 @@ void SetupAutodiscoveryForAuxSensors()
 
 void SetupAutodiscovery(const char *fileName)
 {
-    // Init SPIFFS
-    if (!LittleFS.begin())
-    {
-        Log.println("SPIFFS Filesystem not ready.");
-        return;
-    }
-
     if (!LittleFS.exists(fileName))
     {
         Log.println("HA Autodiscovery file could not be found. Please upload it first.");
@@ -82,9 +75,10 @@ void SetupAutodiscovery(const char *fileName)
         return;
     }
 
-    StaticJsonDocument<4096> doc;
+    JsonDocument doc;
 
     DeserializationError error = deserializeJson(doc, file);
+    file.close();
 
     JsonObject sensors = doc.as<JsonObject>();
 
@@ -179,6 +173,4 @@ void SetupAutodiscovery(const char *fileName)
     if (configuration.General.Debug)
         Log.println("----- HA AD Config END -----///");
 
-    // Close LittleFS.
-    LittleFS.end();
 }

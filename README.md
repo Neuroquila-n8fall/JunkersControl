@@ -116,23 +116,24 @@ esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of
 
 The important part is the addresses `0x10000` for the firmware and `0x307000`for the filesystem.
 
+Release filesystem images contain the credential-free configuration template as `/configuration.json`; they never contain a developer's device-specific configuration. Its empty WiFi credentials make a new controller start the `CERASMARTER` access point for provisioning through the web UI.
+
 If everything went well you should see the following output on the console:
 ```log
 Press the "BOOT" button within the next 5 seconds to enable Setup Mode!
 Setup Mode not enabled. You can enable it at every time by pressing the "BOOT" button once.
-[  5047][E][vfs_api.cpp:104] open(): /littlefs/configuration.json does not exist, no permits for creation
-Configuration file could not be found. Please upload it first.
-Unable to read configuration.
 Invalid WiFi configuration. Launching AP mode.
 WiFi AP launched. Find me @ 192.168.4.1
-Can't connect to MQTT broker. [No Network]
-Can't connect to MQTT broker. [No Network]
-Can't connect to MQTT broker. [No Network]
-Can't connect to MQTT broker. [No Network]
-Can't connect to MQTT broker. [No Network]
 ```
 
-Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json)
+Startup reports filesystem problems separately:
+
+- **LittleFS could not be mounted or formatted** indicates a flash-partition or hardware problem.
+- **LittleFS was formatted and is empty** means the partition recovered but `littlefs.bin` must be uploaded again.
+- **Web frontend is missing** means LittleFS exists, but the filesystem image is absent or incomplete.
+- **Configuration is missing or invalid** starts the setup access point when the frontend is available, so the configuration can be repaired through the web UI.
+
+Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json). After uploading `/configuration.json` in the file manager, use **Reload Configuration** to validate and activate it without a power cycle.
 
 If MDNS is working properly on your end, you will be able to open the web UI using http://cerasmarter/
 
@@ -142,11 +143,11 @@ If MDNS is working properly on your end, you will be able to open the web UI usi
 Have values where you need them, control on demand. You are able to actively steer the heating towards certain temperatures or modes of operation by publishing and subscribing to MQTT topics from within your favorite MQTT broker (Mosquitto is recommended).
 
 #### Where?
-The topics are described inside `/data/configuration.json` or `Configuration > MQTT` on the web UI.
+The topics are described inside `/configuration.json` on the device or under `Configuration > MQTT` in the web UI.
 
 #### How?
 
-To send parameters to the heating controller, you just have to form a JSON and send it to the topic you defined in `/data/configuration.json`
+To send parameters to the heating controller, you just have to form a JSON and send it to the topic you defined in `/configuration.json`.
 
 The `MQTT` section has everything and this is where you define the topics:
 
@@ -222,7 +223,7 @@ See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" t
 ### Night/Economy Mode
 There are two ways to switch the economy mode.
 #### Option #1 (MQTT):
- Set `Enabled` to `false` or `0` using the Parameters JSON file which you send to the Heating Parameters Topic defined in `/data/configuration.json`
+ Set `Enabled` to `false` or `0` using the Parameters JSON file which you send to the Heating Parameters Topic defined in `/configuration.json`.
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
 ```json
@@ -262,42 +263,32 @@ Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTem
 
 ### Fallback and Failsafe
 
-The parameters defined within `heating.h` will become active when the connection to the MQTT broker has been lost.
+The controller starts in local fail-safe mode after every boot and leaves it only after a recognized heating command arrives. That command refreshes the `CommandTimeoutSeconds` lease; broker reconnection alone does not leave fail-safe mode.
 
-```c++
-  //-- Fallback Values
-  //TODO: Should be configurable using configuration.json
-  struct FallBack_
-  {
-    //-- Basepoint Temperature
-    double BasepointTemperature = -10.0F;
-    //-- Endpoint Temperature
-    double EndpointTemperature = 31.0F;
-    //-- Ambient Temperature
-    double AmbientTemperature = 17.0F;
-    //-- Minimum ("Anti Freeze") Temperature.
-    double MinimumFeedTemperature = 10.0F;
-    //-- Enforces the fallback values when set to TRUE
-    bool isOnFallback = false;
-
-    //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
-    HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
-    HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
-  } Fallback;
+```json
+"FailSafe": {
+  "Enabled": true,
+  "CommandTimeoutSeconds": 300,
+  "StartHour": 5,
+  "StartMinute": 30,
+  "StopHour": 23,
+  "StopMinute": 30,
+  "HeatWhenTimeUnknown": true,
+  "BasepointTemperature": -10.0,
+  "EndpointTemperature": 31.0,
+  "MinimumFeedTemperature": 10.0,
+  "MaximumFeedTemperature": 55.0
+}
 ```
 
-The `HeatingScheduleEntry` represents a very basic timeslot:
-Trigger Hour, Trigger Minute, Day Of Week, Heating Enabled.
-`Day Of Week` is currently unused.
+On entry, boost, fixed-setpoint override, fast heatup, valve scaling, dynamic adaptation, and manual adaptation are cleared. Between the daily start and stop times the configured heating curve is used and capped at `MaximumFeedTemperature`. Outside the window heating is disabled. If neither boiler time nor synchronized local time is available, `HeatWhenTimeUnknown` selects between minimum-temperature heating and heating disabled.
 
-The aforementioned values say: 
-- Turn on the heating every day at 5:30
-- Turn off the heating every day at 23:30
+WiFi, MQTT, and NTP recovery are cooperative and bounded; they do not own or suspend the CAN control loop.
 
 
 ### Automatic Controller Detection
 
-Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `BusMessageTimeOut` within `/data/configuration.json`) it will resume control and the `Override` flag returns to true.
+Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `BusMessageTimeOut` within `/configuration.json`) it will resume control and the `Override` flag returns to true.
 
 Example:
 ```json
@@ -320,7 +311,7 @@ The oneWire and DallasTemperature libraries are included and used to fetch addit
 
 #### Where?
 
-Configured using `/data/configuration.json` or `Configuration > Temperature Sensors` on the web UI
+Configured using `/configuration.json` on the device or `Configuration > Temperature Sensors` in the web UI.
 
 See [Auxiliary Sensors](assets/Configuration.md#auxiliary-sensors)
 
@@ -353,7 +344,7 @@ You can do your own calculations and just tell the control to set the temperatur
 
 ### Valve-based control
 
-This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `ValveScalingMaxOpening`) to the `FeedMinimum` plus `Adaption` and `FeedMaximum` (Reported on the topic defined at `HeatingValues` within [Configuration](data/configuration.json.template#L13))
+This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `ValveScalingMaxOpening`) to the `FeedMinimum` plus `Adaption` and `FeedMaximum` (reported on the topic defined at `HeatingValues` within the [configuration template](assets/Templates/Configurations/configuration.json)).
 This is the most demand focused function yet because if you always report the most open valve in the circuit, you end up with a very responsive system that will react on demand immediately.
 This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `DynamicAdaption` which will then add a value mapped between `FeedBaseSetpoint` and `FeedCutoff`. Next set `Adaption` according to your needs.
 
@@ -396,6 +387,11 @@ The standard "Arduino OTA" procedure is included which means you can upload the 
 
 You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
 
+- A firmware-only update preserves the existing LittleFS configuration.
+- Before uploading `littlefs.bin`, download `/configuration.json` from the file manager as a backup. Replacing the filesystem erases the active configuration and installs the credential-free template.
+- After a filesystem update, upload the backup as `/configuration.json` and click **Reload Configuration**. A successful reload activates WiFi, MQTT, CAN, auxiliary-sensor, and LED settings without requiring a power cycle. Without a backup, connect to the `CERASMARTER` setup access point and configure the template values through the web UI.
+- Configuration saves from the web UI are written atomically and verified before they replace the previous file. If validation or writing fails, the previous configuration remains available as a backup.
+
 ## Telnet Console
 
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
@@ -411,14 +407,16 @@ This project was originally specifically designed to be run alongside Home Assis
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
 
 ## Getting Started
-1) Copy [Configuration.json](assets/Templates/Configurations/configuration.json) to the `data` folder.
-2) Use this `configuration.json` to configure the project to your requirements.
-3) Upload the project
-4) Now it will format the SPIFFS filesystem.
-5) `Build Filesystem Image` and `Upload Filesystem Image` so the configuration is stored on SPIFFS
-6) It will now read this config and will reach operational status
 
-You should be able to perform OTA updates now for both application and configuration.
+1. Build and upload the firmware and LittleFS image, or install both binaries from a GitHub release.
+2. Connect to the `CERASMARTER` access point and open `http://192.168.4.1/` if no valid WiFi configuration exists yet.
+3. Configure the device through the web UI, or customize the [configuration template](assets/Templates/Configurations/configuration.json) and upload it as `/configuration.json` in the file manager.
+4. Click **Reload Configuration** after uploading a complete file. The file is validated before it becomes active.
+5. Reconnect using the configured hostname or IP address after WiFi starts.
+
+Do not place a real `configuration.json` in the repository's `data` directory when preparing releases. The filesystem build always copies the credential-free file from `assets/Templates/Configurations/configuration.json`; a device-specific file could contain WiFi and MQTT credentials.
+
+For local USB provisioning only, set `JUNKERSCONTROL_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The GitHub release workflow never sets this override and verifies that release images use the credential-free template.
 
 ### Configuration
 
@@ -438,7 +436,7 @@ WIP
 - [x] Collecting IDs and their meaning
 - [x] Getting the calculations right for the feed setpoint
 - [x] Reading and writing MQTT topics
-- [x] Fallback Mode
+- [x] Configurable offline fail-safe
 - [ ] Taking Weather conditions into account when calculating the feed temperature
 - [x] Also taking indoor temperatures into account
 - [x] Getting the timings right so it doesn't throw off the controller
@@ -446,8 +444,6 @@ WIP
 - [x] Example Configuration for Home Assistant
 - [ ] Dedicated PCB with all components in place and power supply through the controller
 - [ ] Take more intelligent decisions for feed temperatures
-- [ ] Revamp fallback mode to make use of eztime
-- [ ] Make fallback mode more flexible and configurable
 - [ ] Restructure code into reusable classes
 
 ## Special Thanks

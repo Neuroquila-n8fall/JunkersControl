@@ -13,7 +13,9 @@
 
 extern bool ReadConfiguration();
 
-extern void WriteConfiguration();
+extern bool WriteConfiguration();
+
+extern void SetConfigurationUploadPending(bool pending);
 
 extern String IntToHex(int value);
 
@@ -73,11 +75,27 @@ struct Configuration
     struct General_
     {
         char Timezone[255]; // Timezone to be used for NTP, i.e. Europe/Berlin
+        char PosixTimezone[128] = "CET-1CEST,M3.5.0,M10.5.0/3"; // Offline-capable local time rules
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
         bool Debug;            // Output debug messages, true|false
         bool Sniffing;         // Output every CAN message von the bus
     } General;
+
+    struct FailSafe_
+    {
+        bool Enabled = true;
+        unsigned long CommandTimeoutSeconds = 300;
+        int StartHour = 5;
+        int StartMinute = 30;
+        int StopHour = 23;
+        int StopMinute = 30;
+        bool HeatWhenTimeUnknown = true;
+        double BasepointTemperature = -10.0F;
+        double EndpointTemperature = 31.0F;
+        double MinimumFeedTemperature = 10.0F;
+        double MaximumFeedTemperature = 55.0F;
+    } FailSafe;
 
     struct HomeAssistant_
     {
@@ -91,10 +109,10 @@ struct Configuration
 
     struct LEDs_
     {
-        int StatusLed;  // Status LED GPIO, ex. 27
-        int WifiLed;    // Wifi Status LED GPIO, ex. 26
-        int MqttLed;    // Mqtt Led GPIO, ex. 14
-        int HeatingLed; // Heating Active LED GPIO, ex. 25
+        int StatusLed = 27;  // Status LED GPIO, ex. 27
+        int WifiLed = 26;    // Wifi Status LED GPIO, ex. 26
+        int MqttLed = 14;    // Mqtt Led GPIO, ex. 14
+        int HeatingLed = 25; // Heating Active LED GPIO, ex. 25
     } LEDs;
 
     struct CanModuleConfig_

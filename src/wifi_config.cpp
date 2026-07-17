@@ -8,6 +8,8 @@
 const int wifiRetryInterval = 30000;
 //-- Wifi Client object
 WiFiClient espClient;
+static unsigned long lastWifiAttempt = 0;
+static bool wifiWasConnected = false;
 
 
 void connectWifi()
@@ -19,45 +21,46 @@ void connectWifi()
     StartApMode();
     return;
   }
-  //(re)connect WiFi if:
-  //      - We are in STATION mode and not connected
-  //      - We are not connected and not in SetupMode
-  if (!WiFi.isConnected() && WiFi.getMode() == WIFI_MODE_STA || !WiFi.isConnected() && !SetupMode )
+  const bool connected = WiFi.isConnected();
+  if (connected)
   {
-    WiFi.disconnect();
+    if (!wifiWasConnected)
+    {
+      wifiWasConnected = true;
+      Serial.printf("WiFi connected. Address: %s\r\n", WiFi.localIP().toString().c_str());
+      if (!MDNS.begin(configuration.Wifi.Hostname))
+        Serial.println("mDNS responder could not be started.");
+    }
+
+    SyncTimeIfRequired();
+  }
+  else if (!SetupMode)
+  {
+    if (wifiWasConnected)
+      Serial.println("WiFi connection lost. Heating control remains active while reconnecting.");
+    wifiWasConnected = false;
+
+    const unsigned long now = millis();
+    if (lastWifiAttempt != 0 && now - lastWifiAttempt < wifiRetryInterval)
+      return;
+    lastWifiAttempt = now;
+
+    // Start a connection attempt and return immediately. WiFi reconnects in
+    // the ESP networking task while the main loop continues servicing CAN.
+    WiFi.disconnect(true, false);
     WiFi.setHostname(configuration.Wifi.Hostname);
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
 
     Serial.println("WiFi not connected. Reconnecting...");
 
     if(configuration.General.Debug) {
-      Serial.printf("Connecting to %s using password %s and hostname %s \r\n", configuration.Wifi.SSID,
-                    configuration.Wifi.Password, configuration.Wifi.Hostname);
+      Serial.printf("Connecting to %s using hostname %s\r\n", configuration.Wifi.SSID,
+                    configuration.Wifi.Hostname);
     }
 
-    auto prevConnectMillis = millis();
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
-    while (WiFi.waitForConnectResult() != WL_CONNECTED)
-    {
-      // Allow switching tasks
-      vTaskDelay(2);
-      // Wait 10 seconds to connect
-      if (millis() - prevConnectMillis >= 10000)
-      {
-        Serial.println("Connection Failed! Rebooting...");
-        ESP.restart();
-      }      
-    }
-
-    MDNS.begin(configuration.Wifi.Hostname);
-
-    if(configuration.General.Debug)
-    printWifiStatus();
-
   }
-
-  //Sync time
-  SyncTimeIfRequired();
 
   unsigned long currentMillis = millis();
   //Print out WiFi Status
@@ -85,7 +88,6 @@ void printWifiStatus()
       Serial.print("RSSI:\t\t");
       Serial.println(WiFi.RSSI());
 
-      myTZ.setLocation(configuration.General.Timezone);
       Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
     }
 }

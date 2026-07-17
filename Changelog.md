@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.93.4
+
+- Fixed Setup Mode incorrectly reporting that the filesystem was missing when only `configuration.json` was absent. Setup Mode now checks for the web frontend, allowing a fresh controller to start its access point and accept a configuration upload.
+- Added the credential-free configuration template to generated LittleFS images so a freshly flashed controller enters AP provisioning immediately.
+- Added distinct startup diagnostics for an unmountable filesystem, an empty filesystem, a missing web frontend, and a missing or invalid configuration.
+- Made WiFi and MQTT reconnection cooperative and bounded, and removed the infinite NTP synchronization wait from the CAN control path.
+- Fixed CAN receive queue draining, the outgoing-message interval calculation, and an uninitialized message sent during the feed-temperature step.
+- Changed the heating LED to follow the decoded burner flame state while retaining CAN-error blinking.
+- Replaced the non-functional hard-coded fallback with a configurable daily fail-safe, command lease, safe feed-temperature limits, offline timezone rules, and fresh-command recovery. Controllers boot in fail-safe mode until a recognized heating command arrives.
+
+- Updated ArduinoJson, DallasTemperature, AsyncTCP, and ESPAsyncWebServer for compatibility with the current ESP32 Arduino framework.
+- Improved WiFi startup and reconnect handling on the updated framework.
+- Made configuration saves atomic and verified, with backup recovery when a write or reload fails.
+- Fixed configuration persistence for WiFi, MQTT, MQTT topics, CAN, auxiliary sensors, and LED settings.
+- Prevented a web reboot from overwriting a newly uploaded configuration with stale in-memory values.
+- Added a **Reload Configuration** action to the file manager so an uploaded configuration can be activated without a power cycle.
+- Fixed auxiliary-sensor loading in the web UI and retained compatibility with both nested and flat API responses.
+- Improved filesystem lifecycle handling during reboot and Home Assistant discovery.
+- Modernized the GitHub release workflow with maintained action versions, reproducible PlatformIO builds, configuration-exclusion checks, archived firmware and filesystem artifacts, and automatic draft-release creation for tags.
+
+Release filesystem images contain only the credential-free configuration template. Local USB provisioning can explicitly select an external device configuration without placing credentials in the repository; the release workflow verifies that this override is not used for published images.
+
 ## v0.9.3
 Emergency fix for web UI: I forgot to commit the working version of the frontend pages so the forms actually work.
 

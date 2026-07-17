@@ -62,6 +62,52 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="posix-tz">Offline timezone rule</label>
+                                <div class="col-sm-8">
+                                    <input id="posix-tz" name="posix-tz" type="text" class="form-control" required>
+                                    <span class="form-text text-muted">POSIX rule used locally without internet, for example CET-1CEST,M3.5.0,M10.5.0/3.</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <h4>Offline Fail-safe</h4>
+                            <p class="form-text text-muted">Used when no valid heating command has been received within the timeout. A fresh command is required to leave fail-safe mode.</p>
+                            <div class="mb-3 form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="failsafe-enabled" name="failsafe-enabled">
+                                <label class="form-check-label" for="failsafe-enabled">Enable offline fail-safe</label>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-timeout">Command timeout (seconds)</label>
+                                <div class="col-sm-7"><input id="failsafe-timeout" name="failsafe-timeout" type="number" min="10" max="86400" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-start">Daily heating start</label>
+                                <div class="col-sm-7"><input id="failsafe-start" name="failsafe-start" type="time" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-stop">Daily heating stop</label>
+                                <div class="col-sm-7"><input id="failsafe-stop" name="failsafe-stop" type="time" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="failsafe-unknown-time-heat" name="failsafe-unknown-time-heat">
+                                <label class="form-check-label" for="failsafe-unknown-time-heat">Use minimum safe heating when no clock is available</label>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-basepoint">Heating curve basepoint</label>
+                                <div class="col-sm-7"><input id="failsafe-basepoint" name="failsafe-basepoint" type="number" step="0.5" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-endpoint">Heating curve endpoint</label>
+                                <div class="col-sm-7"><input id="failsafe-endpoint" name="failsafe-endpoint" type="number" step="0.5" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-minimum-feed">Minimum feed temperature</label>
+                                <div class="col-sm-7"><input id="failsafe-minimum-feed" name="failsafe-minimum-feed" type="number" min="0" max="100" step="0.5" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="failsafe-maximum-feed">Maximum feed temperature</label>
+                                <div class="col-sm-7"><input id="failsafe-maximum-feed" name="failsafe-maximum-feed" type="number" min="0" max="100" step="0.5" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="debug">
                                     <label class="form-check-label" for="debug">Enable debug messages on the consoles</label>

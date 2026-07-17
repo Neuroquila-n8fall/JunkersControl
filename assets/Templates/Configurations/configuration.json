@@ -1,7 +1,7 @@
 {
     "Wifi": {
-        "SSID": "ssid",
-        "Password": "pass",
+        "SSID": "",
+        "Password": "",
         "Hostname": "CERASMARTER"
     },
     "MQTT": {
@@ -28,12 +28,26 @@
         "OverrideOT": false
     },
     "Time": {
-        "Timezone": "Europe/Berlin"
+        "Timezone": "Europe/Berlin",
+        "PosixTimezone": "CET-1CEST,M3.5.0,M10.5.0/3"
     },
     "General": {
         "BusMessageTimeout": 30,
         "Debug": false,
         "Sniffing": false
+    },
+    "FailSafe": {
+        "Enabled": true,
+        "CommandTimeoutSeconds": 300,
+        "StartHour": 5,
+        "StartMinute": 30,
+        "StopHour": 23,
+        "StopMinute": 30,
+        "HeatWhenTimeUnknown": true,
+        "BasepointTemperature": -10.0,
+        "EndpointTemperature": 31.0,
+        "MinimumFeedTemperature": 10.0,
+        "MaximumFeedTemperature": 55.0
     },
     "HomeAssistant":
     {

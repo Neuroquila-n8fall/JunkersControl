@@ -147,6 +147,8 @@ async function sendGeneralConfig(event) {
     formData.append("watervalues", _("watervalues").checked);
     formData.append("auxvalues", _("auxvalues").checked);
     formData.append("overrideot", _("overrideot").checked);
+    formData.append("failsafe-enabled", _("failsafe-enabled").checked);
+    formData.append("failsafe-unknown-time-heat", _("failsafe-unknown-time-heat").checked);
     formData.append("tz", _("tz").value);
     formData.append("debug", _("debug").checked);
     formData.append("sniffing", _("sniffing").checked);

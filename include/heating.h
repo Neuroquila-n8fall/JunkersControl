@@ -8,15 +8,6 @@
 //  Structs
 //——————————————————————————————————————————————————————————————————————————————
 
-// Represents a very basic structure of a time scheduler entry. It is used by the fallback mechanism.
-typedef struct HeatingScheduleEntry_
-{
-  int StartHour;
-  int StartMinute;
-  int DayOfWeek;
-  bool heat;
-} HeatingScheduleEntry;
-
 // @brief Holds the current temperatures and settings
 struct CeraValues
 {
@@ -88,26 +79,6 @@ struct CeraValues
     double FeedCurrent = 0.00F;
   } MixedCircuit;
 
-  //-- Fallback Values
-  //TODO: Should be configurable using configuration.json
-  struct FallBack_
-  {
-    //-- Basepoint Temperature
-    double BasepointTemperature = -10.0F;
-    //-- Endpoint Temperature
-    double EndpointTemperature = 31.0F;
-    //-- Ambient Temperature
-    double AmbientTemperature = 17.0F;
-    //-- Minimum ("Anti Freeze") Temperature.
-    double MinimumFeedTemperature = 10.0F;
-    //-- Enforces the fallback values when set to TRUE
-    bool isOnFallback = false;
-
-    //-- Heating Scheduler. Fallback values for when the MQTT broker isn't available
-    HeatingScheduleEntry fallbackStartEntry = {5, 30, 0, true};
-    HeatingScheduleEntry fallbackEndEntry = {23, 30, 0, false};
-  } Fallback;
-
   struct BaseValues_
   {
     //-- Basepoint for linear temperature calculation
@@ -122,6 +93,9 @@ struct CeraValues
 
   struct Time_
   {
+    bool HasValidTime = false;
+    unsigned long LastUpdateMillis = 0;
+
     //-- Current Day of the week as configured by the CC
     int DayOfWeek = 0;
 

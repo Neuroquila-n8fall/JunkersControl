@@ -6,6 +6,7 @@
 #include <heating.h>
 #include <ArduinoJson.h>
 #include <ha_autodiscovery.h>
+#include <failsafe.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MQTT Client (uses Wifi Client)
@@ -15,49 +16,43 @@ PubSubClient client(espClient);
 CommandedValues commandedValues;
 String TopicBuf;
 String PayloadBuf;
+static unsigned long lastMqttAttempt = 0;
+static const unsigned long mqttRetryInterval = 30000;
 
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
 {
-  if (!WiFi.isConnected())
-  {
-    Log.println("Can't connect to MQTT broker. [No Network]");
+  if (!WiFi.isConnected() || client.connected())
     return;
-  }
 
-  // Loop until we're reconnected
-  while (!client.connected())
+  const unsigned long now = millis();
+  if (lastMqttAttempt != 0 && now - lastMqttAttempt < mqttRetryInterval)
+    return;
+  lastMqttAttempt = now;
+
+  Log.print("Attempting MQTT connection...");
+
+  String clientId = generateClientId();
+  if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
   {
+    Log.println("connected");
 
-    Log.print("Attempting MQTT connection...");
-
-    String clientId = generateClientId();
-    // Attempt to connect
-    if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
+    client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
+    client.subscribe(configuration.Mqtt.Topics.WaterParameters);
+    client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+    client.subscribe(configuration.Mqtt.Topics.Boost);
+    client.subscribe(configuration.Mqtt.Topics.FastHeatup);
+    if (configuration.HomeAssistant.Enabled)
     {
-      Log.println("connected");
-
-      // Subscribe to parameters.
-      client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
-      client.subscribe(configuration.Mqtt.Topics.WaterParameters);
-      client.subscribe(configuration.Mqtt.Topics.StatusRequest);
-      client.subscribe(configuration.Mqtt.Topics.Boost);
-      client.subscribe(configuration.Mqtt.Topics.FastHeatup);
-      if (configuration.HomeAssistant.Enabled)
-      {
-        SetupAutodiscovery(HaSensorsFileName);
-        SetupAutodiscovery(HaBinarySensorsFileName);
-        SetupAutodiscovery(HaNumbersFileName);
-      }
+      SetupAutodiscovery(HaSensorsFileName);
+      SetupAutodiscovery(HaBinarySensorsFileName);
+      SetupAutodiscovery(HaNumbersFileName);
     }
-    else
-    {
-      Log.print("failed, rc=");
-      Log.print(client.state());
-      Log.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
+  }
+  else
+  {
+    Log.printf("failed, rc=%d. Retrying in %lu seconds while CAN control continues.\r\n",
+               client.state(), mqttRetryInterval / 1000);
   }
 }
 
@@ -79,6 +74,10 @@ void setupMqttClient()
   client.setServer(configuration.Mqtt.Server, configuration.Mqtt.Port);
   client.setCallback(callback);
   client.setKeepAlive(10);
+  // Bound the remaining synchronous part of PubSubClient connection attempts.
+  // The ESP TCP connect and MQTT CONNACK waits must not stall boiler control.
+  espClient.setConnectionTimeout(250);
+  client.setSocketTimeout(1);
 }
 
 String boolToString(bool src)
@@ -90,12 +89,10 @@ String boolToString(bool src)
 void callback(char *topic, byte *payload, unsigned int length)
 {
   ShowActivityLed();
-  payload[length] = '\0';
-  String payloadBuf = String((char *)payload);
-  if (!payloadBuf)
-  {
-    return;
-  }
+  String payloadBuf;
+  payloadBuf.reserve(length);
+  for (unsigned int i = 0; i < length; i++)
+    payloadBuf += static_cast<char>(payload[i]);
   
   /*
   NOTE: This is supposed to be in the HA branch.
@@ -143,13 +140,13 @@ void callback(char *topic, byte *payload, unsigned int length)
   // Status Requested
   if (strcmp(topic, configuration.Mqtt.Topics.StatusRequest) == 0)
   {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
 
     DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
     {
-      Log.printf("[Status Request] Error Processing JSON: %payloadBuf\r\n", error.c_str());
+      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
     /* Example JSON:
@@ -222,13 +219,12 @@ void callback(char *topic, byte *payload, unsigned int length)
     }
     */
 
-    const int docSize = 384;
-    StaticJsonDocument<docSize> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
     if (error)
     {
-      Log.printf("[Heating Parameters] Error Processing JSON: %payloadBuf\r\n", error.c_str());
+      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
       return;
     }
 
@@ -264,9 +260,23 @@ void callback(char *topic, byte *payload, unsigned int length)
     if (!doc["OnDemandBoostDuration"].isNull())
       commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
 
-    // Receiving Water Parameters
-    if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
-    {
+    const bool containsHeatingCommand =
+        !doc["Enabled"].isNull() || !doc["FeedSetpoint"].isNull() ||
+        !doc["FeedBaseSetpoint"].isNull() || !doc["FeedCutOff"].isNull() ||
+        !doc["FeedMinimum"].isNull() || !doc["AuxiliaryTemperature"].isNull() ||
+        !doc["AmbientTemperature"].isNull() || !doc["TargetAmbientTemperature"].isNull() ||
+        !doc["Adaption"].isNull() || !doc["ValveScaling"].isNull() ||
+        !doc["ValveScalingMaxOpening"].isNull() || !doc["ValveScalingOpening"].isNull() ||
+        !doc["DynamicAdaption"].isNull() || !doc["OverrideSetpoint"].isNull() ||
+        !doc["OnDemandBoostDuration"].isNull();
+    if (containsHeatingCommand)
+      NotifyValidHeatingCommand();
+
+  }
+
+  // Receiving Water Parameters
+  if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
+  {
 
       /*
       Example Json:
@@ -275,36 +285,40 @@ void callback(char *topic, byte *payload, unsigned int length)
       }
       */
 
-      const int docSize = 16;
-      StaticJsonDocument<docSize> doc;
+      JsonDocument doc;
       DeserializationError error = deserializeJson(doc, (char *)payload, length);
 
       if (error)
       {
-        Log.printf("[Water Parameters] Error Processing JSON: %payloadBuf\r\n", error.c_str());
+        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
         return;
       }
 
       if (!doc["Setpoint"].isNull())
         commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
-    }
   }
 
   // On-Demand Boost
   if (strcmp(topic, configuration.Mqtt.Topics.Boost) == 0)
   {
+    if (payloadBuf != "0" && payloadBuf != "1")
+      return;
     int i = payloadBuf.toInt();
     commandedValues.Heating.Boost = i == 1;
     commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+    NotifyValidHeatingCommand();
     SetFeedTemperature();
   }
 
   // Fast Heatup
   if (strcmp(topic, configuration.Mqtt.Topics.FastHeatup) == 0)
   {
+    if (payloadBuf != "0" && payloadBuf != "1")
+      return;
     int i = payloadBuf.toInt();
     commandedValues.Heating.FastHeatup = i == 1;
     commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+    NotifyValidHeatingCommand();
     SetFeedTemperature();
   }
 }
@@ -318,13 +332,13 @@ void PublishStatus()
       "Error": 0..255,
   }
   */
-  StaticJsonDocument<384> doc;
+  JsonDocument doc;
   JsonObject jsonObj = doc.to<JsonObject>();
 
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("General");
+    jsonObj = doc["General"].to<JsonObject>();
   }
 
   jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
@@ -367,13 +381,13 @@ void PublishHeatingTemperaturesAndStatus()
   }
   */
 
-  StaticJsonDocument<384> doc;
+  JsonDocument doc;
   JsonObject jsonObj = doc.to<JsonObject>();
 
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("Heating");
+    jsonObj = doc["Heating"].to<JsonObject>();
   }
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
@@ -422,13 +436,13 @@ void PublishWaterTemperatures()
     }
   */
 
-  StaticJsonDocument<384> doc;
+  JsonDocument doc;
   JsonObject jsonObj = doc.to<JsonObject>();
 
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("Water");
+    jsonObj = doc["Water"].to<JsonObject>();
   }
 
   jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
@@ -471,19 +485,19 @@ void PublishAuxiliaryTemperatures()
   }
   */
 
-  StaticJsonDocument<384> doc;
+  JsonDocument doc;
   JsonObject jsonObj = doc.to<JsonObject>();
 
   // Create a parent block for HA
   if (configuration.HomeAssistant.Enabled)
   {
-    jsonObj = doc.createNestedObject("Auxiliary");
+    jsonObj = doc["Auxiliary"].to<JsonObject>();
   }
 
   for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
   {
     Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
-    JsonObject sensorVal = jsonObj.createNestedObject(curSensor.Label);
+    JsonObject sensorVal = jsonObj[curSensor.Label].to<JsonObject>();
     sensorVal["Temperature"] = ceraValues.Auxiliary.Temperatures[i];
     sensorVal["Reachable"] = boolToString(curSensor.reachable);
   }
@@ -511,7 +525,7 @@ void PublishAuxiliaryTemperatures()
 void PublishLog(const char *msg, const char *func, LogLevel level)
 {
   const size_t size = 1024;
-  StaticJsonDocument<size> doc;
+  JsonDocument doc;
   JsonObject root = doc.to<JsonObject>();
   root["lvl"] = level;
   root["fnc"] = func;

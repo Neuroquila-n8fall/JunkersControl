@@ -210,7 +210,9 @@
             if(refresh === true)
             {
                 const response = await getConfigJson("/api/config/auxsensors"); 
-                sensors = response.at(0);
+                // Accept both the historical nested response and the briefly
+                // shipped flat-array response during firmware upgrades.
+                sensors = Array.isArray(response.at(0)) ? response.at(0) : response;
             }
 
             sensors.forEach(e => {

@@ -5,8 +5,17 @@
 //——————————————————————————————————————————————————————————————————————————————
 
 const char *configFileName = (char *)"/configuration.json";
+const char *temporaryConfigFileName = (char *)"/configuration.tmp";
+const char *backupConfigFileName = (char *)"/configuration.bak";
 
 Configuration configuration;
+
+static bool configurationUploadPending = false;
+
+void SetConfigurationUploadPending(bool pending)
+{
+    configurationUploadPending = pending;
+}
 
 // Converters
 
@@ -24,6 +33,12 @@ String IntToHex(int value)
 
 bool ReadConfiguration()
 {
+    if (!LittleFS.exists(configFileName) && LittleFS.exists(backupConfigFileName))
+    {
+        Log.println("Recovering configuration from backup.");
+        LittleFS.rename(backupConfigFileName, configFileName);
+    }
+
     if (!LittleFS.exists(configFileName))
     {
         Log.println("Configuration file could not be found. Please upload it first.");
@@ -39,9 +54,9 @@ bool ReadConfiguration()
         return false;
     }
 
-    // Open and parse the file
-    const int docSize = 4096;
-    StaticJsonDocument<docSize> doc;
+    // The configuration currently occupies almost 4 KB as JSON. ArduinoJson
+    // also needs space for its object tree and duplicated strings.
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
 
     if (error)
@@ -85,11 +100,45 @@ bool ReadConfiguration()
 
     JsonObject TimeSettings = doc["Time"];
     strlcpy(configuration.General.Timezone, TimeSettings["Timezone"], sizeof(configuration.General.Timezone)); // true
+    const char *posixTimezone = TimeSettings["PosixTimezone"] | "CET-1CEST,M3.5.0,M10.5.0/3";
+    strlcpy(configuration.General.PosixTimezone, posixTimezone, sizeof(configuration.General.PosixTimezone));
 
     JsonObject GeneralSettings = doc["General"];
     configuration.General.BusMessageTimeout = GeneralSettings["BusMessageTimeout"];
     configuration.General.Debug = GeneralSettings["Debug"];
     configuration.General.Sniffing = GeneralSettings["Sniffing"];
+
+    JsonObject FailSafeSettings = doc["FailSafe"];
+    if (!FailSafeSettings.isNull())
+    {
+        configuration.FailSafe.Enabled = FailSafeSettings["Enabled"] | configuration.FailSafe.Enabled;
+        configuration.FailSafe.CommandTimeoutSeconds = FailSafeSettings["CommandTimeoutSeconds"] | configuration.FailSafe.CommandTimeoutSeconds;
+        configuration.FailSafe.StartHour = FailSafeSettings["StartHour"] | configuration.FailSafe.StartHour;
+        configuration.FailSafe.StartMinute = FailSafeSettings["StartMinute"] | configuration.FailSafe.StartMinute;
+        configuration.FailSafe.StopHour = FailSafeSettings["StopHour"] | configuration.FailSafe.StopHour;
+        configuration.FailSafe.StopMinute = FailSafeSettings["StopMinute"] | configuration.FailSafe.StopMinute;
+        configuration.FailSafe.HeatWhenTimeUnknown = FailSafeSettings["HeatWhenTimeUnknown"] | configuration.FailSafe.HeatWhenTimeUnknown;
+        configuration.FailSafe.BasepointTemperature = FailSafeSettings["BasepointTemperature"] | configuration.FailSafe.BasepointTemperature;
+        configuration.FailSafe.EndpointTemperature = FailSafeSettings["EndpointTemperature"] | configuration.FailSafe.EndpointTemperature;
+        configuration.FailSafe.MinimumFeedTemperature = FailSafeSettings["MinimumFeedTemperature"] | configuration.FailSafe.MinimumFeedTemperature;
+        configuration.FailSafe.MaximumFeedTemperature = FailSafeSettings["MaximumFeedTemperature"] | configuration.FailSafe.MaximumFeedTemperature;
+    }
+    if (configuration.FailSafe.CommandTimeoutSeconds < 10 || configuration.FailSafe.CommandTimeoutSeconds > 86400)
+        configuration.FailSafe.CommandTimeoutSeconds = 300;
+    configuration.FailSafe.StartHour = constrain(configuration.FailSafe.StartHour, 0, 23);
+    configuration.FailSafe.StartMinute = constrain(configuration.FailSafe.StartMinute, 0, 59);
+    configuration.FailSafe.StopHour = constrain(configuration.FailSafe.StopHour, 0, 23);
+    configuration.FailSafe.StopMinute = constrain(configuration.FailSafe.StopMinute, 0, 59);
+    if (!isfinite(configuration.FailSafe.BasepointTemperature))
+        configuration.FailSafe.BasepointTemperature = -10;
+    if (!isfinite(configuration.FailSafe.EndpointTemperature))
+        configuration.FailSafe.EndpointTemperature = 31;
+    if (!isfinite(configuration.FailSafe.MinimumFeedTemperature) || configuration.FailSafe.MinimumFeedTemperature < 0)
+        configuration.FailSafe.MinimumFeedTemperature = 10;
+    if (!isfinite(configuration.FailSafe.MaximumFeedTemperature) ||
+        configuration.FailSafe.MaximumFeedTemperature < configuration.FailSafe.MinimumFeedTemperature ||
+        configuration.FailSafe.MaximumFeedTemperature > 100)
+        configuration.FailSafe.MaximumFeedTemperature = 55;
 
     JsonObject HomeAssistantSettings = doc["HomeAssistant"];
     configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"];
@@ -100,10 +149,14 @@ bool ReadConfiguration()
     configuration.HomeAssistant.TempUnit = HomeAssistantSettings["TempUnit"].as<String>();
 
     JsonObject Leds = doc["LEDs"];
-    configuration.LEDs.WifiLed = Leds["Wifi"];       // 26
-    configuration.LEDs.StatusLed = Leds["Status"];   // 27
-    configuration.LEDs.MqttLed = Leds["Mqtt"];       // 14
-    configuration.LEDs.HeatingLed = Leds["Heating"]; // 25
+    if (Leds["Wifi"].is<int>())
+        configuration.LEDs.WifiLed = Leds["Wifi"];
+    if (Leds["Status"].is<int>())
+        configuration.LEDs.StatusLed = Leds["Status"];
+    if (Leds["Mqtt"].is<int>())
+        configuration.LEDs.MqttLed = Leds["Mqtt"];
+    if (Leds["Heating"].is<int>())
+        configuration.LEDs.HeatingLed = Leds["Heating"];
 
     JsonObject CAN = doc["CAN"];
     configuration.CanModuleConfig.CAN_Quartz = CAN["Quartz"];
@@ -156,7 +209,7 @@ bool ReadConfiguration()
     ceraValues.Auxiliary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
 
     // Set initial values to zero.
-    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    for (size_t i = 0; i < sensorCount; i++)
     {
         ceraValues.Auxiliary.Temperatures[i] = 0.0F;
     }
@@ -198,22 +251,30 @@ bool ReadConfiguration()
     return true;
 }
 
-void WriteConfiguration()
+bool WriteConfiguration()
 {
-    DynamicJsonDocument doc(3072);
+    // An uploaded configuration is authoritative until the device reboots.
+    // Refuse to overwrite it with the stale runtime copy in the meantime.
+    if (configurationUploadPending)
+    {
+        Log.println("Configuration save skipped: an uploaded configuration is pending reboot.");
+        return false;
+    }
 
-    JsonObject Wifi = doc.createNestedObject("Wifi");
+    JsonDocument doc;
+
+    JsonObject Wifi = doc["Wifi"].to<JsonObject>();
     Wifi["SSID"] = configuration.Wifi.SSID;
     Wifi["Password"] = configuration.Wifi.Password;
     Wifi["Hostname"] = configuration.Wifi.Hostname;
 
-    JsonObject MQTT = doc.createNestedObject("MQTT");
+    JsonObject MQTT = doc["MQTT"].to<JsonObject>();
     MQTT["Server"] = configuration.Mqtt.Server;
     MQTT["Port"] = configuration.Mqtt.Port;
     MQTT["User"] = configuration.Mqtt.User;
     MQTT["Password"] = configuration.Mqtt.Password;
 
-    JsonObject MQTT_Topics = MQTT.createNestedObject("Topics");
+    JsonObject MQTT_Topics = MQTT["Topics"].to<JsonObject>();
     MQTT_Topics["HeatingValues"] = configuration.Mqtt.Topics.HeatingValues;
     MQTT_Topics["HeatingParameters"] = configuration.Mqtt.Topics.HeatingParameters;
     MQTT_Topics["WaterValues"] = configuration.Mqtt.Topics.WaterValues;
@@ -224,37 +285,51 @@ void WriteConfiguration()
     MQTT_Topics["Boost"] = configuration.Mqtt.Topics.Boost;
     MQTT_Topics["FastHeatup"] = configuration.Mqtt.Topics.FastHeatup;
 
-    JsonObject Features = doc.createNestedObject("Features");
+    JsonObject Features = doc["Features"].to<JsonObject>();
     Features["HeatingParameters"] = configuration.Features.HeatingParameters;
     Features["WaterParameters"] = configuration.Features.WaterParameters;
     Features["AuxiliaryValues"] = configuration.Features.AuxiliaryParameters;
     Features["OverrideOT"] = configuration.Features.UseAuxiliaryOutsideTempReference;
 
     doc["Time"]["Timezone"] = configuration.General.Timezone;
+    doc["Time"]["PosixTimezone"] = configuration.General.PosixTimezone;
 
-    JsonObject General = doc.createNestedObject("General");
+    JsonObject General = doc["General"].to<JsonObject>();
     General["BusMessageTimeout"] = configuration.General.BusMessageTimeout;
     General["Debug"] = configuration.General.Debug;
     General["Sniffing"] = configuration.General.Sniffing;
 
-    JsonObject HomeAssistant = doc.createNestedObject("HomeAssistant");
+    JsonObject FailSafe = doc["FailSafe"].to<JsonObject>();
+    FailSafe["Enabled"] = configuration.FailSafe.Enabled;
+    FailSafe["CommandTimeoutSeconds"] = configuration.FailSafe.CommandTimeoutSeconds;
+    FailSafe["StartHour"] = configuration.FailSafe.StartHour;
+    FailSafe["StartMinute"] = configuration.FailSafe.StartMinute;
+    FailSafe["StopHour"] = configuration.FailSafe.StopHour;
+    FailSafe["StopMinute"] = configuration.FailSafe.StopMinute;
+    FailSafe["HeatWhenTimeUnknown"] = configuration.FailSafe.HeatWhenTimeUnknown;
+    FailSafe["BasepointTemperature"] = configuration.FailSafe.BasepointTemperature;
+    FailSafe["EndpointTemperature"] = configuration.FailSafe.EndpointTemperature;
+    FailSafe["MinimumFeedTemperature"] = configuration.FailSafe.MinimumFeedTemperature;
+    FailSafe["MaximumFeedTemperature"] = configuration.FailSafe.MaximumFeedTemperature;
+
+    JsonObject HomeAssistant = doc["HomeAssistant"].to<JsonObject>();
     HomeAssistant["AutoDiscoveryPrefix"] = configuration.HomeAssistant.AutoDiscoveryPrefix;
     HomeAssistant["OffDelay"] = configuration.HomeAssistant.OffDelay;
     HomeAssistant["Enabled"] = configuration.HomeAssistant.Enabled;
     HomeAssistant["DeviceId"] = configuration.HomeAssistant.DeviceId;
     HomeAssistant["TempUnit"] = configuration.HomeAssistant.TempUnit;
 
-    JsonObject CAN = doc.createNestedObject("CAN");
+    JsonObject CAN = doc["CAN"].to<JsonObject>();
     CAN["Quartz"] = configuration.CanModuleConfig.CAN_Quartz;
 
-    JsonObject CAN_Addresses = CAN.createNestedObject("Addresses");
+    JsonObject CAN_Addresses = CAN["Addresses"].to<JsonObject>();
 
-    JsonObject CAN_Addresses_Controller = CAN_Addresses.createNestedObject("Controller");
+    JsonObject CAN_Addresses_Controller = CAN_Addresses["Controller"].to<JsonObject>();
     CAN_Addresses_Controller["FlameStatus"] = IntToHex(configuration.CanAddresses.General.FlameLit);
     CAN_Addresses_Controller["Error"] = IntToHex(configuration.CanAddresses.General.Error);
     CAN_Addresses_Controller["DateTime"] = IntToHex(configuration.CanAddresses.General.DateTime);
 
-    JsonObject CAN_Addresses_Heating = CAN_Addresses.createNestedObject("Heating");
+    JsonObject CAN_Addresses_Heating = CAN_Addresses["Heating"].to<JsonObject>();
     CAN_Addresses_Heating["FeedCurrent"] = IntToHex(configuration.CanAddresses.Heating.FeedCurrent);
     CAN_Addresses_Heating["FeedMax"] = IntToHex(configuration.CanAddresses.Heating.FeedMax);
     CAN_Addresses_Heating["FeedSetpoint"] = IntToHex(configuration.CanAddresses.Heating.FeedSetpoint);
@@ -266,7 +341,7 @@ void WriteConfiguration()
     CAN_Addresses_Heating["Mode"] = IntToHex(configuration.CanAddresses.Heating.Mode);
     CAN_Addresses_Heating["Economy"] = IntToHex(configuration.CanAddresses.Heating.Economy);
 
-    JsonObject CAN_Addresses_HotWater = CAN_Addresses.createNestedObject("HotWater");
+    JsonObject CAN_Addresses_HotWater = CAN_Addresses["HotWater"].to<JsonObject>();
     CAN_Addresses_HotWater["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.SetpointTemperature);
     CAN_Addresses_HotWater["MaxTemperature"] = IntToHex(configuration.CanAddresses.HotWater.MaxTemperature);
     CAN_Addresses_HotWater["CurrentTemperature"] = IntToHex(configuration.CanAddresses.HotWater.CurrentTemperature);
@@ -274,21 +349,21 @@ void WriteConfiguration()
     CAN_Addresses_HotWater["BufferOperation"] = IntToHex(configuration.CanAddresses.HotWater.BufferOperation);
     CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature);
 
-    JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses.createNestedObject("MixedCircuit");
+    JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses["MixedCircuit"].to<JsonObject>();
     CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
     CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
 
-    JsonArray AuxiliarySensors_Sensors = doc["AuxiliarySensors"].createNestedArray("Sensors");
+    JsonArray AuxiliarySensors_Sensors = doc["AuxiliarySensors"]["Sensors"].to<JsonArray>();
 
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
     {
-        JsonObject sensorEntry = AuxiliarySensors_Sensors.createNestedObject();
+        JsonObject sensorEntry = AuxiliarySensors_Sensors.add<JsonObject>();
         Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
         sensorEntry["Label"] = curSensor.Label;
         sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
-        JsonArray address = sensorEntry.createNestedArray("Address");
+        JsonArray address = sensorEntry["Address"].to<JsonArray>();
         // Device address has a fixed size of 8
         for (unsigned char curAddress : curSensor.Address)
         {
@@ -298,14 +373,66 @@ void WriteConfiguration()
         }
     }
 
-    JsonObject LEDs = doc.createNestedObject("LEDs");
+    JsonObject LEDs = doc["LEDs"].to<JsonObject>();
     LEDs["Wifi"] = configuration.LEDs.WifiLed;
     LEDs["Status"] = configuration.LEDs.StatusLed;
     LEDs["Mqtt"] = configuration.LEDs.MqttLed;
     LEDs["Heating"] = configuration.LEDs.HeatingLed;
 
-    File file = LittleFS.open(configFileName, FILE_WRITE, true);
-    serializeJsonPretty(doc, file);
-    serializeJsonPretty(doc, Serial);
+    if (doc.overflowed())
+    {
+        Log.println("Configuration could not be saved: JSON document overflowed.");
+        return false;
+    }
+
+    File file = LittleFS.open(temporaryConfigFileName, FILE_WRITE, true);
+    if (!file)
+    {
+        Log.println("Configuration could not be saved: temporary file could not be opened.");
+        return false;
+    }
+
+    const size_t bytesWritten = serializeJsonPretty(doc, file);
+    file.flush();
     file.close();
+
+    if (bytesWritten == 0)
+    {
+        LittleFS.remove(temporaryConfigFileName);
+        Log.println("Configuration could not be saved: serialization failed.");
+        return false;
+    }
+
+    // Keep the previous file recoverable until the complete replacement has
+    // been committed.
+    LittleFS.remove(backupConfigFileName);
+    if (LittleFS.exists(configFileName) && !LittleFS.rename(configFileName, backupConfigFileName))
+    {
+        LittleFS.remove(temporaryConfigFileName);
+        Log.println("Configuration could not be saved: current file could not be backed up.");
+        return false;
+    }
+
+    if (!LittleFS.rename(temporaryConfigFileName, configFileName))
+    {
+        LittleFS.rename(backupConfigFileName, configFileName);
+        Log.println("Configuration could not be saved: temporary file could not be committed.");
+        return false;
+    }
+
+    // Verify the committed file before discarding the known-good backup.
+    File committedFile = LittleFS.open(configFileName, FILE_READ);
+    JsonDocument committedDoc;
+    DeserializationError verificationError = deserializeJson(committedDoc, committedFile);
+    committedFile.close();
+    if (verificationError || !committedDoc.is<JsonObject>())
+    {
+        LittleFS.remove(configFileName);
+        LittleFS.rename(backupConfigFileName, configFileName);
+        Log.printf("Configuration verification failed: %s\r\n", verificationError.c_str());
+        return false;
+    }
+
+    LittleFS.remove(backupConfigFileName);
+    return true;
 }

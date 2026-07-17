@@ -3,6 +3,7 @@
 
 // Main Header
 #include <main.h>
+#include <failsafe.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -44,13 +45,23 @@ volatile bool SetupMode = false;
 
 void setup()
 {
-  // Init SPIFFS
-  if (!LittleFS.begin())
-    LittleFS.begin(true);
   // Setup Serial
   Serial.begin(115200);
-  Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", STR(ENV));
-  Serial.printf("\e[1;32mRunning Build: %s\r\n\e[0m", STR(VERSION));
+  Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", JC_STRINGIFY(ENV));
+  Serial.printf("\e[1;32mRunning Build: %s\r\n\e[0m", JC_STRINGIFY(VERSION));
+
+  // Init LittleFS. Formatting remains the recovery path for an unreadable
+  // partition, but report it explicitly because it removes all stored files.
+  if (!LittleFS.begin())
+  {
+    Serial.println("\e[1;33mLittleFS could not be mounted. Attempting to format the filesystem partition.\e[0m");
+    if (!LittleFS.begin(true))
+    {
+      Serial.println("\e[1;31mLittleFS could not be mounted or formatted. Check the partition layout and flash a matching littlefs.bin.\e[0m");
+      return;
+    }
+    Serial.println("\e[1;33mLittleFS was formatted and is empty. Upload littlefs.bin before continuing.\e[0m");
+  }
 
   Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
 
@@ -70,11 +81,15 @@ void setup()
   if (SetupMode)
   {
 
-    if (!LittleFS.exists("/configuration.json"))
+    const bool frontendAvailable = LittleFS.exists("/frontend/index.html") ||
+                                   LittleFS.exists("/frontend/index.html.gz");
+    if (!frontendAvailable)
     {
-      Serial.println("\e[1;31mPlease upload the Filesystem image first.\e[0m");
+      Serial.println("\e[1;31mLittleFS is mounted, but the web frontend is missing. Upload a matching littlefs.bin.\e[0m");
       return;
     }
+    if (!LittleFS.exists("/configuration.json"))
+      Serial.println("\e[1;33m/configuration.json is missing. Starting Setup Mode so it can be uploaded.\e[0m");
     // Launch AP Mode to let the user configure the basics.
     StartApMode();
     ConfigureAndStartWebserver();
@@ -91,9 +106,25 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
 
   if (!result)
   {
-    Log.println("Unable to read configuration.");
+    const bool frontendAvailable = LittleFS.exists("/frontend/index.html") ||
+                                   LittleFS.exists("/frontend/index.html.gz");
+    if (!frontendAvailable)
+    {
+      Serial.println("\e[1;31mConfiguration could not be loaded and the web frontend is missing. Upload a matching littlefs.bin.\e[0m");
+      return;
+    }
+
+    Serial.println("\e[1;33mConfiguration is missing or invalid. Starting the CERASMARTER setup access point.\e[0m");
+    SetupMode = true;
+    StartApMode();
+    ConfigureAndStartWebserver();
+    ota();
     return;
   }
+
+  SetupFailSafe();
+  if (!myTZ.setPosix(configuration.General.PosixTimezone))
+    Serial.println("Invalid POSIX timezone rule. Fail-safe will use boiler time or its unknown-time policy.");
 
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
@@ -121,10 +152,8 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
   // Setup can module
   setupCan();
 
-  // Connect WiFi. This call will block the thread until a result of the connection attempt has been received. This is very important for OTA to work.
+  // Start WiFi asynchronously. Heating/CAN processing remains active while it connects.
   connectWifi();
-  //-------------------------------------
-  //-- NOTE: The code below won't be reached until the WiFi has connected within connectWifi().
   ota();
   TelnetServer.begin();
   initSensors();
@@ -153,6 +182,9 @@ void loop()
     WiFi.disconnect();
     server->end();
     vTaskDelay(3000 / portTICK_PERIOD_MS);
+    // Ensure all filesystem metadata and file contents are committed before a
+    // software reset. This mirrors the reliable power-cycle behavior.
+    LittleFS.end();
     ESP.restart();
   }
 
@@ -173,8 +205,6 @@ void loop()
     return;
   }
 
-  // Run Timer Events
-  events();
   // store the current timer millis
   unsigned long currentMillis = millis();
   // Connect WiFi (if disconnected)
@@ -190,10 +220,13 @@ void loop()
     return;
   }
 
-  // MQTT Client Keepalive
-  client.loop();
   // Process incoming CAN messages
   processCan();
+  // Apply the local safety profile before the next CAN command-chain step.
+  UpdateFailSafe();
+  // MQTT maintenance follows CAN work and is bounded by the configured socket
+  // timeout, so network traffic cannot take priority over boiler traffic.
+  client.loop();
   // Telnet Communication
   CheckForConnections();
   // Read Telnet commands
@@ -206,9 +239,6 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(1)
   {
-    // Ensure that we are connected to MQTT
-    reconnectMqtt();
-
     // If we didn't spot a controller message on the network for x seconds we will take over control.
     // As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
     if (currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
@@ -242,7 +272,7 @@ void loop()
       //   to have been incorporated into the controller as well because values arrive in
       //   intervals of approximately 1 second.
 
-      CANMessage msg;
+      CANMessage msg = {};
 
       switch (currentStep)
       {
@@ -268,7 +298,7 @@ void loop()
 
         if (configuration.General.Debug)
         {
-          Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fallback is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", ceraValues.Fallback.isOnFallback ? "YES" : "NO");
+          Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fail-safe is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", IsFailSafeActive() ? "YES" : "NO");
         }
 
         break;
@@ -308,8 +338,8 @@ void loop()
         return; // important!
       }
 
-      // Increase counter
-      currentStep++;
+      // Increase counter and keep the chain within its six defined steps.
+      currentStep = (currentStep + 1) % 6;
 
       SendMessage(msg);
     }
@@ -345,54 +375,6 @@ void loop()
   //——————————————————————————————————————————————————————————————————————————————
   runEverySeconds(30)
   {
-    // Run on fallback values when the connection to the server has been lost.
-    if (TimeIsSynced() && !client.connected())
-    {
-
-      // Note: negate this statement to try out the fallback mode.
-      if (!client.connected() && !ceraValues.Fallback.isOnFallback)
-      {
-        // Activate fallback
-        ceraValues.Fallback.isOnFallback = true;
-        Log.println("Connection lost. Switching over to fallback mode!");
-      }
-
-      // Check if the profile has to be changed depending on the time schedule.
-      //   Check if the current hour is in between the start of both "Start" and "End" marks
-      if (myTZ.hour() >= ceraValues.Fallback.fallbackStartEntry.StartHour && myTZ.hour() < ceraValues.Fallback.fallbackEndEntry.StartHour)
-      {
-        // Check if the minute mark has been passed.
-        if (myTZ.minute() >= ceraValues.Fallback.fallbackStartEntry.StartMinute)
-        {
-          // Activate Heating Profile by overwriting the fields with fallback values
-          commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.BasepointTemperature;
-          commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.EndpointTemperature;
-          commandedValues.Heating.Active = true;
-          return; // important!
-        }
-      }
-
-      // Check if we have passed the hour mark.
-      if (myTZ.hour() > ceraValues.Fallback.fallbackEndEntry.StartHour)
-      {
-        // Check if the minute mark has been passed
-        if (myTZ.minute() >= ceraValues.Fallback.fallbackStartEntry.StartMinute)
-        {
-          // Set both Base and Endpoint to the anti-freeze setting.
-          commandedValues.Heating.BasepointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
-          commandedValues.Heating.EndpointTemperature = ceraValues.Fallback.MinimumFeedTemperature;
-          commandedValues.Heating.Active = false;
-        }
-      }
-    }
-
-    // Disable fallback mode when connected.
-    if (client.connected() && ceraValues.Fallback.isOnFallback)
-    {
-      ceraValues.Fallback.isOnFallback = false;
-      Log.println("Connection established. Switching over to SCADA!");
-    }
-
     if (TimeIsSynced() && !AlarmIsSet)
     {
       // Set Reboot time next day
@@ -406,6 +388,14 @@ void loop()
     // Set Date & Time
     SetDateTime();
   }
+  runEverySeconds(1)
+  {
+    // Network recovery deliberately runs after all CAN and control work.
+    reconnectMqtt();
+  }
+  // Progress ezTime only after CAN receive and control work has completed.
+  // Unlike waitForSync(), this returns after the current event attempt.
+  events();
   // Allow the CPU to switch tasks.
   vTaskDelay(2);
 }
@@ -427,7 +417,7 @@ void SendMessage(CANMessage msg)
     }
     if (!can.tryToSend(msg))
     {
-      CanSendErrorCount++;
+      CanSendErrorCount = CanSendErrorCount + 1;
       if (CanErrorActivityHandle == NULL)
       {
         xTaskCreate(ShowCanError, "Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
@@ -459,11 +449,11 @@ void WriteMessage(CANMessage msg, bool received /* = true */)
   // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
   char dataBuf[255];
   String data;
-  StaticJsonDocument<128> doc;
+  JsonDocument doc;
   doc["id"] = msg.id;
   doc["len"] = msg.len;
   doc["rcv"] = received;
-  JsonArray msgData = doc.createNestedArray("data");
+  JsonArray msgData = doc["data"].to<JsonArray>();
 
   for (int x = 0; x < msg.len; x++)
   {
@@ -493,7 +483,7 @@ void SetDateTime()
 {
   runEverySeconds(dateTimeSendDelay)
   {
-    if (lastSentMessageTime - millis() >= 1000)
+    if (millis() - lastSentMessageTime >= 1000)
     {
 
       CANMessage msg = PrepareMessage(configuration.CanAddresses.General.DateTime, 4);
@@ -536,9 +526,9 @@ CANMessage PrepareMessage(uint32_t id, int length /* = 8 */)
 bool SafeToSendMessage(bool dontWaitForController /*= true*/)
 {
   if (dontWaitForController)
-    return (lastSentMessageTime - millis() >= 1000);
+    return (millis() - lastSentMessageTime >= 1000);
 
-  return (lastHeatingMessageTime - millis() >= 1000 && lastSentMessageTime - millis() >= 1000);
+  return (millis() - lastHeatingMessageTime >= 1000 && millis() - lastSentMessageTime >= 1000);
 }
 
 void ShowHeartbeat(void *pvParameter)
@@ -607,21 +597,9 @@ void UpdateLeds(void *pvParameter)
 
     if (CanErrorActivityHandle == NULL)
     {
-      // BLink LED if Pump is active but heating isn't. This means the heating is about to go off.
-      if (ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
-      {
-        digitalWrite(configuration.LEDs.HeatingLed, !digitalRead(configuration.LEDs.HeatingLed));
-      }
-
-      if (!ceraValues.Heating.PumpActive && !ceraValues.Heating.Active)
-      {
-        digitalWrite(configuration.LEDs.HeatingLed, LOW);
-      }
-
-      if (ceraValues.Heating.PumpActive && ceraValues.Heating.Active)
-      {
-        digitalWrite(configuration.LEDs.HeatingLed, HIGH);
-      }
+      // The heating LED is the flame indicator. CAN errors retain priority and
+      // blink this output from ShowCanError instead.
+      digitalWrite(configuration.LEDs.HeatingLed, ceraValues.General.FlameLit ? HIGH : LOW);
     }
     vTaskDelay(1000 / portTICK_PERIOD_MS);
   }

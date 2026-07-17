@@ -31,13 +31,27 @@ def gzip_webfiles( source, target, env ):
 
     source_data_path = os.path.join( env.get('PROJECT_DIR'), SOURCE_DIR_NAME )
     target_data_path = os.path.join( env.get( 'PROJECT_DIR' ), TARGET_DIR_NAME )
+    configuration_template_path = os.path.join(
+        env.get('PROJECT_DIR'), 'assets', 'Templates', 'Configurations', 'configuration.json'
+    )
+    target_configuration_path = os.path.join(target_data_path, 'configuration.json')
+    # Local USB provisioning may explicitly select a device configuration without
+    # ever placing credentials in the repository. CI intentionally leaves this unset.
+    configuration_source_path = os.environ.get(
+        'JUNKERSCONTROL_CONFIG_FILE', configuration_template_path
+    )
 
     # CHECK DATA DIR
     if not os.path.exists( source_data_path ):
         print( 'GZIP: DATA DIRECTORY MISSING AT PATH: ' + source_data_path )
         print( 'GZIP: PLEASE CREATE THE DIRECTORY FIRST (ABORTING)' )
         print( 'GZIP: FAILURE / ABORTED' )
-        return
+        raise RuntimeError('Source data directory is missing')
+
+    if not os.path.isfile(configuration_source_path):
+        print('GZIP: CONFIGURATION SOURCE IS MISSING')
+        print('GZIP: FAILURE / ABORTED')
+        raise RuntimeError('Configuration source is missing')
     
     # CHECK GZIP DIR
     if not os.path.exists( target_data_path ):
@@ -50,7 +64,16 @@ def gzip_webfiles( source, target, env ):
             # print( 'GZIP: EXCEPTION... ' + str( e ) )
             print( 'GZIP: PLEASE CREATE THE DIRECTORY FIRST (ABORTING)' )
             print( 'GZIP: FAILURE / ABORTED' )
-            return
+            raise
+
+    # A release filesystem must be directly provisionable, but must never copy
+    # a developer's device-specific configuration. Always source this file from
+    # the versioned, credential-free template outside the data directory.
+    if configuration_source_path == configuration_template_path:
+        print('  Copying credential-free configuration template')
+    else:
+        print('  Copying explicitly selected local device configuration')
+    shutil.copyfile(configuration_source_path, target_configuration_path)
 
     files_to_gzip = []
     files_to_copy = []

@@ -1,9 +1,60 @@
 #include <webconfig.h>
+#include <failsafe.h>
 
 AsyncWebServer *server;
 AsyncEventSource *eventSource;
 
 volatile bool ShouldReboot = false;
+
+struct UploadResult
+{
+    int status;
+    const char *message;
+};
+
+static const char *configurationUploadFileName = "/configuration.upload";
+
+static bool validateConfigurationFile(const char *path, String &errorMessage)
+{
+    File file = LittleFS.open(path, FILE_READ);
+    if (!file)
+    {
+        errorMessage = "Configuration file could not be opened.";
+        return false;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error)
+    {
+        errorMessage = "Configuration contains invalid JSON: " + String(error.c_str());
+        return false;
+    }
+
+    const char *requiredSections[] = {
+        "Wifi", "MQTT", "Features", "Time", "General", "HomeAssistant",
+        "CAN", "AuxiliarySensors", "LEDs"};
+    for (const char *section : requiredSections)
+    {
+        if (!doc[section].is<JsonObject>())
+        {
+            errorMessage = "Configuration section is missing or invalid: " + String(section);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void sendConfigurationSaveResult(AsyncWebServerRequest *request, const char *successMessage)
+{
+    if (WriteConfiguration())
+        request->send(200, "application/json", successMessage);
+    else
+        request->send(500, "application/json", R"({"status":500,"msg":"Configuration could not be saved."})");
+}
 
 void StartApMode()
 {
@@ -115,26 +166,41 @@ void configureGeneralEndpoints()
                 onGeneralConfigReceive(request, json);
             });
 
+    rcvHandler->setMethod(HTTP_POST);
     server->addHandler(rcvHandler);
 }
 
 void getGeneralConfig(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     doc["heatingvalues"] = configuration.Features.HeatingParameters;
     doc["watervalues"] = configuration.Features.WaterParameters;
     doc["auxvalues"] = configuration.Features.AuxiliaryParameters;
     doc["overrideot"] = configuration.Features.UseAuxiliaryOutsideTempReference;
     doc["tz"] = configuration.General.Timezone;
+    doc["posix-tz"] = configuration.General.PosixTimezone;
     doc["busmsgtimeout"] = configuration.General.BusMessageTimeout;
     doc["debug"] = configuration.General.Debug;
     doc["sniffing"] = configuration.General.Sniffing;
+    doc["failsafe-enabled"] = configuration.FailSafe.Enabled;
+    doc["failsafe-timeout"] = configuration.FailSafe.CommandTimeoutSeconds;
+    char startTime[6];
+    char stopTime[6];
+    snprintf(startTime, sizeof(startTime), "%02d:%02d", configuration.FailSafe.StartHour, configuration.FailSafe.StartMinute);
+    snprintf(stopTime, sizeof(stopTime), "%02d:%02d", configuration.FailSafe.StopHour, configuration.FailSafe.StopMinute);
+    doc["failsafe-start"] = startTime;
+    doc["failsafe-stop"] = stopTime;
+    doc["failsafe-unknown-time-heat"] = configuration.FailSafe.HeatWhenTimeUnknown;
+    doc["failsafe-basepoint"] = configuration.FailSafe.BasepointTemperature;
+    doc["failsafe-endpoint"] = configuration.FailSafe.EndpointTemperature;
+    doc["failsafe-minimum-feed"] = configuration.FailSafe.MinimumFeedTemperature;
+    doc["failsafe-maximum-feed"] = configuration.FailSafe.MaximumFeedTemperature;
     sendJson(doc, request);
 }
 
 void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<200> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -142,6 +208,49 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     else if (json.is<JsonObject>())
     {
         doc = json.as<JsonObject>();
+    }
+
+    int failSafeStartHour = configuration.FailSafe.StartHour;
+    int failSafeStartMinute = configuration.FailSafe.StartMinute;
+    int failSafeStopHour = configuration.FailSafe.StopHour;
+    int failSafeStopMinute = configuration.FailSafe.StopMinute;
+    unsigned long failSafeTimeout = configuration.FailSafe.CommandTimeoutSeconds;
+    double failSafeBasepoint = configuration.FailSafe.BasepointTemperature;
+    double failSafeEndpoint = configuration.FailSafe.EndpointTemperature;
+    double failSafeMinimum = configuration.FailSafe.MinimumFeedTemperature;
+    double failSafeMaximum = configuration.FailSafe.MaximumFeedTemperature;
+
+    auto parseTime = [](const String &value, int &hour, int &minute)
+    {
+        if (value.length() != 5 || value.charAt(2) != ':')
+            return false;
+        hour = value.substring(0, 2).toInt();
+        minute = value.substring(3, 5).toInt();
+        return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+    };
+
+    if (!doc["failsafe-timeout"].isNull())
+        failSafeTimeout = doc["failsafe-timeout"].as<unsigned long>();
+    if (!doc["failsafe-basepoint"].isNull())
+        failSafeBasepoint = doc["failsafe-basepoint"].as<double>();
+    if (!doc["failsafe-endpoint"].isNull())
+        failSafeEndpoint = doc["failsafe-endpoint"].as<double>();
+    if (!doc["failsafe-minimum-feed"].isNull())
+        failSafeMinimum = doc["failsafe-minimum-feed"].as<double>();
+    if (!doc["failsafe-maximum-feed"].isNull())
+        failSafeMaximum = doc["failsafe-maximum-feed"].as<double>();
+
+    const bool startValid = doc["failsafe-start"].isNull() ||
+                            parseTime(doc["failsafe-start"].as<String>(), failSafeStartHour, failSafeStartMinute);
+    const bool stopValid = doc["failsafe-stop"].isNull() ||
+                           parseTime(doc["failsafe-stop"].as<String>(), failSafeStopHour, failSafeStopMinute);
+    if (!startValid || !stopValid || failSafeTimeout < 10 || failSafeTimeout > 86400 ||
+        !isfinite(failSafeBasepoint) || !isfinite(failSafeEndpoint) ||
+        !isfinite(failSafeMinimum) || !isfinite(failSafeMaximum) ||
+        failSafeMinimum < 0 || failSafeMaximum > 100 || failSafeMinimum > failSafeMaximum)
+    {
+        request->send(400, "application/json", R"({"status":400,"msg":"Invalid fail-safe time, timeout, or temperature range."})");
+        return;
     }
 
     if (!doc["heatingvalues"].isNull())
@@ -159,6 +268,9 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     if (!doc["tz"].isNull())
         strlcpy(configuration.General.Timezone, doc["tz"], sizeof(configuration.General.Timezone));
 
+    if (!doc["posix-tz"].isNull())
+        strlcpy(configuration.General.PosixTimezone, doc["posix-tz"], sizeof(configuration.General.PosixTimezone));
+
     if (!doc["busmsgtimeout"].isNull())
         configuration.General.BusMessageTimeout = doc["busmsgtimeout"];
 
@@ -168,11 +280,23 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     if (!doc["sniffing"].isNull())
         configuration.General.Sniffing = doc["sniffing"] == "true";
 
+    if (!doc["failsafe-enabled"].isNull())
+        configuration.FailSafe.Enabled = doc["failsafe-enabled"] == "true";
+    if (!doc["failsafe-unknown-time-heat"].isNull())
+        configuration.FailSafe.HeatWhenTimeUnknown = doc["failsafe-unknown-time-heat"] == "true";
+    configuration.FailSafe.CommandTimeoutSeconds = failSafeTimeout;
+    configuration.FailSafe.StartHour = failSafeStartHour;
+    configuration.FailSafe.StartMinute = failSafeStartMinute;
+    configuration.FailSafe.StopHour = failSafeStopHour;
+    configuration.FailSafe.StopMinute = failSafeStopMinute;
+    configuration.FailSafe.BasepointTemperature = failSafeBasepoint;
+    configuration.FailSafe.EndpointTemperature = failSafeEndpoint;
+    configuration.FailSafe.MinimumFeedTemperature = failSafeMinimum;
+    configuration.FailSafe.MaximumFeedTemperature = failSafeMaximum;
+
     configuration.General.Debug = configuration.General.Debug;
 
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"Feature configuration has been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"Feature configuration has been saved."})");
 }
 
 #pragma endregion
@@ -202,6 +326,7 @@ void configureWifiEndpoints()
                 onWifiConfigReceive(request, json);
             });
 
+    wifiConfigRcvHandler->setMethod(HTTP_POST);
     server->addHandler(wifiConfigRcvHandler);
 
     // Wifi Config GET
@@ -212,7 +337,7 @@ void configureWifiEndpoints()
 void getWifiConfig(AsyncWebServerRequest *request)
 {
 
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["wifi_ssid"] = configuration.Wifi.SSID;
     doc["wifi_pw"] = configuration.Wifi.Password;
     doc["hostname"] = configuration.Wifi.Hostname;
@@ -221,7 +346,7 @@ void getWifiConfig(AsyncWebServerRequest *request)
 
 void onWifiConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<200> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -247,14 +372,12 @@ void onWifiConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     strlcpy(configuration.Wifi.SSID, doc["wifi_ssid"], sizeof(configuration.Wifi.SSID));
     strlcpy(configuration.Wifi.Password, doc["wifi_pw"], sizeof(configuration.Wifi.Password));
     strlcpy(configuration.Wifi.Hostname, doc["hostname"], sizeof(configuration.Wifi.Hostname));
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"Wifi configuration has been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"Wifi configuration has been saved."})");
 }
 
 void getCurrentWifiNetwork(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     doc["ssid"] = WiFi.SSID();
     doc["rssi"] = WiFi.RSSI();
     doc["ip"] = WiFi.localIP().toString();
@@ -267,14 +390,14 @@ void getCurrentWifiNetwork(AsyncWebServerRequest *request)
 
 void getWifiNetworks(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
 
     int count = WiFi.scanNetworks();
     if (count == 0)
         sendJson(doc, request);
     for (size_t i = 0; i < count; i++)
     {
-        JsonObject network = doc.createNestedObject();
+        JsonObject network = doc.add<JsonObject>();
         network["SSID"] = WiFi.SSID(i);
         network["RSSI"] = WiFi.RSSI(i);
         network["Encryption"] = WiFi.encryptionType(i);
@@ -305,6 +428,7 @@ void configureMqttEndpoints()
                 onMqttConfigReceive(request, json);
             });
 
+    mqttConfigRcvHandler->setMethod(HTTP_POST);
     server->addHandler(mqttConfigRcvHandler);
 
     // MQTT Topics GET
@@ -319,12 +443,13 @@ void configureMqttEndpoints()
                 onMqttTopicConfigReceive(request, json);
             });
 
+    mqttTopicsRcvHandler->setMethod(HTTP_POST);
     server->addHandler(mqttTopicsRcvHandler);
 }
 
 void getMqttConfig(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     doc["mqtt-server"] = configuration.Mqtt.Server;
     doc["mqtt-port"] = configuration.Mqtt.Port;
     doc["mqtt-user"] = configuration.Mqtt.User;
@@ -335,7 +460,7 @@ void getMqttConfig(AsyncWebServerRequest *request)
 
 void onMqttConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<200> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -355,14 +480,12 @@ void onMqttConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     configuration.Mqtt.Port = doc["mqtt-port"];
     strlcpy(configuration.Mqtt.User, doc["mqtt-user"], sizeof(configuration.Mqtt.User));
     strlcpy(configuration.Mqtt.Password, doc["mqtt-password"], sizeof(configuration.Mqtt.Password));
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"MQTT configuration has been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"MQTT configuration has been saved."})");
 }
 
 void getMqttTopicConfig(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     doc["status"] = configuration.Mqtt.Topics.Status;
     doc["statusrequest"] = configuration.Mqtt.Topics.StatusRequest;
     doc["auxvalues"] = configuration.Mqtt.Topics.AuxiliaryValues;
@@ -378,7 +501,7 @@ void getMqttTopicConfig(AsyncWebServerRequest *request)
 
 void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<200> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -412,9 +535,7 @@ void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     strlcpy(configuration.Mqtt.Topics.StatusRequest, doc["statusrequest"], sizeof(configuration.Mqtt.Topics.StatusRequest));
     strlcpy(configuration.Mqtt.Topics.WaterParameters, doc["waterparameters"], sizeof(configuration.Mqtt.Topics.WaterParameters));
     strlcpy(configuration.Mqtt.Topics.WaterValues, doc["watervalues"], sizeof(configuration.Mqtt.Topics.WaterValues));
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"MQTT Topics have been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"MQTT Topics have been saved."})");
 }
 
 #pragma endregion
@@ -450,7 +571,7 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
     if (Update.write(data, len) != len)
     {
         Update.printError(Serial);
-        StaticJsonDocument<512> doc;
+        JsonDocument doc;
         doc["status"] = 500;
         doc["msg"] = Update.errorString();
         String json;
@@ -481,8 +602,37 @@ void configureFilemanagerEndpoints()
 {
     server->on(
         "/filemanager/upload", HTTP_POST, [](AsyncWebServerRequest *request)
-        { request->send(200); },
+        {
+            UploadResult *result = static_cast<UploadResult *>(request->_tempObject);
+            if (result == nullptr)
+            {
+                request->send(500, "application/json", R"({"status":500,"msg":"Upload failed."})");
+                return;
+            }
+            request->send(result->status, "application/json", result->message);
+        },
         handleUpload);
+
+    server->on("/api/config/reload", HTTP_POST, [](AsyncWebServerRequest *request)
+               {
+                   String validationError;
+                   if (!validateConfigurationFile(configFileName, validationError))
+                   {
+                       JsonDocument responseDoc;
+                       responseDoc["status"] = 400;
+                       responseDoc["msg"] = validationError;
+                       String response;
+                       serializeJson(responseDoc, response);
+                       request->send(400, "application/json", response);
+                       return;
+                   }
+
+                   // Keep the uploaded file authoritative until the restart.
+                   SetConfigurationUploadPending(true);
+                   request->send(202, "application/json",
+                                 R"({"status":202,"msg":"Configuration validated. Restarting to load it."})");
+                   ShouldReboot = true;
+               });
 
     server->on("/filemanager/file", HTTP_GET, [](AsyncWebServerRequest *request)
                {
@@ -513,7 +663,7 @@ void configureFilemanagerEndpoints()
 void getFsUsagePercent(AsyncWebServerRequest *request)
 {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
-    StaticJsonDocument<128> doc;
+    JsonDocument doc;
     double total = LittleFS.totalBytes();
     double used = LittleFS.usedBytes();
     double free = total - used;
@@ -541,12 +691,12 @@ void listFsFiles(AsyncWebServerRequest *request, String path /* = "/" */)
     }
     File rootDir = LittleFS.open(path);
     File fsEntry = rootDir.openNextFile();
-    StaticJsonDocument<2048> doc;
-    JsonArray files = doc.createNestedArray((String)rootDir.path());
+    JsonDocument doc;
+    JsonArray files = doc[(String)rootDir.path()].to<JsonArray>();
 
     while (fsEntry)
     {
-        JsonObject file = files.createNestedObject();
+        JsonObject file = files.add<JsonObject>();
         file["Name"] = (String)fsEntry.name();
         file["Size"] = (int)fsEntry.size();
         file["Directory"] = fsEntry.isDirectory();
@@ -564,20 +714,80 @@ void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t
 
     if (!index)
     {
+        UploadResult *result = static_cast<UploadResult *>(calloc(1, sizeof(UploadResult)));
+        request->_tempObject = result;
+        if (result == nullptr)
+            return;
+
+        result->status = 200;
+        result->message = R"({"status":200,"msg":"File uploaded."})";
+
+        String uploadPath = filename.startsWith("/") ? filename : "/" + filename;
+        if (uploadPath == configFileName)
+            uploadPath = configurationUploadFileName;
+
         // open the file on first call and store the file handle in the request object
-        request->_tempFile = LittleFS.open(filename, FILE_WRITE, true);
+        request->_tempFile = LittleFS.open(uploadPath, FILE_WRITE, true);
+        if (!request->_tempFile)
+        {
+            result->status = 500;
+            result->message = R"({"status":500,"msg":"The upload target could not be opened."})";
+            return;
+        }
     }
 
-    if (len)
+    UploadResult *result = static_cast<UploadResult *>(request->_tempObject);
+    if (result == nullptr || result->status != 200)
+        return;
+
+    if (len && request->_tempFile.write(data, len) != len)
     {
-        // stream the incoming chunk to the opened file
-        request->_tempFile.write(data, len);
+        result->status = 500;
+        result->message = R"({"status":500,"msg":"The uploaded file could not be written completely."})";
     }
 
     if (final)
     {
         // close the file handle as the upload is now done
+        request->_tempFile.flush();
         request->_tempFile.close();
+
+        String uploadPath = filename.startsWith("/") ? filename : "/" + filename;
+        if (uploadPath != configFileName || result->status != 200)
+            return;
+
+        String validationError;
+        if (!validateConfigurationFile(configurationUploadFileName, validationError))
+        {
+            LittleFS.remove(configurationUploadFileName);
+            result->status = 400;
+            result->message = R"({"status":400,"msg":"Uploaded configuration is invalid or incomplete."})";
+            return;
+        }
+
+        // Use the same recovery path as normal configuration saves so boot can
+        // restore it if power is lost between the two renames.
+        const char *uploadBackupFileName = "/configuration.bak";
+        LittleFS.remove(uploadBackupFileName);
+        if (LittleFS.exists(configFileName) && !LittleFS.rename(configFileName, uploadBackupFileName))
+        {
+            LittleFS.remove(configurationUploadFileName);
+            result->status = 500;
+            result->message = R"({"status":500,"msg":"Current configuration could not be backed up."})";
+            return;
+        }
+
+        if (!LittleFS.rename(configurationUploadFileName, configFileName))
+        {
+            LittleFS.rename(uploadBackupFileName, configFileName);
+            result->status = 500;
+            result->message = R"({"status":500,"msg":"Uploaded configuration could not be committed."})";
+            return;
+        }
+
+        LittleFS.remove(uploadBackupFileName);
+        SetConfigurationUploadPending(true);
+        result->message = R"({"status":200,"msg":"Configuration uploaded. Reboot to apply it."})";
     }
 }
 
@@ -602,19 +812,20 @@ void configureCanConfigEndpoints()
                 onCanbusConfigReceive(request, json);
             });
 
+    rcvHandler->setMethod(HTTP_POST);
     server->addHandler(rcvHandler);
 }
 
 void getCanbusConfig(AsyncWebServerRequest *request)
 {
     // Take values directly from configuration
-    StaticJsonDocument<1024> doc;
-    JsonObject CAN_Addresses_Controller = doc.createNestedObject("Controller");
+    JsonDocument doc;
+    JsonObject CAN_Addresses_Controller = doc["Controller"].to<JsonObject>();
     CAN_Addresses_Controller["FlameStatus"] = IntToHex(configuration.CanAddresses.General.FlameLit);
     CAN_Addresses_Controller["Error"] = IntToHex(configuration.CanAddresses.General.Error);
     CAN_Addresses_Controller["DateTime"] = IntToHex(configuration.CanAddresses.General.DateTime);
 
-    JsonObject CAN_Addresses_Heating = doc.createNestedObject("Heating");
+    JsonObject CAN_Addresses_Heating = doc["Heating"].to<JsonObject>();
     CAN_Addresses_Heating["FeedCurrent"] = IntToHex(configuration.CanAddresses.Heating.FeedCurrent);
     CAN_Addresses_Heating["FeedMax"] = IntToHex(configuration.CanAddresses.Heating.FeedMax);
     CAN_Addresses_Heating["FeedSetpoint"] = IntToHex(configuration.CanAddresses.Heating.FeedSetpoint);
@@ -626,7 +837,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_Heating["Mode"] = IntToHex(configuration.CanAddresses.Heating.Mode);
     CAN_Addresses_Heating["Economy"] = IntToHex(configuration.CanAddresses.Heating.Economy);
 
-    JsonObject CAN_Addresses_HotWater = doc.createNestedObject("HotWater");
+    JsonObject CAN_Addresses_HotWater = doc["HotWater"].to<JsonObject>();
     CAN_Addresses_HotWater["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.SetpointTemperature);
     CAN_Addresses_HotWater["MaxTemperature"] = IntToHex(configuration.CanAddresses.HotWater.MaxTemperature);
     CAN_Addresses_HotWater["CurrentTemperature"] = IntToHex(configuration.CanAddresses.HotWater.CurrentTemperature);
@@ -634,7 +845,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_HotWater["BufferOperation"] = IntToHex(configuration.CanAddresses.HotWater.BufferOperation);
     CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature);
 
-    JsonObject CAN_Addresses_MixedCircuit = doc.createNestedObject("MixedCircuit");
+    JsonObject CAN_Addresses_MixedCircuit = doc["MixedCircuit"].to<JsonObject>();
     CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
@@ -645,7 +856,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
 
 void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<2048> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -695,9 +906,7 @@ void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char *>());   // "0x440"
     configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char *>());           // "0x407"
 
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"CAN Config have been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"CAN Config have been saved."})");
 }
 
 #pragma endregion
@@ -721,21 +930,26 @@ void configureAuxSensorsEndpoints()
                 onAuxSensorsConfigReceive(request, json);
             });
 
+    rcvHandler->setMethod(HTTP_POST);
     server->addHandler(rcvHandler);
 }
 
 void getAuxSensorsConfig(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<1024> doc;
-    JsonArray AuxiliarySensors_Sensors = doc.createNestedArray();
+    JsonDocument doc;
+    // Preserve the existing API contract: the sensors array is the first item
+    // in the root array. The web UI deployed on existing devices reads it via
+    // response.at(0).
+    JsonArray root = doc.to<JsonArray>();
+    JsonArray AuxiliarySensors_Sensors = root.add<JsonArray>();
 
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
     {
-        JsonObject sensorEntry = AuxiliarySensors_Sensors.createNestedObject();
+        JsonObject sensorEntry = AuxiliarySensors_Sensors.add<JsonObject>();
         Sensor curSensor = configuration.TemperatureSensors.Sensors[i];
         sensorEntry["Label"] = curSensor.Label;
         sensorEntry["IsReturnValue"] = curSensor.UseAsReturnValueReference;
-        JsonArray address = sensorEntry.createNestedArray("Address");
+        JsonArray address = sensorEntry["Address"].to<JsonArray>();
         // Device address has a fixed size of 8
         for (unsigned char curAddress : curSensor.Address)
         {
@@ -786,7 +1000,7 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
             }
         ]
     */
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -807,7 +1021,7 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
     ceraValues.Auxiliary.Temperatures = (float *)malloc(sensorCount * sizeof(float));
 
     // Set initial values to zero.
-    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
+    for (size_t i = 0; i < sensorCount; i++)
     {
         ceraValues.Auxiliary.Temperatures[i] = 0.0F;
     }
@@ -846,9 +1060,7 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
         }
     }
 
-    WriteConfiguration();
-
-    request->send(200, "application/json", R"({"status":200, "msg":"Auxiliary Sensors have been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"Auxiliary Sensors have been saved."})");
 }
 
 #pragma endregion
@@ -872,12 +1084,13 @@ void configureLedConfigEndpoints()
                 onLedConfigReceive(request, json);
             });
 
+    rcvHandler->setMethod(HTTP_POST);
     server->addHandler(rcvHandler);
 }
 
 void getLedConfig(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     doc["wifi-led"] = configuration.LEDs.WifiLed;
     doc["status-led"] = configuration.LEDs.StatusLed;
     doc["mqtt-led"] = configuration.LEDs.MqttLed;
@@ -887,7 +1100,7 @@ void getLedConfig(AsyncWebServerRequest *request)
 
 void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     if (json.is<JsonArray>())
     {
         doc = json.as<JsonArray>();
@@ -897,18 +1110,30 @@ void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         doc = json.as<JsonObject>();
     }
 
-    if (!doc["wifi-led"].isNull())
-        configuration.LEDs.WifiLed = doc["wifi-led"];
-    if (!doc["status-led"].isNull())
-        configuration.LEDs.StatusLed = doc["status-led"];
-    if (!doc["mqtt-led"].isNull())
-        configuration.LEDs.MqttLed = doc["mqtt-led"];
-    if (!doc["heating-led"].isNull())
-        configuration.LEDs.HeatingLed = doc["heating-led"];
+    if (doc["wifi-led"].isNull() || doc["status-led"].isNull() ||
+        doc["mqtt-led"].isNull() || doc["heating-led"].isNull())
+    {
+        request->send(400, "application/json", R"({"status":400,"msg":"All four LED GPIO values are required."})");
+        return;
+    }
 
-    WriteConfiguration();
+    const int wifiLed = doc["wifi-led"].as<int>();
+    const int statusLed = doc["status-led"].as<int>();
+    const int mqttLed = doc["mqtt-led"].as<int>();
+    const int heatingLed = doc["heating-led"].as<int>();
+    if (wifiLed < 0 || wifiLed > 39 || statusLed < 0 || statusLed > 39 ||
+        mqttLed < 0 || mqttLed > 39 || heatingLed < 0 || heatingLed > 39)
+    {
+        request->send(400, "application/json", R"({"status":400,"msg":"LED GPIO values must be between 0 and 39."})");
+        return;
+    }
 
-    request->send(200, "application/json", R"({"status":200, "msg":"LED config has been saved."})");
+    configuration.LEDs.WifiLed = wifiLed;
+    configuration.LEDs.StatusLed = statusLed;
+    configuration.LEDs.MqttLed = mqttLed;
+    configuration.LEDs.HeatingLed = heatingLed;
+
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"LED config has been saved."})");
 
 }
 
@@ -916,7 +1141,7 @@ void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 
 void getSystemStatus(AsyncWebServerRequest *request)
 {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     doc["cores"] = ESP.getChipCores();
     doc["model"] = ESP.getChipModel();
     doc["revision"] = ESP.getChipRevision();
@@ -928,6 +1153,7 @@ void getSystemStatus(AsyncWebServerRequest *request)
     doc["canstatus"] = CanConfigErrorCode;
     doc["canerrorcount"] = CanSendErrorCount;
     doc["mqtt"] = client.connected();
+    doc["failsafe"] = IsFailSafeActive();
 
     sendJson(doc, request);
 }

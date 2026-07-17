@@ -42,8 +42,8 @@
 #endif
 
 //-- Preprocessor 
-#define ST(A) #A
-#define STR(A) ST(A)
+#define JC_STRINGIFY_IMPL(A) #A
+#define JC_STRINGIFY(A) JC_STRINGIFY_IMPL(A)
 
 
 extern void SendMessage(CANMessage msg);

@@ -176,8 +176,18 @@ function completeHandler(event) {
     const file = _("file1").files[0];
     listFiles(CurrentPath);
     showUsagePercentage();
-    _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
-    <strong>File Uploaded!</strong> The File ${file.name} has been successfully uploaded into "${CurrentPath}"
+    let response = {};
+    try {
+        response = JSON.parse(event.target.responseText);
+    } catch (_) {
+        response.msg = "The server returned an invalid response.";
+    }
+    const succeeded = event.target.status >= 200 && event.target.status < 300;
+    const alertClass = succeeded ? "alert-success" : "alert-danger";
+    const heading = succeeded ? "File Uploaded!" : "File Upload Failed!";
+    const details = response.msg || `The File ${file.name} was uploaded into "${CurrentPath}".`;
+    _("status").innerHTML = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+    <strong>${heading}</strong> ${details}
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`;
     _("upload_form").reset();
@@ -198,4 +208,22 @@ function abortHandler(event) {
     </div>`;
     _("upload_form").reset();
     listFiles(CurrentPath);
+}
+
+async function reloadConfiguration() {
+    const button = _("reload-config");
+    button.disabled = true;
+    _("statusdetails").innerHTML = "Validating configuration...";
+
+    try {
+        const response = await fetch("/api/config/reload", { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.msg || "Configuration validation failed.");
+        }
+        _("statusdetails").innerHTML = `${result.msg} The device will be unavailable briefly.`;
+    } catch (error) {
+        _("statusdetails").innerHTML = `<div class="alert alert-danger" role="alert">${error.message}</div>`;
+        button.disabled = false;
+    }
 }
