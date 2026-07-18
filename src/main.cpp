@@ -63,6 +63,10 @@ void setup()
     Serial.println("\e[1;33mLittleFS was formatted and is empty. Upload littlefs.bin before continuing.\e[0m");
   }
 
+  String restoreError;
+  if (!RestoreConfigurationAfterFilesystemUpdate(restoreError))
+    Serial.printf("\e[1;31m%s\e[0m\r\n", restoreError.c_str());
+
   Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
 
 #pragma region "Setup Mode"

@@ -23,7 +23,7 @@ def gzip_file( src_path, dst_path ):
 def gzip_webfiles( source, target, env ):
     
     # FILETYPES / SUFFIXES WHICh NEED TO BE GZIPPED
-    filetypes_to_gzip = [ '.css', '.html', '.js' ]
+    filetypes_to_gzip = [ '.css', '.html', '.js', '.json' ]
 
     print( '\nGZIP: INITIATED GZIP FOR SPIFFS...\n' )
     SOURCE_DIR_NAME = 'data'
@@ -38,7 +38,7 @@ def gzip_webfiles( source, target, env ):
     # Local USB provisioning may explicitly select a device configuration without
     # ever placing credentials in the repository. CI intentionally leaves this unset.
     configuration_source_path = os.environ.get(
-        'JUNKERSCONTROL_CONFIG_FILE', configuration_template_path
+        'CERASMARTER_CONFIG_FILE', configuration_template_path
     )
 
     # CHECK DATA DIR

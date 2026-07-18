@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Added a live home dashboard for boiler, heating, hot-water, connectivity, and fail-safe state, including a dependency-free five-minute temperature chart.
+- Restored percentage progress bars for RAM and application flash usage, and added a separate LittleFS usage indicator to the dashboard.
+- Made the manual configuration reload action prominent in the file manager and clarified when it is still required.
+- Added complete web fallback controls for every MQTT-controlled runtime value and consolidated both transports behind the same command handlers.
+- Added `GET /api/runtime` and `POST /api/control` for current values and immediate heating control.
+- Preserved valid device configuration automatically across LittleFS images uploaded through the web interface by using a one-shot NVS backup and boot-time restore. Raw serial filesystem flashing remains outside firmware control.
+- Added English and German web-interface localization with automatic browser-language defaults and persisted preferences.
+- Reworked localization into one JSON resource per language with maintainable, area-based keys and explicit `data-i18n` attribute support, following the structure documented by the Javascript i18n core project.
+- Added a persistent light/dark appearance switch to every web-interface page, with the operating-system preference used as the initial default.
+- Replaced the dark-mode text control with a compact sun/moon icon and normalized MQTT form columns so translated labels wrap without displacing inputs.
+- Completed the Cerasmarter branding migration by renaming Home Assistant runtime topics to `cerasmarter/<DeviceId>/...` and the local provisioning override to `CERASMARTER_CONFIG_FILE`.
+- Renamed generated GitHub release artifacts to `Cerasmarter-<tag>`; historical repository URLs remain unchanged because the GitHub repository itself has not been renamed.
+- Enhanced the CAN message analyzer to show the configured controller value name beside every known CAN address and captured message.
 - Replaced the incomplete legacy Home Assistant integration with current MQTT device discovery using one retained device payload.
 - Removed manual Home Assistant YAML and filesystem discovery-template files.
 - Added discovery for heating, hot-water, controller-status, and dynamic auxiliary-temperature entities under one device.
@@ -11,7 +24,7 @@
 - Added Home Assistant configuration to the web interface and automatic MQTT reconnection after saving it.
 - Added cleanup of retained discovery records when Home Assistant discovery is disabled or its device identity changes.
 - Added meaningful Home Assistant icons for every discovered entity and changed the burner flame entity to explicit on/off semantics with a flame icon.
-- Changed the Home Assistant device manufacturer and discovery origin branding from JunkersControl to Cerasmarter.
+- Changed the Home Assistant device manufacturer and discovery origin branding to Cerasmarter.
 - Added Home Assistant diagnostic entities for heap memory, filesystem and flash storage, chip model and revision, CPU cores, CPU frequency, and auxiliary-sensor connectivity.
 - Fixed MQTT command handling, including the previously unreachable hot-water parameter handler and unsafe callback payload termination.
 - Prevented stale generated filesystem files from leaking into release images and made preprocessing failures stop the build.

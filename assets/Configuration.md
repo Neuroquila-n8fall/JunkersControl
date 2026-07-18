@@ -272,7 +272,7 @@ Cerasmarter supports native MQTT device discovery. No manual Home Assistant YAML
 - `TempUnit` is used by all discovered temperature entities. Normally this is `°C` or `°F`.
 - `OffDelay` is the number of seconds after which an active binary sensor returns to off without a newer active state. Set it to `0` to disable this behavior.
 
-The controller publishes one retained device-discovery payload to `<AutoDiscoveryPrefix>/device/<DeviceId>/config`. Runtime data uses `junkerscontrol/<DeviceId>/...`; changing the discovery prefix does not change state or command topics.
+The controller publishes one retained device-discovery payload to `<AutoDiscoveryPrefix>/device/<DeviceId>/config`. Runtime data uses `cerasmarter/<DeviceId>/...`; changing the discovery prefix does not change state or command topics.
 
 Treat `DeviceId` as stable after Home Assistant has discovered the controller. When the ID or discovery prefix is changed through the web interface, the controller removes its previous retained discovery record before reconnecting with the new identity. If the broker is unavailable during that change, remove the old device or retained discovery topic manually.
 

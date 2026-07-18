@@ -17,6 +17,10 @@ extern bool WriteConfiguration();
 
 extern void SetConfigurationUploadPending(bool pending);
 
+extern bool BackupConfigurationForFilesystemUpdate(String &errorMessage);
+
+extern bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage);
+
 extern String IntToHex(int value);
 
 extern unsigned long convertHexString(const char *src);

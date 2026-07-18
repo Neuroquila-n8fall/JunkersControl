@@ -1,4 +1,5 @@
 #include <configuration.h>
+#include <Preferences.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
@@ -11,6 +12,139 @@ const char *backupConfigFileName = (char *)"/configuration.bak";
 Configuration configuration;
 
 static bool configurationUploadPending = false;
+static const char *filesystemBackupNamespace = "cerafsbackup";
+static const char *filesystemBackupKey = "config";
+static const size_t maximumBackupSize = 16384;
+
+static bool validateConfigurationDocument(JsonDocument &doc, String &errorMessage)
+{
+    const char *requiredSections[] = {"Wifi", "MQTT", "Features", "Time", "General", "HomeAssistant", "CAN", "AuxiliarySensors", "LEDs"};
+    for (const char *section : requiredSections)
+    {
+        if (!doc[section].is<JsonObject>())
+        {
+            errorMessage = "Configuration section is missing or invalid: " + String(section);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool BackupConfigurationForFilesystemUpdate(String &errorMessage)
+{
+    File file = LittleFS.open(configFileName, FILE_READ);
+    if (!file)
+    {
+        errorMessage = "The active configuration could not be opened; filesystem update cancelled.";
+        return false;
+    }
+    const size_t size = file.size();
+    if (size == 0 || size > maximumBackupSize)
+    {
+        file.close();
+        errorMessage = "The active configuration has an unsupported size; filesystem update cancelled.";
+        return false;
+    }
+    std::unique_ptr<uint8_t[]> data(new (std::nothrow) uint8_t[size]);
+    if (!data || file.read(data.get(), size) != size)
+    {
+        file.close();
+        errorMessage = "The active configuration could not be read; filesystem update cancelled.";
+        return false;
+    }
+    file.close();
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, data.get(), size);
+    if (jsonError || !validateConfigurationDocument(doc, errorMessage))
+    {
+        if (jsonError)
+            errorMessage = "The active configuration is invalid JSON; filesystem update cancelled.";
+        return false;
+    }
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+    {
+        errorMessage = "NVS backup storage could not be opened; filesystem update cancelled.";
+        return false;
+    }
+    const size_t written = preferences.putBytes(filesystemBackupKey, data.get(), size);
+    preferences.end();
+    if (written != size)
+    {
+        errorMessage = "The configuration could not be backed up to NVS; filesystem update cancelled.";
+        return false;
+    }
+    return true;
+}
+
+bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage)
+{
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+        return true;
+    const size_t size = preferences.getBytesLength(filesystemBackupKey);
+    if (size == 0)
+    {
+        preferences.end();
+        return true;
+    }
+    if (size > maximumBackupSize)
+    {
+        preferences.remove(filesystemBackupKey);
+        preferences.end();
+        errorMessage = "Discarded an oversized configuration backup from NVS.";
+        return false;
+    }
+    std::unique_ptr<uint8_t[]> data(new (std::nothrow) uint8_t[size]);
+    if (!data || preferences.getBytes(filesystemBackupKey, data.get(), size) != size)
+    {
+        preferences.end();
+        errorMessage = "The configuration backup could not be read from NVS.";
+        return false;
+    }
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, data.get(), size);
+    if (jsonError || !validateConfigurationDocument(doc, errorMessage))
+    {
+        preferences.remove(filesystemBackupKey);
+        preferences.end();
+        if (jsonError)
+            errorMessage = "Discarded an invalid configuration backup from NVS.";
+        return false;
+    }
+    const char *restoreFileName = "/configuration.restore";
+    File restored = LittleFS.open(restoreFileName, FILE_WRITE, true);
+    if (!restored || restored.write(data.get(), size) != size)
+    {
+        restored.close();
+        LittleFS.remove(restoreFileName);
+        preferences.end();
+        errorMessage = "The preserved configuration could not be restored to LittleFS.";
+        return false;
+    }
+    restored.flush();
+    restored.close();
+    LittleFS.remove(backupConfigFileName);
+    if (LittleFS.exists(configFileName) && !LittleFS.rename(configFileName, backupConfigFileName))
+    {
+        LittleFS.remove(restoreFileName);
+        preferences.end();
+        errorMessage = "The filesystem template could not be replaced by the preserved configuration.";
+        return false;
+    }
+    if (!LittleFS.rename(restoreFileName, configFileName))
+    {
+        LittleFS.rename(backupConfigFileName, configFileName);
+        preferences.end();
+        errorMessage = "The preserved configuration could not be committed.";
+        return false;
+    }
+    LittleFS.remove(backupConfigFileName);
+    preferences.remove(filesystemBackupKey);
+    preferences.end();
+    Log.println("Restored configuration preserved across the filesystem update.");
+    return true;
+}
 
 void SetConfigurationUploadPending(bool pending)
 {
@@ -164,7 +298,7 @@ bool ReadConfiguration()
 
     String temperatureUnit = HomeAssistantSettings["TempUnit"].as<String>();
     configuration.HomeAssistant.TempUnit = temperatureUnit.isEmpty() ? "°C" : temperatureUnit;
-    configuration.HomeAssistant.StateTopic = "junkerscontrol/" + configuration.HomeAssistant.DeviceId + "/";
+    configuration.HomeAssistant.StateTopic = "cerasmarter/" + configuration.HomeAssistant.DeviceId + "/";
 
     JsonObject Leds = doc["LEDs"];
     if (Leds["Wifi"].is<int>())

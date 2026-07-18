@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cerasmarter - Fallback Heating Control</title><link rel="stylesheet" href="frontend/css/bootstrap.min.css"><link rel="stylesheet" href="frontend/css/bootstrap-icons.css"><link rel="stylesheet" href="frontend/css/theme.css"></head>
+<body><div id="navigation-container"></div><main class="container py-4">
+<h2 class="mt-4">Fallback Heating Control</h2>
+<div class="alert alert-warning"><strong>Immediate control</strong><br><span>These runtime values are sent directly to the heating controller. They are not saved to configuration.json and may later be replaced by MQTT or Home Assistant commands.</span></div>
+<form id="control-form" class="control-form"><div class="row g-3">
+<div class="col-lg-6"><div class="card"><div class="card-header">Heating</div><div class="card-body row g-3">
+<div class="col-12 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="Enabled" name="Enabled"><label class="form-check-label" for="Enabled">Heating enabled</label></div>
+<div class="col-6"><label class="form-label" for="FeedSetpoint">Requested Feed Setpoint</label><div class="input-group"><input class="form-control" type="number" step="0.1" min="0" max="100" id="FeedSetpoint" name="FeedSetpoint"><span class="input-group-text">°C</span></div></div>
+<div class="col-6"><label class="form-label" for="FeedMinimum">Minimum Feed Temperature</label><div class="input-group"><input class="form-control" type="number" step="0.1" min="0" max="100" id="FeedMinimum" name="FeedMinimum"><span class="input-group-text">°C</span></div></div>
+<div class="col-6"><label class="form-label" for="FeedBaseSetpoint">Heating curve basepoint</label><input class="form-control" type="number" step="0.1" id="FeedBaseSetpoint" name="FeedBaseSetpoint"></div>
+<div class="col-6"><label class="form-label" for="FeedCutOff">Heating curve endpoint</label><input class="form-control" type="number" step="0.1" id="FeedCutOff" name="FeedCutOff"></div>
+<div class="col-12 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="OverrideSetpoint" name="OverrideSetpoint"><label class="form-check-label" for="OverrideSetpoint">Use requested feed setpoint directly</label></div>
+<div class="col-6"><label class="form-label" for="Adaption">Feed temperature adaption</label><input class="form-control" type="number" step="0.1" id="Adaption" name="Adaption"></div>
+<div class="col-6 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="DynamicAdaption" name="DynamicAdaption"><label class="form-check-label" for="DynamicAdaption">Dynamic adaption</label></div>
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">Room and boost</div><div class="card-body row g-3">
+<div class="col-6"><label class="form-label" for="AmbientTemperature">Room Reference Temperature</label><div class="input-group"><input class="form-control" type="number" step="0.1" id="AmbientTemperature" name="AmbientTemperature"><span class="input-group-text">°C</span></div></div>
+<div class="col-6"><label class="form-label" for="TargetAmbientTemperature">Target room temperature</label><div class="input-group"><input class="form-control" type="number" step="0.1" id="TargetAmbientTemperature" name="TargetAmbientTemperature"><span class="input-group-text">°C</span></div></div>
+<div class="col-6"><label class="form-label" for="AuxiliaryTemperature">Auxiliary outside temperature</label><div class="input-group"><input class="form-control" type="number" step="0.1" id="AuxiliaryTemperature" name="AuxiliaryTemperature"><span class="input-group-text">°C</span></div></div>
+<div class="col-6"><label class="form-label" for="OnDemandBoostDuration">Boost Duration</label><div class="input-group"><input class="form-control" type="number" min="0" max="86400" id="OnDemandBoostDuration" name="OnDemandBoostDuration"><span class="input-group-text">s</span></div></div>
+<div class="col-6 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="Boost" name="Boost"><label class="form-check-label" for="Boost">Boost</label></div>
+<div class="col-6 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="FastHeatup" name="FastHeatup"><label class="form-check-label" for="FastHeatup">Fast Heatup</label></div>
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">Valve scaling</div><div class="card-body row g-3">
+<div class="col-12 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="ValveScaling" name="ValveScaling"><label class="form-check-label" for="ValveScaling">Enable valve scaling</label></div>
+<div class="col-6"><label class="form-label" for="ValveScalingMaxOpening">Maximum valve opening</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="ValveScalingMaxOpening" name="ValveScalingMaxOpening"><span class="input-group-text">%</span></div></div>
+<div class="col-6"><label class="form-label" for="ValveScalingOpening">Current valve opening</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="ValveScalingOpening" name="ValveScalingOpening"><span class="input-group-text">%</span></div></div>
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">Hot Water</div><div class="card-body"><label class="form-label" for="HotWaterSetpoint">Temperature Setpoint</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="HotWaterSetpoint" name="HotWaterSetpoint"><span class="input-group-text">°C</span></div></div></div></div>
+</div><div id="control-status" class="mt-3"></div><button class="btn btn-primary mt-3" type="submit"><i class="bi bi-send"></i> Apply Control Values</button></form>
+</main><script src="frontend/js/i18n.js"></script><script src="frontend/js/api.js"></script><script src="frontend/js/framework.js"></script><script src="frontend/js/bootstrap.bundle.min.js"></script><script src="frontend/js/control.js"></script></body></html>

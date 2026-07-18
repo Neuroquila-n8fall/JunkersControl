@@ -58,7 +58,7 @@ jobs:
       - name: Archive release binaries
         uses: actions/upload-artifact@v7
         with:
-          name: JunkersControl-${{ env.RELEASE_TAG }}
+          name: Cerasmarter-${{ env.RELEASE_TAG }}
           path: |
             .pio/build/github/firmware.bin
             .pio/build/github/littlefs.bin
