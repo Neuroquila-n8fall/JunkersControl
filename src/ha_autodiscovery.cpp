@@ -1,176 +1,448 @@
 #include <ha_autodiscovery.h>
-#include <Arduino.h>
 
-const char *HaSensorsFileName = (char *)"/ha_sensors.json";
-const char *HaBinarySensorsFileName = (char *)"/ha_binarysensors.json";
-const char *HaNumbersFileName = (char *)"/ha_numbers.json";
+#include <ArduinoJson.h>
+#include <configuration.h>
+#include <failsafe.h>
+#include <heating.h>
+#include <main.h>
+#include <mqtt.h>
 
-/// @brief Create a JSON definition of a HA sensor.
-/// @param name Name of the Sensor. Example: "Heating Feed Setpoint Temperature"
-/// @param unit_of_measurement °C, KW, ...
-/// @param device_class See https://www.home-assistant.io/integrations/sensor/#device-class
-/// @param force_update Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history. See https://www.home-assistant.io/integrations/sensor.mqtt/#force_update
-/// @param sensorShortName A short name for the sensor wich is used inside the discovery topic.
-/// @param value_template The template to be used inside HA to correctly parse this value. Example:"{{ value_json.temperature | float(default=0) }}"
-void CreateAndPublishAutoDiscoverySensorJson(
-    String name,
-    String value_template,
-    String unit_of_measurement = (char *)"°C",
-    String state_topic = "homeassistant/device/state",
-    char *device_class = (char *)"temperature",
-    bool force_update = true,
-    char *sensorShortName = (char *)"temperature")
+namespace
 {
-    // This is the discovery topic for this specific sensor
-    String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/sensor/" + configuration.HomeAssistant.DeviceId + "/temperature/config";
-
-    JsonDocument doc;
-    char buffer[256];
-
-    doc["name"] = name;
-    doc["uniq_id"] = configuration.HomeAssistant.DeviceId;
-    doc["stat_t"] = state_topic;
-    doc["unit_of_meas"] = unit_of_measurement;
-    doc["dev_cla"] = device_class;
-    doc["frc_upd"] = force_update;
-    // I'm sending a JSON object as the state of this MQTT device
-    // so we'll need to unpack this JSON object to get a single value
-    // for this specific sensor.
-    doc["val_tpl"] = value_template;
-
-    size_t n = serializeJson(doc, buffer);
-    client.publish(configuration.HomeAssistant.StateTopic.c_str(), buffer, n);
+String availabilityTopic()
+{
+    return configuration.HomeAssistant.StateTopic + "availability";
 }
 
-void SetupAutodiscoveryForAuxSensors()
+String discoveryTopic()
+{
+    return configuration.HomeAssistant.AutoDiscoveryPrefix + "/device/" +
+           configuration.HomeAssistant.DeviceId + "/config";
+}
+
+String homeAssistantStatusTopic()
+{
+    return configuration.HomeAssistant.AutoDiscoveryPrefix + "/status";
+}
+
+String sanitizeId(String value)
+{
+    value.toLowerCase();
+    for (size_t i = 0; i < value.length(); i++)
+    {
+        const char c = value.charAt(i);
+        if (!isAlphaNumeric(c) && c != '_' && c != '-')
+            value.setCharAt(i, '_');
+    }
+    return value;
+}
+
+String softwareVersion()
+{
+    String version = JC_STRINGIFY(VERSION);
+    version.replace("\"", "");
+    return version;
+}
+
+String stateTopic(const String &category)
+{
+    return configuration.HomeAssistant.StateTopic + category + "/state";
+}
+
+String commandTopic(const String &category, const String &key)
+{
+    return configuration.HomeAssistant.StateTopic + category + "/" + key + "/set";
+}
+
+String uniqueId(const String &componentId)
+{
+    return sanitizeId(configuration.HomeAssistant.DeviceId + "_" + componentId);
+}
+
+JsonObject addComponent(JsonObject components, const String &componentId, const char *platform, const String &name)
+{
+    JsonObject component = components[componentId].to<JsonObject>();
+    component["p"] = platform;
+    component["name"] = name;
+    component["unique_id"] = uniqueId(componentId);
+    return component;
+}
+
+void addSensor(JsonObject components,
+               const String &componentId,
+               const String &name,
+               const String &category,
+               const String &valueTemplate,
+               const char *deviceClass = nullptr,
+               const String &unit = "",
+               const char *icon = nullptr)
+{
+    JsonObject sensor = addComponent(components, componentId, "sensor", name);
+    sensor["state_topic"] = stateTopic(category);
+    sensor["value_template"] = valueTemplate;
+    if (deviceClass != nullptr)
+        sensor["device_class"] = deviceClass;
+    if (!unit.isEmpty())
+        sensor["unit_of_measurement"] = unit;
+    if (icon != nullptr)
+        sensor["icon"] = icon;
+    if (deviceClass != nullptr && strcmp(deviceClass, "temperature") == 0)
+        sensor["state_class"] = "measurement";
+}
+
+void addDiagnosticSensor(JsonObject components,
+                         const String &componentId,
+                         const String &name,
+                         const String &valueTemplate,
+                         const char *deviceClass,
+                         const String &unit,
+                         const char *icon,
+                         const char *stateClass = nullptr)
+{
+    addSensor(components, componentId, name, "General", valueTemplate, deviceClass, unit, icon);
+    JsonObject sensor = components[componentId].as<JsonObject>();
+    sensor["entity_category"] = "diagnostic";
+    if (stateClass != nullptr)
+        sensor["state_class"] = stateClass;
+}
+
+void addBinarySensor(JsonObject components,
+                     const String &componentId,
+                     const String &name,
+                     const String &category,
+                     const String &valueTemplate,
+                     const char *deviceClass = nullptr,
+                     const char *icon = nullptr,
+                     const char *entityCategory = nullptr)
+{
+    JsonObject sensor = addComponent(components, componentId, "binary_sensor", name);
+    sensor["state_topic"] = stateTopic(category);
+    sensor["value_template"] = valueTemplate;
+    sensor["payload_on"] = "true";
+    sensor["payload_off"] = "false";
+    if (deviceClass != nullptr)
+        sensor["device_class"] = deviceClass;
+    if (icon != nullptr)
+        sensor["icon"] = icon;
+    if (entityCategory != nullptr)
+        sensor["entity_category"] = entityCategory;
+    if (configuration.HomeAssistant.OffDelay > 0)
+        sensor["off_delay"] = configuration.HomeAssistant.OffDelay;
+}
+
+void addNumber(JsonObject components,
+               const String &componentId,
+               const String &name,
+               const String &category,
+               const String &key,
+               const String &valueTemplate,
+               double minimum,
+               double maximum,
+               double step,
+               const String &unit = "",
+               const char *mode = "slider",
+               const char *icon = nullptr)
+{
+    JsonObject number = addComponent(components, componentId, "number", name);
+    number["state_topic"] = stateTopic(category);
+    number["command_topic"] = commandTopic(category, key);
+    number["value_template"] = valueTemplate;
+    number["min"] = minimum;
+    number["max"] = maximum;
+    number["step"] = step;
+    number["mode"] = mode;
+    if (!unit.isEmpty())
+        number["unit_of_measurement"] = unit;
+    if (icon != nullptr)
+        number["icon"] = icon;
+
+    client.subscribe(number["command_topic"].as<const char *>());
+}
+
+void addSwitch(JsonObject components,
+               const String &componentId,
+               const String &name,
+               const String &category,
+               const String &key,
+               const String &valueTemplate,
+               const char *icon = nullptr)
+{
+    JsonObject control = addComponent(components, componentId, "switch", name);
+    control["state_topic"] = stateTopic(category);
+    control["command_topic"] = commandTopic(category, key);
+    control["value_template"] = valueTemplate;
+    control["payload_on"] = "true";
+    control["payload_off"] = "false";
+    control["state_on"] = "true";
+    control["state_off"] = "false";
+    control["optimistic"] = false;
+    if (icon != nullptr)
+        control["icon"] = icon;
+
+    client.subscribe(control["command_topic"].as<const char *>());
+}
+
+String escapeTemplateKey(String value)
+{
+    value.replace("\\", "\\\\");
+    value.replace("'", "\\'");
+    return value;
+}
+
+void addCoreComponents(JsonObject components)
+{
+    const String temperatureUnit = configuration.HomeAssistant.TempUnit;
+
+    addSensor(components, "general_error", "Error", "General",
+              "{{ value_json.General.Error | int(default=0) }}", nullptr, "", "mdi:alert-circle-outline");
+
+    addDiagnosticSensor(components, "diagnostic_free_heap", "Free Heap",
+                        "{{ value_json.General.FreeHeap | int(default=0) }}", "data_size", "B",
+                        "mdi:memory", "measurement");
+    addDiagnosticSensor(components, "diagnostic_heap_size", "Heap Size",
+                        "{{ value_json.General.HeapSize | int(default=0) }}", "data_size", "B",
+                        "mdi:memory", "measurement");
+    addDiagnosticSensor(components, "diagnostic_filesystem_used", "Filesystem Used",
+                        "{{ value_json.General.FilesystemUsed | int(default=0) }}", "data_size", "B",
+                        "mdi:database", "measurement");
+    addDiagnosticSensor(components, "diagnostic_filesystem_size", "Filesystem Size",
+                        "{{ value_json.General.FilesystemSize | int(default=0) }}", "data_size", "B",
+                        "mdi:database-outline", "measurement");
+    addDiagnosticSensor(components, "diagnostic_flash_size", "Flash Size",
+                        "{{ value_json.General.FlashSize | int(default=0) }}", "data_size", "B",
+                        "mdi:chip", "measurement");
+    addDiagnosticSensor(components, "diagnostic_chip_model", "Chip Model",
+                        "{{ value_json.General.ChipModel | default('unknown') }}", nullptr, "",
+                        "mdi:chip");
+    addDiagnosticSensor(components, "diagnostic_chip_revision", "Chip Revision",
+                        "{{ value_json.General.ChipRevision | default('unknown') }}", nullptr, "",
+                        "mdi:counter");
+    addDiagnosticSensor(components, "diagnostic_cpu_cores", "CPU Cores",
+                        "{{ value_json.General.CpuCores | int(default=0) }}", nullptr, "",
+                        "mdi:cpu-32-bit");
+    addDiagnosticSensor(components, "diagnostic_cpu_frequency", "CPU Frequency",
+                        "{{ value_json.General.CpuFrequency | int(default=0) }}", "frequency", "MHz",
+                        "mdi:speedometer", "measurement");
+
+    addSensor(components, "heating_feed_current", "Current Feed Temperature", "Heating",
+              "{{ value_json.Heating.FeedCurrent | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:thermometer-water");
+    addSensor(components, "heating_feed_maximum", "Maximum Feed Temperature", "Heating",
+              "{{ value_json.Heating.FeedMaximum | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:thermometer-high");
+    addSensor(components, "heating_feed_setpoint", "Feed Setpoint Temperature", "Heating",
+              "{{ value_json.Heating.FeedSetpoint | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:thermometer-check");
+    addSensor(components, "heating_outside", "Outside Temperature", "Heating",
+              "{{ value_json.Heating.Outside | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:sun-thermometer-outline");
+
+    addSensor(components, "water_maximum", "Maximum Water Temperature", "Water",
+              "{{ value_json.Water.Maximum | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:thermometer-high");
+    addSensor(components, "water_current", "Current Water Temperature", "Water",
+              "{{ value_json.Water.Current | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:water-thermometer");
+    addSensor(components, "water_setpoint", "Water Setpoint Temperature", "Water",
+              "{{ value_json.Water.Setpoint | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:thermometer-check");
+    addSensor(components, "water_continuous_flow_setpoint", "Continuous Flow Setpoint", "Water",
+              "{{ value_json.Water.CFSetpoint | float(default=0) }}", "temperature", temperatureUnit,
+              "mdi:water-sync");
+
+    addBinarySensor(components, "general_gas_burner", "Flame Lit", "General",
+                    "{{ value_json.General.GasBurner }}", nullptr, "mdi:fire");
+    addBinarySensor(components, "heating_pump", "Heating Pump", "Heating",
+                    "{{ value_json.Heating.Pump }}", "running", "mdi:pump");
+    addBinarySensor(components, "heating_season", "Heating Season", "Heating",
+                    "{{ value_json.Heating.Season }}", nullptr, "mdi:radiator");
+    addBinarySensor(components, "heating_working", "Heating Operation", "Heating",
+                    "{{ value_json.Heating.Working }}", "running", "mdi:heating-coil");
+    addBinarySensor(components, "water_now", "Hot Water Now", "Water",
+                    "{{ value_json.Water.Now }}", "running", "mdi:water-boiler");
+    addBinarySensor(components, "water_buffer", "Hot Water Buffer Mode", "Water",
+                    "{{ value_json.Water.Buffer }}", "running", "mdi:water-boiler-auto");
+
+    addNumber(components, "heating_requested_setpoint", "Requested Feed Setpoint", "Heating", "Setpoint",
+              "{{ value_json.Heating.RequestedFeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
+              "slider", "mdi:thermometer-chevron-up");
+    addNumber(components, "heating_boost_duration", "Boost Duration", "Heating", "BoostDuration",
+              "{{ value_json.Heating.BoostDuration | int(default=0) }}", 0, 86400, 1, "s", "box",
+              "mdi:timer-outline");
+    addNumber(components, "heating_room_reference", "Room Reference Temperature", "Heating", "RoomReferenceT",
+              "{{ value_json.Heating.RoomReferenceT | float(default=0) }}", -50, 100, 0.1, temperatureUnit,
+              "slider", "mdi:home-thermometer");
+
+    addSwitch(components, "heating_enabled", "Heating Enabled", "Heating", "Enabled",
+              "{{ value_json.Heating.Enabled }}", "mdi:radiator");
+    addSwitch(components, "heating_boost", "Heating Boost", "Heating", "Boost",
+              "{{ value_json.Heating.Boost }}", "mdi:fire-circle");
+    addSwitch(components, "heating_fast_heatup", "Fast Heatup", "Heating", "FastHeatup",
+              "{{ value_json.Heating.FastHeatup }}", "mdi:heat-wave");
+}
+
+void addAuxiliaryComponents(JsonObject components)
 {
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; i++)
     {
-        String label = configuration.TemperatureSensors.Sensors[i].Label;
-        label.replace(" ", "-");
-        char *valTempl;
-        sprintf(valTempl, "{{ value_json.Auxiliary.%s }}", label.c_str());
-        String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
-        CreateAndPublishAutoDiscoverySensorJson(
-            label.c_str(),
-            configuration.HomeAssistant.TempUnit.c_str(),
-            valTempl,
-            topic);
+        const String label = configuration.TemperatureSensors.Sensors[i].Label;
+        const String id = sanitizeId(label);
+        const String templateKey = escapeTemplateKey(label);
+
+        addSensor(components, "auxiliary_" + id + "_temperature", label + " Temperature", "Auxiliary",
+                  "{{ value_json.Auxiliary['" + templateKey + "'].Temperature | float(default=0) }}",
+                  "temperature", configuration.HomeAssistant.TempUnit, "mdi:thermometer-probe");
+        addBinarySensor(components, "auxiliary_" + id + "_reachable", label + " Reachable", "Auxiliary",
+                        "{{ value_json.Auxiliary['" + templateKey + "'].Reachable }}", "connectivity",
+                        "mdi:lan-connect", "diagnostic");
     }
 }
 
-void SetupAutodiscovery(const char *fileName)
+bool parseNumber(const String &payload, double &value)
 {
-    if (!LittleFS.exists(fileName))
+    char *end = nullptr;
+    value = strtod(payload.c_str(), &end);
+    return end != payload.c_str() && *end == '\0' && isfinite(value);
+}
+
+bool handleHomeAssistantCommand(const String &relativeTopic, const String &payload)
+{
+    if (relativeTopic == "Heating/Enabled/set" ||
+        relativeTopic == "Heating/Boost/set" ||
+        relativeTopic == "Heating/FastHeatup/set")
     {
-        Log.println("HA Autodiscovery file could not be found. Please upload it first.");
-        return;
+        String normalizedPayload = payload;
+        normalizedPayload.toLowerCase();
+        const bool enabled = normalizedPayload == "true" || normalizedPayload == "on" || normalizedPayload == "1";
+        const bool disabled = normalizedPayload == "false" || normalizedPayload == "off" || normalizedPayload == "0";
+        if (!enabled && !disabled)
+        {
+            Log.printf("Ignoring invalid HA switch payload on %s\r\n", relativeTopic.c_str());
+            return true;
+        }
+
+        if (relativeTopic == "Heating/Enabled/set")
+            commandedValues.Heating.Active = enabled;
+        else if (relativeTopic == "Heating/Boost/set")
+        {
+            commandedValues.Heating.Boost = enabled;
+            commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+        }
+        else
+        {
+            commandedValues.Heating.FastHeatup = enabled;
+            commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+        }
+
+        SetFeedTemperature();
+        NotifyValidHeatingCommand();
+        Log.printf("Applied HA command: %s\r\n", relativeTopic.c_str());
+        PublishHeatingTemperaturesAndStatus();
+        return true;
     }
 
-    File file = LittleFS.open(fileName);
-
-    if (!file)
+    double value = 0;
+    if (!parseNumber(payload, value))
     {
-        Log.println("HA Autodiscovery file could not be loaded. Consider checking and reuploading it.");
-        return;
+        Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
+        return true;
     }
+
+    if (relativeTopic == "Heating/Setpoint/set")
+    {
+        commandedValues.Heating.FeedSetpoint = constrain(value, 0.0, 100.0);
+        commandedValues.Heating.OverrideSetpoint = true;
+        SetFeedTemperature();
+    }
+    else if (relativeTopic == "Heating/BoostDuration/set")
+    {
+        commandedValues.Heating.BoostDuration = constrain(static_cast<int>(value), 0, 86400);
+    }
+    else if (relativeTopic == "Heating/RoomReferenceT/set")
+    {
+        commandedValues.Heating.AmbientTemperature = constrain(value, -50.0, 100.0);
+        SetFeedTemperature();
+    }
+    else
+    {
+        return false;
+    }
+
+    NotifyValidHeatingCommand();
+    Log.printf("Applied HA command: %s\r\n", relativeTopic.c_str());
+    PublishHeatingTemperaturesAndStatus();
+    return true;
+}
+} // namespace
+
+void PublishHomeAssistantAvailability(bool online)
+{
+    if (MUTE_MQTT == 1 || !configuration.HomeAssistant.Enabled || !client.connected())
+        return;
+
+    const String topic = availabilityTopic();
+    client.publish(topic.c_str(), online ? "online" : "offline", true);
+}
+
+void SetupHomeAssistantDiscovery()
+{
+    if (MUTE_MQTT == 1 || !configuration.HomeAssistant.Enabled || !client.connected())
+        return;
+
+    client.subscribe(homeAssistantStatusTopic().c_str());
 
     JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
 
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
+    JsonObject device = root["dev"].to<JsonObject>();
+    device["ids"] = configuration.HomeAssistant.DeviceId;
+    device["name"] = configuration.HomeAssistant.DeviceId;
+    device["mf"] = "Cerasmarter";
+    device["mdl"] = "Cerasmart-er";
+    device["sw"] = softwareVersion();
 
-    JsonObject sensors = doc.as<JsonObject>();
+    JsonObject origin = root["o"].to<JsonObject>();
+    origin["name"] = "Cerasmarter";
+    origin["sw"] = softwareVersion();
+    origin["url"] = "https://github.com/Neuroquila-n8fall/JunkersControl";
 
-    if (error)
+    root["availability_topic"] = availabilityTopic();
+    root["payload_available"] = "online";
+    root["payload_not_available"] = "offline";
+    root["qos"] = 0;
+
+    JsonObject components = root["cmps"].to<JsonObject>();
+    addCoreComponents(components);
+    addAuxiliaryComponents(components);
+
+    String payload;
+    serializeJson(doc, payload);
+    const String topic = discoveryTopic();
+    const bool published = client.publish(topic.c_str(), payload.c_str(), true);
+    PublishHomeAssistantAvailability(true);
+
+    Log.printf("Home Assistant device discovery %s (%u components, %u bytes).\r\n",
+               published ? "published" : "failed",
+               static_cast<unsigned int>(components.size()),
+               static_cast<unsigned int>(payload.length()));
+}
+
+bool HandleHomeAssistantMessage(const char *topic, const String &payload)
+{
+    if (!configuration.HomeAssistant.Enabled)
+        return false;
+
+    if (homeAssistantStatusTopic() == topic)
     {
-        Log.print("deserializeJson() failed: ");
-        Log.println(error.c_str());
-        return;
-    }
-    if (configuration.General.Debug)
-        Log.println("///----- Reading HA AD Config -----");
-    // Sensor Type Category Block: Sensor, Binary Sensor, ...
-    for (JsonPair SensorCategory : sensors)
-    {
-        if (configuration.General.Debug)
-            Log.println(SensorCategory.key().c_str());
-        // Sensor Device Specific Category like Heating, Water, ...
-        JsonObject CurCategoryObj = doc[SensorCategory.key().c_str()].as<JsonObject>();
-
-        for (JsonPair InternalDevCategory : CurCategoryObj)
-        {
-            if (configuration.General.Debug)
-                Log.printf("\t%s\r\n", InternalDevCategory.key().c_str());
-            // Specific Internal Device Category Config
-            JsonArray CurSensorObject = CurCategoryObj[InternalDevCategory.key().c_str()].as<JsonArray>();
-
-            for (JsonObject SensorConfig : CurSensorObject)
-            {
-                String curKey;
-                for (JsonPair curPair : SensorConfig)
-                {
-                    curKey = curPair.key().c_str();
-                    break;
-                }
-                if (configuration.General.Debug)
-                    Log.printf("\t\t%s\r\n", curKey.c_str());
-
-                JsonObject CurrentSensor = SensorConfig[curKey];
-                String discoveryTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + SensorCategory.key().c_str() + "/" + configuration.HomeAssistant.DeviceId + "/" + curKey + "/config";
-                // Replace any whitespaces by dashes
-                String label = CurrentSensor["Label"].as<String>();
-                label.replace(" ", "-");
-                if (label.length() == 0)
-                {
-                    label = curKey;
-                }
-                // Topic Abbreviation
-                String baseTopic = configuration.HomeAssistant.StateTopic;
-                baseTopic += InternalDevCategory.key().c_str();
-                CurrentSensor["~"] = baseTopic;
-                // Set the default state topic only if it hasn't been defined (special cases for numbers, switches)
-                const char *stat_t = CurrentSensor["stat_t"];
-                if (!stat_t)
-                    CurrentSensor["stat_t"] = "~/state";
-                CurrentSensor["name"] = configuration.HomeAssistant.DeviceId + "_" + label;
-                CurrentSensor["uniq_id"] = configuration.HomeAssistant.DeviceId + "_" + curKey;
-                CurrentSensor["off_delay"] = configuration.HomeAssistant.OffDelay;
-                // Remove "Label" Value because it isn't specified for HA AD
-                CurrentSensor.remove("Label");
-
-                // Subscribe to cmd topic, if set.
-                const char *cmd_t = CurrentSensor["cmd_t"];
-                if (cmd_t)
-                {
-                    // <basetopic>/<value name>/set
-                    String cmdTopic = baseTopic;
-                    cmdTopic += "/";
-                    cmdTopic += curKey;
-                    cmdTopic += CurrentSensor["cmd_t"].as<String>();
-                    cmdTopic.replace("~", "");
-                    client.subscribe(cmdTopic.c_str());
-
-                    // Assemble a specific command topic from the key: ~/<value name>/set
-                    cmdTopic = CurrentSensor["cmd_t"].as<String>();
-                    cmdTopic.replace("~", "");
-                    CurrentSensor["cmd_t"] = "~/" + curKey + cmdTopic;
-                }
-
-                // Sensor is assembled. We have to transmit this config to HA now in order to get it working
-                char buffer[768];
-                size_t n = serializeJson(CurrentSensor, buffer);
-                if (configuration.General.Debug)
-                {
-                    Log.println(discoveryTopic);
-                    serializeJsonPretty(CurrentSensor, Serial);
-                }
-                client.publish(discoveryTopic.c_str(), buffer, n);
-            }
-        }
+        if (payload == "online")
+            SetupHomeAssistantDiscovery();
+        return true;
     }
 
-    if (configuration.General.Debug)
-        Log.println("----- HA AD Config END -----///");
+    const String statePrefix = configuration.HomeAssistant.StateTopic;
+    const String messageTopic = topic;
+    if (!messageTopic.startsWith(statePrefix) || !messageTopic.endsWith("/set"))
+        return false;
 
+    return handleHomeAssistantCommand(messageTopic.substring(statePrefix.length()), payload);
 }

@@ -32,27 +32,40 @@ void reconnectMqtt()
 
   Log.print("Attempting MQTT connection...");
 
-  String clientId = generateClientId();
-  if (client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password))
+  const String clientId = generateClientId();
+  bool connected = false;
+  if (configuration.HomeAssistant.Enabled)
   {
-    Log.println("connected");
-
-    client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
-    client.subscribe(configuration.Mqtt.Topics.WaterParameters);
-    client.subscribe(configuration.Mqtt.Topics.StatusRequest);
-    client.subscribe(configuration.Mqtt.Topics.Boost);
-    client.subscribe(configuration.Mqtt.Topics.FastHeatup);
-    if (configuration.HomeAssistant.Enabled)
-    {
-      SetupAutodiscovery(HaSensorsFileName);
-      SetupAutodiscovery(HaBinarySensorsFileName);
-      SetupAutodiscovery(HaNumbersFileName);
-    }
+    const String availability = configuration.HomeAssistant.StateTopic + "availability";
+    connected = client.connect(clientId.c_str(),
+                               configuration.Mqtt.User,
+                               configuration.Mqtt.Password,
+                               availability.c_str(),
+                               0,
+                               true,
+                               "offline");
   }
   else
   {
+    connected = client.connect(clientId.c_str(), configuration.Mqtt.User, configuration.Mqtt.Password);
+  }
+
+  if (!connected)
+  {
     Log.printf("failed, rc=%d. Retrying in %lu seconds while CAN control continues.\r\n",
                client.state(), mqttRetryInterval / 1000);
+    return;
+  }
+
+  Log.println("connected");
+  client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
+  client.subscribe(configuration.Mqtt.Topics.WaterParameters);
+  client.subscribe(configuration.Mqtt.Topics.StatusRequest);
+  client.subscribe(configuration.Mqtt.Topics.Boost);
+  client.subscribe(configuration.Mqtt.Topics.FastHeatup);
+  if (configuration.HomeAssistant.Enabled)
+  {
+    SetupHomeAssistantDiscovery();
   }
 }
 
@@ -78,6 +91,8 @@ void setupMqttClient()
   // The ESP TCP connect and MQTT CONNACK waits must not stall boiler control.
   espClient.setConnectionTimeout(250);
   client.setSocketTimeout(1);
+  if (!client.setBufferSize(16384))
+    Log.println("Unable to allocate the MQTT buffer required for Home Assistant discovery.");
 }
 
 String boolToString(bool src)
@@ -93,49 +108,8 @@ void callback(char *topic, byte *payload, unsigned int length)
   payloadBuf.reserve(length);
   for (unsigned int i = 0; i < length; i++)
     payloadBuf += static_cast<char>(payload[i]);
-  
-  /*
-  NOTE: This is supposed to be in the HA branch.
-  */
-  //TopicBuf = topic;
-//
-  //// Command Topics for HA auto discovery.
-  //if (TopicBuf.endsWith(F("/set")))
-  //{
-  //  WriteToConsoles("Received SET Topic: ");
-  //  WriteToConsoles(TopicBuf);
-  //  WriteToConsoles("\r\n");
-  //  // Remove prefixes
-  //  TopicBuf.replace(configuration.HomeAssistant.AutoDiscoveryPrefix + "/","");
-  //  TopicBuf.replace(configuration.HomeAssistant.DeviceId + "/","");
-  //  // Try to get the category
-  //  String category = TopicBuf.substring(0,TopicBuf.indexOf('/'));
-  //  category.replace("/","");
-  //  // Remove Category from string
-  //  TopicBuf.replace(category,"");
-  //  TopicBuf.replace(F("/set"),"");
-  //  String parameterName = TopicBuf.substring(TopicBuf.lastIndexOf('/'),TopicBuf.length());
-  //  parameterName.replace(F("/"),"");
-//
-  //  WriteToConsoles("Received Values for Category: ");
-  //  WriteToConsoles(category);
-  //  WriteToConsoles(" Parameter Name: ");
-  //  WriteToConsoles(parameterName);
-  //  WriteToConsoles(" Payload: ");
-  //  WriteToConsoles(PayloadBuf);
-  //  WriteToConsoles("\r\n");
-  //  
-  //  // Setting Values coming from HA.
-  //  // NOTE: This is all hardcoded on purpose as we have no means of determining which variable is targeted
-  //  if(category == "Heating")
-  //  {
-  //    if(parameterName == "BoostDuration")
-  //    {
-//
-  //    }
-  //  }
-  //}
-  
+  if (HandleHomeAssistantMessage(topic, payloadBuf))
+    return;
 
   // Status Requested
   if (strcmp(topic, configuration.Mqtt.Topics.StatusRequest) == 0)
@@ -259,7 +233,6 @@ void callback(char *topic, byte *payload, unsigned int length)
       commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
     if (!doc["OnDemandBoostDuration"].isNull())
       commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
-
     const bool containsHeatingCommand =
         !doc["Enabled"].isNull() || !doc["FeedSetpoint"].isNull() ||
         !doc["FeedBaseSetpoint"].isNull() || !doc["FeedCutOff"].isNull() ||
@@ -273,7 +246,6 @@ void callback(char *topic, byte *payload, unsigned int length)
       NotifyValidHeatingCommand();
 
   }
-
   // Receiving Water Parameters
   if (strcmp(topic, configuration.Mqtt.Topics.WaterParameters) == 0)
   {
@@ -343,6 +315,18 @@ void PublishStatus()
 
   jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
   jsonObj["Error"] = ceraValues.General.Error;
+  jsonObj["FreeHeap"] = ESP.getFreeHeap();
+  jsonObj["HeapSize"] = ESP.getHeapSize();
+  jsonObj["FilesystemUsed"] = LittleFS.usedBytes();
+  jsonObj["FilesystemSize"] = LittleFS.totalBytes();
+  jsonObj["FlashSize"] = ESP.getFlashChipSize();
+  jsonObj["ChipModel"] = ESP.getChipModel();
+  const uint16_t chipRevision = ESP.getChipRevision();
+  char chipRevisionText[8];
+  snprintf(chipRevisionText, sizeof(chipRevisionText), "%u.%u", chipRevision / 100, chipRevision % 100);
+  jsonObj["ChipRevision"] = chipRevisionText;
+  jsonObj["CpuCores"] = ESP.getChipCores();
+  jsonObj["CpuFrequency"] = ESP.getCpuFreqMHz();
 
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
@@ -356,7 +340,7 @@ void PublishStatus()
   if (configuration.HomeAssistant.Enabled)
   {
     String topic = configuration.HomeAssistant.StateTopic + "General/state";
-    client.publish(topic.c_str(), buffer, n);
+    client.publish(topic.c_str(), reinterpret_cast<const uint8_t *>(buffer), n, true);
   }
   else
   {
@@ -400,6 +384,10 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
+  jsonObj["Enabled"] = boolToString(commandedValues.Heating.Active);
+  jsonObj["RequestedFeedSetpoint"] = commandedValues.Heating.FeedSetpoint;
+  jsonObj["BoostDuration"] = commandedValues.Heating.BoostDuration;
+  jsonObj["RoomReferenceT"] = commandedValues.Heating.AmbientTemperature;
 
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
@@ -413,7 +401,7 @@ void PublishHeatingTemperaturesAndStatus()
   if (configuration.HomeAssistant.Enabled)
   {
     String topic = configuration.HomeAssistant.StateTopic + "Heating/state";
-    client.publish(topic.c_str(), buffer, n);
+    client.publish(topic.c_str(), reinterpret_cast<const uint8_t *>(buffer), n, true);
   }
   else
   {
@@ -464,7 +452,7 @@ void PublishWaterTemperatures()
   if (configuration.HomeAssistant.Enabled)
   {
     String topic = configuration.HomeAssistant.StateTopic + "Water/state";
-    client.publish(topic.c_str(), buffer, n);
+    client.publish(topic.c_str(), reinterpret_cast<const uint8_t *>(buffer), n, true);
   }
   else
   {
@@ -514,7 +502,7 @@ void PublishAuxiliaryTemperatures()
   if (configuration.HomeAssistant.Enabled)
   {
     String topic = configuration.HomeAssistant.StateTopic + "Auxiliary/state";
-    client.publish(topic.c_str(), buffer, n);
+    client.publish(topic.c_str(), reinterpret_cast<const uint8_t *>(buffer), n, true);
   }
   else
   {

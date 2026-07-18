@@ -252,6 +252,42 @@ Example Output:
 Following the timestamp when the message has been received, you will find the ID of the message, i.e.: `CAN: [0x20D]` following the data bytes in hexadecimal representation and the decimal value in paranthesis `0x18 (24)`. Each Byte is separated by tab `\t`
 
 
+### Home Assistant
+
+Cerasmarter supports native MQTT device discovery. No manual Home Assistant YAML or filesystem discovery-template files are needed.
+
+```json
+    "HomeAssistant": {
+        "AutoDiscoveryPrefix": "homeassistant",
+        "OffDelay": 30,
+        "Enabled": true,
+        "DeviceId": "cerasmarter_1",
+        "TempUnit": "°C"
+    }
+```
+
+- `Enabled` activates Home Assistant device discovery and Home Assistant-specific state and command topics.
+- `AutoDiscoveryPrefix` must match the discovery prefix configured in Home Assistant's MQTT integration. Its default is `homeassistant`.
+- `DeviceId` must be unique for every controller on the broker. It identifies the Home Assistant device and forms part of its MQTT topics. Spaces and `/` characters are normalized to `_`.
+- `TempUnit` is used by all discovered temperature entities. Normally this is `°C` or `°F`.
+- `OffDelay` is the number of seconds after which an active binary sensor returns to off without a newer active state. Set it to `0` to disable this behavior.
+
+The controller publishes one retained device-discovery payload to `<AutoDiscoveryPrefix>/device/<DeviceId>/config`. Runtime data uses `junkerscontrol/<DeviceId>/...`; changing the discovery prefix does not change state or command topics.
+
+Treat `DeviceId` as stable after Home Assistant has discovered the controller. When the ID or discovery prefix is changed through the web interface, the controller removes its previous retained discovery record before reconnecting with the new identity. If the broker is unavailable during that change, remove the old device or retained discovery topic manually.
+
+The discovered device contains:
+
+- General error and gas-burner state.
+- Heating temperatures, pump/season/operation/boost states, and fast-heatup state.
+- Hot-water temperatures and operating states.
+- A temperature entity and diagnostic connectivity entity for every configured auxiliary sensor.
+- Diagnostic entities for heap memory, filesystem and flash storage, chip model and revision, and CPU core count and frequency.
+- Number controls for requested feed temperature, boost duration, and room-reference temperature.
+- Switch controls for heating enablement, boost, and fast heatup.
+
+Discovery and state payloads are retained. The controller publishes retained online/offline availability using MQTT Last Will and republishes discovery when Home Assistant sends its MQTT birth message.
+
 ### CAN Configuration
 
 ```json

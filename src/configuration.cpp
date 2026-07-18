@@ -141,12 +141,30 @@ bool ReadConfiguration()
         configuration.FailSafe.MaximumFeedTemperature = 55;
 
     JsonObject HomeAssistantSettings = doc["HomeAssistant"];
-    configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"];
-    configuration.HomeAssistant.DeviceId = HomeAssistantSettings["DeviceId"].as<String>();
-    configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"];
-    configuration.HomeAssistant.AutoDiscoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
-    configuration.HomeAssistant.StateTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + configuration.HomeAssistant.DeviceId + "/";
-    configuration.HomeAssistant.TempUnit = HomeAssistantSettings["TempUnit"].as<String>();
+    configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"] | false;
+    configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"] | 0;
+
+    String deviceId = HomeAssistantSettings["DeviceId"].as<String>();
+    if (deviceId.isEmpty())
+        deviceId = configuration.Wifi.Hostname;
+    if (deviceId.isEmpty())
+        deviceId = "cerasmarter";
+    deviceId.trim();
+    deviceId.replace(" ", "_");
+    deviceId.replace("/", "_");
+    configuration.HomeAssistant.DeviceId = deviceId;
+
+    String discoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
+    discoveryPrefix.trim();
+    while (discoveryPrefix.endsWith("/"))
+        discoveryPrefix.remove(discoveryPrefix.length() - 1);
+    if (discoveryPrefix.isEmpty())
+        discoveryPrefix = "homeassistant";
+    configuration.HomeAssistant.AutoDiscoveryPrefix = discoveryPrefix;
+
+    String temperatureUnit = HomeAssistantSettings["TempUnit"].as<String>();
+    configuration.HomeAssistant.TempUnit = temperatureUnit.isEmpty() ? "°C" : temperatureUnit;
+    configuration.HomeAssistant.StateTopic = "junkerscontrol/" + configuration.HomeAssistant.DeviceId + "/";
 
     JsonObject Leds = doc["LEDs"];
     if (Leds["Wifi"].is<int>())

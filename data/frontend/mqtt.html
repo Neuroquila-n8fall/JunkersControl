@@ -73,6 +73,65 @@
                         </div>
                     </form>
                 </div>
+                <div class="row mt-4">
+                    <h4>Home Assistant Device Discovery</h4>
+                </div>
+                <div class="row">
+                    <form id="home-assistant-form">
+                        <div class="text-start">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ha-enabled"
+                                    name="enabled">
+                                <label class="form-check-label" for="ha-enabled">Enable Home Assistant MQTT device discovery</label>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-3 col-form-label" for="discovery-prefix">Discovery Prefix</label>
+                                <div class="col-sm-9">
+                                    <input id="discovery-prefix" name="discovery-prefix" type="text"
+                                        class="form-control" value="homeassistant" required>
+                                    <span class="form-text text-muted">Must match the MQTT discovery prefix configured in Home Assistant.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-3 col-form-label" for="device-id">Device ID</label>
+                                <div class="col-sm-9">
+                                    <input id="device-id" name="device-id" type="text" class="form-control"
+                                        placeholder="cerasmarter_1" required>
+                                    <span class="form-text text-muted">Use a unique value for every controller on the MQTT broker. Changing it replaces the controller's discovered device.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-3 col-form-label" for="temperature-unit">Temperature Unit</label>
+                                <div class="col-sm-9">
+                                    <input id="temperature-unit" name="temperature-unit" type="text"
+                                        class="form-control" value="°C" required>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-3 col-form-label" for="off-delay">Binary Sensor Off Delay</label>
+                                <div class="col-sm-9">
+                                    <input id="off-delay" name="off-delay" type="number" min="0" step="1"
+                                        class="form-control" value="0" required>
+                                    <span class="form-text text-muted">Seconds before an active binary sensor resets; use 0 to disable.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-3 col-form-label" for="state-topic">Runtime Topic</label>
+                                <div class="col-sm-9">
+                                    <input id="state-topic" name="state-topic" type="text" class="form-control" readonly>
+                                </div>
+                            </div>
+                            <div class="container"><span id="home-assistant-status"></span></div>
+                            <div class="mb-3 row justify-content-end">
+                                <div class="col-sm-9">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-home-assistant">
+                                        Save Home Assistant Config
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
                 <div class="row">
                     <h4>Topics Configuration</h4>
                 </div>
@@ -194,9 +253,11 @@
         loadNavigation();
         loadMqttConfig();
         loadMqttTopicsConfig();
+        loadHomeAssistantConfig();
 
         _("mqtt-form").addEventListener('submit', sendMqttConfig);
         _("mqtt-topics-form").addEventListener('submit', sendMqttTopicsConfig);
+        _("home-assistant-form").addEventListener('submit', sendHomeAssistantConfig);
 
         async function loadMqttConfig() {
             const form = document.forms["mqtt-form"];
@@ -216,6 +277,41 @@
                 form.elements[entry].value = config[entry];
             }
             form.disabled = false;
+        }
+
+        async function loadHomeAssistantConfig() {
+            const form = document.forms["home-assistant-form"];
+            form.disabled = true;
+            const config = await getConfigJson("/api/config/homeassistant");
+            _("ha-enabled").checked = config.enabled;
+            for (const field of ["discovery-prefix", "device-id", "temperature-unit", "off-delay", "state-topic"])
+                form.elements[field].value = config[field];
+            form.disabled = false;
+        }
+
+        async function sendHomeAssistantConfig(event) {
+            event.preventDefault();
+            const button = _("save-home-assistant");
+            button.disabled = true;
+
+            const payload = Object.fromEntries(new FormData(event.target).entries());
+            payload.enabled = _("ha-enabled").checked;
+            delete payload["state-topic"];
+
+            const response = await fetch('/api/config/homeassistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json().catch(() => ({}));
+            const level = response.ok ? "success" : "danger";
+            _("home-assistant-status").innerHTML = `<div class="alert alert-${level} alert-dismissible fade show" role="alert">
+                <strong>${response.ok ? "Config Saved" : "Error"}</strong><br>${result.msg || response.statusText}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`;
+
+            if (response.ok)
+                await loadHomeAssistantConfig();
+            button.disabled = false;
         }
     </script>
 </body>
