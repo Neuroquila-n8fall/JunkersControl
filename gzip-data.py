@@ -53,27 +53,16 @@ def gzip_webfiles( source, target, env ):
         print('GZIP: FAILURE / ABORTED')
         raise RuntimeError('Configuration source is missing')
     
-    # CHECK GZIP DIR
-    if not os.path.exists( target_data_path ):
-        print( 'GZIP: GZIP DIRECTORY MISSING AT PATH: ' + target_data_path )
-        print( 'GZIP: TRYING TO CREATE IT...' )
-        try:
-            os.mkdir( target_data_path )
-        except Exception as e:
-            print( 'GZIP: FAILED TO CREATE DIRECTORY: ' + target_data_path )
-            # print( 'GZIP: EXCEPTION... ' + str( e ) )
-            print( 'GZIP: PLEASE CREATE THE DIRECTORY FIRST (ABORTING)' )
-            print( 'GZIP: FAILURE / ABORTED' )
-            raise
-
-    # A release filesystem must be directly provisionable, but must never copy
-    # a developer's device-specific configuration. Always source this file from
-    # the versioned, credential-free template outside the data directory.
-    if configuration_source_path == configuration_template_path:
-        print('  Copying credential-free configuration template')
-    else:
-        print('  Copying explicitly selected local device configuration')
-    shutil.copyfile(configuration_source_path, target_configuration_path)
+    # Keep the generated tree in place because cloud-synced directories can be
+    # locked on Windows. Stale files are removed individually after the source
+    # file list has been assembled below.
+    try:
+        os.makedirs( target_data_path, exist_ok=True )
+    except Exception as e:
+        print( 'GZIP: FAILED TO CREATE DIRECTORY: ' + target_data_path )
+        print( 'GZIP: EXCEPTION... ' + str( e ) )
+        print( 'GZIP: FAILURE / ABORTED' )
+        raise
 
     files_to_gzip = []
     files_to_copy = []
@@ -92,6 +81,30 @@ def gzip_webfiles( source, target, env ):
             else:
                 # Just Copy
                 files_to_copy.append( fileFullPath )
+
+    expected_target_files = { target_configuration_path }
+    for file in files_to_copy:
+        expected_target_files.add( file.replace(source_data_path, target_data_path) )
+    for file in files_to_gzip:
+        expected_target_files.add( file.replace(source_data_path, target_data_path) + '.gz' )
+
+    # Remove generated files that no longer have a source. This prevents old
+    # templates or a previously staged configuration from entering the image.
+    for dirpath, dirs, files in os.walk(target_data_path):
+        for filename in files:
+            target_file = os.path.join(dirpath, filename)
+            if target_file not in expected_target_files:
+                print( '  Removing stale file: ' + target_file )
+                os.remove( target_file )
+
+    # A release filesystem must be directly provisionable, but must never copy
+    # a developer's device-specific configuration. Always use the credential-free
+    # template unless local provisioning explicitly selected an external file.
+    if configuration_source_path == configuration_template_path:
+        print('  Copying credential-free configuration template')
+    else:
+        print('  Copying explicitly selected local device configuration')
+    shutil.copyfile(configuration_source_path, target_configuration_path)
 
     # Copy files not included in gzip extension list
     for file in files_to_copy:        
@@ -124,6 +137,7 @@ def gzip_webfiles( source, target, env ):
         print( 'GZIP: EXCEPTION... {}'.format( e ) )
     if was_error:
         print( 'GZIP: FAILURE/INCOMPLETE.\n' )
+        raise RuntimeError( 'Filesystem preprocessing failed' )
     else:
         print( 'GZIP: SUCCESS/COMPRESSED.\n' )
 

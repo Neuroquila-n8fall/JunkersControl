@@ -48,12 +48,16 @@ static bool validateConfigurationFile(const char *path, String &errorMessage)
     return true;
 }
 
-static void sendConfigurationSaveResult(AsyncWebServerRequest *request, const char *successMessage)
+static bool sendConfigurationSaveResult(AsyncWebServerRequest *request, const char *successMessage)
 {
     if (WriteConfiguration())
+    {
         request->send(200, "application/json", successMessage);
-    else
-        request->send(500, "application/json", R"({"status":500,"msg":"Configuration could not be saved."})");
+        return true;
+    }
+
+    request->send(500, "application/json", R"({"status":500,"msg":"Configuration could not be saved."})");
+    return false;
 }
 
 void StartApMode()
@@ -445,6 +449,20 @@ void configureMqttEndpoints()
 
     mqttTopicsRcvHandler->setMethod(HTTP_POST);
     server->addHandler(mqttTopicsRcvHandler);
+
+    server->on("/api/config/homeassistant", HTTP_GET, [](AsyncWebServerRequest *request)
+               { getHomeAssistantConfig(request); });
+
+    auto *homeAssistantRcvHandler =
+        new AsyncCallbackJsonWebHandler(
+            "/api/config/homeassistant",
+            [](AsyncWebServerRequest *request, JsonVariant &json)
+            {
+                onHomeAssistantConfigReceive(request, json);
+            });
+
+    homeAssistantRcvHandler->setMethod(HTTP_POST);
+    server->addHandler(homeAssistantRcvHandler);
 }
 
 void getMqttConfig(AsyncWebServerRequest *request)
@@ -536,6 +554,94 @@ void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     strlcpy(configuration.Mqtt.Topics.WaterParameters, doc["waterparameters"], sizeof(configuration.Mqtt.Topics.WaterParameters));
     strlcpy(configuration.Mqtt.Topics.WaterValues, doc["watervalues"], sizeof(configuration.Mqtt.Topics.WaterValues));
     sendConfigurationSaveResult(request, R"({"status":200, "msg":"MQTT Topics have been saved."})");
+}
+
+void getHomeAssistantConfig(AsyncWebServerRequest *request)
+{
+    JsonDocument doc;
+    doc["enabled"] = configuration.HomeAssistant.Enabled;
+    doc["discovery-prefix"] = configuration.HomeAssistant.AutoDiscoveryPrefix;
+    doc["device-id"] = configuration.HomeAssistant.DeviceId;
+    doc["temperature-unit"] = configuration.HomeAssistant.TempUnit;
+    doc["off-delay"] = configuration.HomeAssistant.OffDelay;
+    doc["state-topic"] = configuration.HomeAssistant.StateTopic;
+    sendJson(doc, request);
+}
+
+void onHomeAssistantConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
+{
+    if (!json.is<JsonObject>())
+    {
+        request->send(400, "application/json", R"({"status":400, "msg":"Expected a JSON object."})");
+        return;
+    }
+
+    JsonObject doc = json.as<JsonObject>();
+    if (doc["enabled"].isNull() ||
+        doc["discovery-prefix"].isNull() ||
+        doc["device-id"].isNull() ||
+        doc["temperature-unit"].isNull() ||
+        doc["off-delay"].isNull())
+    {
+        request->send(400, "application/json", R"({"status":400, "msg":"Missing Home Assistant configuration fields."})");
+        return;
+    }
+
+    String discoveryPrefix = doc["discovery-prefix"].as<String>();
+    discoveryPrefix.trim();
+    while (discoveryPrefix.endsWith("/"))
+        discoveryPrefix.remove(discoveryPrefix.length() - 1);
+
+    String deviceId = doc["device-id"].as<String>();
+    deviceId.trim();
+    deviceId.replace(" ", "_");
+    deviceId.replace("/", "_");
+
+    String temperatureUnit = doc["temperature-unit"].as<String>();
+    temperatureUnit.trim();
+    const int offDelay = doc["off-delay"].as<int>();
+
+    if (discoveryPrefix.isEmpty() || discoveryPrefix.indexOf('#') >= 0 || discoveryPrefix.indexOf('+') >= 0 ||
+        deviceId.isEmpty() || temperatureUnit.isEmpty() || offDelay < 0)
+    {
+        request->send(400, "application/json", R"({"status":400, "msg":"Invalid discovery prefix, device ID, temperature unit, or off delay."})");
+        return;
+    }
+
+    const bool previousEnabled = configuration.HomeAssistant.Enabled;
+    const String previousDiscoveryPrefix = configuration.HomeAssistant.AutoDiscoveryPrefix;
+    const String previousDeviceId = configuration.HomeAssistant.DeviceId;
+    const String previousStateTopic = configuration.HomeAssistant.StateTopic;
+
+    bool enabled = false;
+    if (doc["enabled"].is<bool>())
+        enabled = doc["enabled"].as<bool>();
+    else
+    {
+        String enabledValue = doc["enabled"].as<String>();
+        enabledValue.toLowerCase();
+        enabled = enabledValue == "true" || enabledValue == "1" || enabledValue == "on";
+    }
+
+    configuration.HomeAssistant.Enabled = enabled;
+    configuration.HomeAssistant.AutoDiscoveryPrefix = discoveryPrefix;
+    configuration.HomeAssistant.DeviceId = deviceId;
+    configuration.HomeAssistant.TempUnit = temperatureUnit;
+    configuration.HomeAssistant.OffDelay = offDelay;
+    configuration.HomeAssistant.StateTopic = "junkerscontrol/" + deviceId + "/";
+
+    if (sendConfigurationSaveResult(request, R"({"status":200, "msg":"Home Assistant configuration has been saved. MQTT will reconnect automatically."})"))
+    {
+        const bool identityChanged = previousDiscoveryPrefix != discoveryPrefix || previousDeviceId != deviceId;
+        if (previousEnabled && (!enabled || identityChanged) && client.connected())
+        {
+            const String previousAvailabilityTopic = previousStateTopic + "availability";
+            const String previousDiscoveryTopic = previousDiscoveryPrefix + "/device/" + previousDeviceId + "/config";
+            client.publish(previousAvailabilityTopic.c_str(), "offline", true);
+            client.publish(previousDiscoveryTopic.c_str(), "", true);
+        }
+        client.disconnect();
+    }
 }
 
 #pragma endregion

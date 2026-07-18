@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Replaced the incomplete legacy Home Assistant integration with current MQTT device discovery using one retained device payload.
+- Removed manual Home Assistant YAML and filesystem discovery-template files.
+- Added discovery for heating, hot-water, controller-status, and dynamic auxiliary-temperature entities under one device.
+- Added MQTT number controls for requested feed temperature, boost duration, and room-reference temperature.
+- Added MQTT switches for heating enablement, boost, and fast heatup.
+- Added retained online/offline availability through MQTT Last Will and automatic rediscovery after Home Assistant restarts.
+- Added Home Assistant configuration to the web interface and automatic MQTT reconnection after saving it.
+- Added cleanup of retained discovery records when Home Assistant discovery is disabled or its device identity changes.
+- Added meaningful Home Assistant icons for every discovered entity and changed the burner flame entity to explicit on/off semantics with a flame icon.
+- Changed the Home Assistant device manufacturer and discovery origin branding from JunkersControl to Cerasmarter.
+- Added Home Assistant diagnostic entities for heap memory, filesystem and flash storage, chip model and revision, CPU cores, CPU frequency, and auxiliary-sensor connectivity.
+- Fixed MQTT command handling, including the previously unreachable hot-water parameter handler and unsafe callback payload termination.
+- Prevented stale generated filesystem files from leaking into release images and made preprocessing failures stop the build.
+
 ## v0.93.4
 
 - Pinned release and development builds to the tested pioarduino ESP32 platform, and upgraded all GitHub Actions workflows to Node.js 24-compatible action versions.

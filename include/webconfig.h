@@ -47,6 +47,8 @@ extern void onMqttConfigReceive(AsyncWebServerRequest *request, JsonVariant &jso
 extern void getMqttTopicConfig(AsyncWebServerRequest *request);
 
 extern void onMqttTopicConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
+extern void getHomeAssistantConfig(AsyncWebServerRequest *request);
+extern void onHomeAssistantConfigReceive(AsyncWebServerRequest *request, JsonVariant &json);
 
 extern void getSystemInfo(AsyncWebServerRequest *request);
 

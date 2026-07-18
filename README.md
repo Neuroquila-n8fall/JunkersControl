@@ -397,7 +397,26 @@ You can also use the web UI (See: Firmware Update on the menu bar) to upload the
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
 ## Home Assistant Integration
-This project was originally specifically designed to be run alongside Home Assistant and efforts have been taken to make the setup as hassle-free as possible but the so-called autodiscovery is still in the works. In the meantime you may find the necessary scripts, values and other stuff inside the [Home Assistant Folder](Home%20Assistant)
+
+Cerasmarter uses current MQTT **device discovery**. No Home Assistant YAML files or separate discovery templates are required.
+
+Set `HomeAssistant.Enabled` to `true`, configure the same discovery prefix used by Home Assistant (normally `homeassistant`), and give every controller a unique `DeviceId`. After connecting to MQTT, the controller publishes one retained device-discovery document to:
+
+```text
+<AutoDiscoveryPrefix>/device/<DeviceId>/config
+```
+
+Home Assistant groups the heating, hot-water, status, and auxiliary-temperature entities under one device. The integration provides temperature and status sensors, binary operating-state sensors, dynamically generated auxiliary-sensor entities, number controls for requested feed temperature, boost duration, and room-reference temperature, plus switches for heating enablement, boost, and fast heatup.
+
+Memory, filesystem and flash capacity, chip model and revision, CPU core count, CPU frequency, and auxiliary-sensor connectivity are exposed as diagnostic entities. Home Assistant keeps these on the device's diagnostic card instead of treating them as normal heating controls or measurements.
+
+Discovery assigns purpose-specific Material Design icons to every entity. The **Flame Lit** binary sensor intentionally has no Home Assistant device class: it therefore reports plain **On/Off** while using a flame icon whose active color follows the burner state. MQTT discovery supports one static icon per entity, so using different custom glyphs for its on and off states would require a separate Home Assistant template entity.
+
+Runtime state and command topics use `junkerscontrol/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
+
+Keep `DeviceId` stable after discovery. If it or the discovery prefix is changed through the web interface, the controller removes its previous retained discovery record and reconnects with the new identity. An old record only needs manual removal if the broker was unavailable during the change.
+
+See the [configuration guide](assets/Configuration.md#home-assistant) for all settings.
 
 ## Hints
 - If you just wanna read then usually you have nothing to modify. The program will see other controllers on the bus and will go into "read-only" mode by itself. If you're not wanting to take any risks, you have to set the variable `OverrideControl` in [main.cpp](src/main.cpp) to `false`. This way nothing will be sent on the bus udner any circumstances but you can read everything.

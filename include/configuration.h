@@ -99,12 +99,12 @@ struct Configuration
 
     struct HomeAssistant_
     {
-        String AutoDiscoveryPrefix;
+        String AutoDiscoveryPrefix = "homeassistant";
         bool Enabled = false;
-        int OffDelay;
-        String DeviceId;
+        int OffDelay = 0;
+        String DeviceId = "cerasmarter";
         String StateTopic;
-        String TempUnit;
+        String TempUnit = "°C";
     } HomeAssistant;
 
     struct LEDs_
