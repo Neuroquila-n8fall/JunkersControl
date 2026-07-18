@@ -2,6 +2,7 @@
 
 ## v0.93.4
 
+- Pinned release and development builds to the tested pioarduino ESP32 platform, and upgraded all GitHub Actions workflows to Node.js 24-compatible action versions.
 - Fixed Setup Mode incorrectly reporting that the filesystem was missing when only `configuration.json` was absent. Setup Mode now checks for the web frontend, allowing a fresh controller to start its access point and accept a configuration upload.
 - Added the credential-free configuration template to generated LittleFS images so a freshly flashed controller enters AP provisioning immediately.
 - Added distinct startup diagnostics for an unmountable filesystem, an empty filesystem, a missing web frontend, and a missing or invalid configuration.
