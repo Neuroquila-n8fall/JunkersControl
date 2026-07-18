@@ -1,5 +1,7 @@
 #include <webconfig.h>
 #include <failsafe.h>
+#include <heating.h>
+#include <mqtt.h>
 
 AsyncWebServer *server;
 AsyncEventSource *eventSource;
@@ -12,7 +14,79 @@ struct UploadResult
     const char *message;
 };
 
+struct FirmwareUpdateResult
+{
+    int status = 500;
+    String message = R"({"status":500,"msg":"Update did not start."})";
+    bool failed = false;
+};
+
 static const char *configurationUploadFileName = "/configuration.upload";
+
+static void populateRuntimeJson(JsonDocument &doc)
+{
+    JsonObject system = doc["System"].to<JsonObject>();
+    system["Wifi"] = WiFi.isConnected();
+    system["Mqtt"] = client.connected();
+    system["OverrideControl"] = OverrideControl;
+    system["FailSafe"] = IsFailSafeActive();
+    system["CanErrors"] = CanSendErrorCount;
+    system["Uptime"] = millis() / 1000UL;
+
+    JsonObject general = doc["General"].to<JsonObject>();
+    general["FlameLit"] = ceraValues.General.FlameLit;
+    general["OutsideTemperature"] = ceraValues.General.OutsideTemperature;
+    general["HasOutsideTemperature"] = ceraValues.General.HasReceivedOT;
+    general["Error"] = ceraValues.General.Error;
+
+    JsonObject heating = doc["Heating"].to<JsonObject>();
+    heating["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+    heating["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
+    heating["FeedSetpoint"] = ceraValues.Heating.FeedSetpoint;
+    heating["CalculatedFeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
+    heating["Pump"] = ceraValues.Heating.PumpActive;
+    heating["Active"] = ceraValues.Heating.Active;
+    heating["Power"] = ceraValues.Heating.HeatingPower;
+    heating["Season"] = ceraValues.Heating.Season;
+    heating["Economy"] = ceraValues.Heating.Economy;
+
+    JsonObject water = doc["HotWater"].to<JsonObject>();
+    water["Current"] = ceraValues.Hotwater.TemperatureCurrent;
+    water["Setpoint"] = ceraValues.Hotwater.SetPoint;
+    water["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
+    water["Now"] = ceraValues.Hotwater.Now;
+    water["Buffer"] = ceraValues.Hotwater.BufferMode;
+
+    JsonArray auxiliary = doc["Auxiliary"].to<JsonArray>();
+    for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; ++i)
+    {
+        JsonObject sensor = auxiliary.add<JsonObject>();
+        sensor["Label"] = configuration.TemperatureSensors.Sensors[i].Label;
+        sensor["Temperature"] = ceraValues.Auxiliary.Temperatures[i];
+        sensor["Reachable"] = configuration.TemperatureSensors.Sensors[i].reachable;
+    }
+
+    JsonObject command = doc["Command"].to<JsonObject>();
+    command["Enabled"] = commandedValues.Heating.Active;
+    command["FeedSetpoint"] = commandedValues.Heating.FeedSetpoint;
+    command["FeedBaseSetpoint"] = commandedValues.Heating.BasepointTemperature;
+    command["FeedCutOff"] = commandedValues.Heating.EndpointTemperature;
+    command["FeedMinimum"] = commandedValues.Heating.MinimumFeedTemperature;
+    command["AuxiliaryTemperature"] = commandedValues.Heating.AuxiliaryTemperature;
+    command["AmbientTemperature"] = commandedValues.Heating.AmbientTemperature;
+    command["TargetAmbientTemperature"] = commandedValues.Heating.TargetAmbientTemperature;
+    command["Adaption"] = commandedValues.Heating.FeedAdaption;
+    command["ValveScaling"] = commandedValues.Heating.ValveScaling;
+    command["ValveScalingMaxOpening"] = commandedValues.Heating.MaxValveOpening;
+    command["ValveScalingOpening"] = commandedValues.Heating.ValveOpening;
+    command["DynamicAdaption"] = commandedValues.Heating.DynamicAdaption;
+    command["OverrideSetpoint"] = commandedValues.Heating.OverrideSetpoint;
+    command["OnDemandBoostDuration"] = commandedValues.Heating.BoostDuration;
+    command["Boost"] = commandedValues.Heating.Boost;
+    command["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
+    command["FastHeatup"] = commandedValues.Heating.FastHeatup;
+    command["HotWaterSetpoint"] = commandedValues.HotWater.SetPoint;
+}
 
 static bool validateConfigurationFile(const char *path, String &errorMessage)
 {
@@ -123,6 +197,9 @@ void ConfigureAndStartWebserver()
     server->on("/cananalyzer", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/canalyzer.html", "text/html"); });
 
+    server->on("/control", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/control.html", "text/html"); });
+
     server->serveStatic("/", LittleFS, "/");
 
     // Finally, start the server
@@ -149,6 +226,50 @@ void configureGeneralApiEndpoints()
     // Info GET
     server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request)
                { getSystemStatus(request); });
+
+    server->on("/api/runtime", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+                   JsonDocument doc;
+                   populateRuntimeJson(doc);
+                   sendJson(doc, request);
+               });
+
+    auto *controlHandler = new AsyncCallbackJsonWebHandler(
+        "/api/control", [](AsyncWebServerRequest *request, JsonVariant &json)
+        {
+            if (!json.is<JsonObject>())
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"Expected a JSON object."})");
+                return;
+            }
+            bool changed = ApplyHeatingCommand(json.as<JsonVariantConst>());
+            if (!json["HotWaterSetpoint"].isNull())
+            {
+                JsonDocument waterDoc;
+                waterDoc["Setpoint"] = json["HotWaterSetpoint"];
+                changed = ApplyHotWaterCommand(waterDoc.as<JsonVariantConst>()) || changed;
+            }
+            if (!json["Boost"].isNull())
+            {
+                ApplyBoostCommand(json["Boost"].as<bool>());
+                changed = true;
+            }
+            if (!json["FastHeatup"].isNull())
+            {
+                ApplyFastHeatupCommand(json["FastHeatup"].as<bool>());
+                changed = true;
+            }
+            if (!changed)
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"No recognized control value was supplied."})");
+                return;
+            }
+            JsonDocument response;
+            populateRuntimeJson(response);
+            sendJson(response, request);
+        });
+    controlHandler->setMethod(HTTP_POST);
+    server->addHandler(controlHandler);
 }
 
 #pragma region "General Config"
@@ -628,7 +749,7 @@ void onHomeAssistantConfigReceive(AsyncWebServerRequest *request, JsonVariant &j
     configuration.HomeAssistant.DeviceId = deviceId;
     configuration.HomeAssistant.TempUnit = temperatureUnit;
     configuration.HomeAssistant.OffDelay = offDelay;
-    configuration.HomeAssistant.StateTopic = "junkerscontrol/" + deviceId + "/";
+    configuration.HomeAssistant.StateTopic = "cerasmarter/" + deviceId + "/";
 
     if (sendConfigurationSaveResult(request, R"({"status":200, "msg":"Home Assistant configuration has been saved. MQTT will reconnect automatically."})"))
     {
@@ -654,7 +775,17 @@ void configureFirmwareEndpoints()
     // Firmware Update
     server->on(
         "/upload-firmware", HTTP_POST, [](AsyncWebServerRequest *request)
-        { request->send(200); },
+        {
+            FirmwareUpdateResult *result = static_cast<FirmwareUpdateResult *>(request->_tempObject);
+            if (!result)
+            {
+                request->send(500, "application/json", R"({"status":500,"msg":"Update failed before upload processing."})");
+                return;
+            }
+            request->send(result->status, "application/json", result->message);
+            delete result;
+            request->_tempObject = nullptr;
+        },
         handleDoUpdate);
 
     server->on("/update-firmware", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -666,23 +797,43 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
     if (!index)
     {
         Serial.println("Update");
+        FirmwareUpdateResult *result = new FirmwareUpdateResult();
+        request->_tempObject = result;
         // Decide what to update. If the filename contains "littlefs" it's a filesystem image.
         int cmd = (filename.indexOf("littlefs") > -1) ? U_SPIFFS : U_FLASH;
+        if (cmd == U_SPIFFS)
+        {
+            String backupError;
+            if (!BackupConfigurationForFilesystemUpdate(backupError))
+            {
+                result->failed = true;
+                result->status = 409;
+                JsonDocument doc;
+                doc["status"] = 409;
+                doc["msg"] = backupError;
+                serializeJson(doc, result->message);
+                return;
+            }
+        }
         if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd))
         {
             Update.printError(Serial);
+            result->failed = true;
+            result->message = String(R"({"status":500,"msg":")") + Update.errorString() + R"("})";
+            return;
         }
     }
+
+    FirmwareUpdateResult *result = static_cast<FirmwareUpdateResult *>(request->_tempObject);
+    if (!result || result->failed)
+        return;
 
     if (Update.write(data, len) != len)
     {
         Update.printError(Serial);
-        JsonDocument doc;
-        doc["status"] = 500;
-        doc["msg"] = Update.errorString();
-        String json;
-        serializeJson(doc, json);
-        request->send(200, "application/json", json);
+        result->failed = true;
+        result->message = String(R"({"status":500,"msg":")") + Update.errorString() + R"("})";
+        return;
     }
 
     if (final)
@@ -690,12 +841,14 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
         if (!Update.end(true))
         {
             Update.printError(Serial);
-            request->send(500, "application/json", R"({"status":500, "msg":"Update has failed. Please retry again after rebooting."})");
+            result->failed = true;
+            result->message = R"({"status":500,"msg":"Update has failed. Please retry again after rebooting."})";
         }
         else
         {
             Serial.println("Update complete");
-            request->send(200, "application/json", R"({"status":200, "msg":"Update completed. Reboot to apply."})");
+            result->status = 200;
+            result->message = R"({"status":200,"msg":"Update completed. Reboot to apply. Device configuration will be restored automatically after a filesystem update."})";
         }
     }
 }
@@ -1256,6 +1409,8 @@ void getSystemStatus(AsyncWebServerRequest *request)
     doc["heap"] = ESP.getHeapSize();
     doc["freesketch"] = ESP.getFreeSketchSpace();
     doc["sketchsize"] = ESP.getSketchSize();
+    doc["filesystemused"] = LittleFS.usedBytes();
+    doc["filesystemsize"] = LittleFS.totalBytes();
     doc["canstatus"] = CanConfigErrorCode;
     doc["canerrorcount"] = CanSendErrorCount;
     doc["mqtt"] = client.connected();

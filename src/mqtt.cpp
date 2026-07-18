@@ -19,6 +19,63 @@ String PayloadBuf;
 static unsigned long lastMqttAttempt = 0;
 static const unsigned long mqttRetryInterval = 30000;
 
+bool ApplyHeatingCommand(JsonVariantConst json)
+{
+  bool changed = false;
+#define APPLY_VALUE(KEY, TARGET) if (!json[KEY].isNull()) { TARGET = json[KEY]; changed = true; }
+  APPLY_VALUE("Enabled", commandedValues.Heating.Active)
+  APPLY_VALUE("FeedSetpoint", commandedValues.Heating.FeedSetpoint)
+  APPLY_VALUE("FeedBaseSetpoint", commandedValues.Heating.BasepointTemperature)
+  APPLY_VALUE("FeedCutOff", commandedValues.Heating.EndpointTemperature)
+  APPLY_VALUE("FeedMinimum", commandedValues.Heating.MinimumFeedTemperature)
+  APPLY_VALUE("AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature)
+  APPLY_VALUE("AmbientTemperature", commandedValues.Heating.AmbientTemperature)
+  APPLY_VALUE("TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature)
+  APPLY_VALUE("Adaption", commandedValues.Heating.FeedAdaption)
+  APPLY_VALUE("ValveScaling", commandedValues.Heating.ValveScaling)
+  APPLY_VALUE("ValveScalingMaxOpening", commandedValues.Heating.MaxValveOpening)
+  APPLY_VALUE("ValveScalingOpening", commandedValues.Heating.ValveOpening)
+  APPLY_VALUE("DynamicAdaption", commandedValues.Heating.DynamicAdaption)
+  APPLY_VALUE("OverrideSetpoint", commandedValues.Heating.OverrideSetpoint)
+  APPLY_VALUE("OnDemandBoostDuration", commandedValues.Heating.BoostDuration)
+#undef APPLY_VALUE
+  if (changed)
+  {
+    commandedValues.Heating.FeedSetpoint = constrain(commandedValues.Heating.FeedSetpoint, 0.0, 100.0);
+    commandedValues.Heating.MinimumFeedTemperature = constrain(commandedValues.Heating.MinimumFeedTemperature, 0.0, 100.0);
+    commandedValues.Heating.MaxValveOpening = constrain(commandedValues.Heating.MaxValveOpening, 0, 100);
+    commandedValues.Heating.ValveOpening = constrain(commandedValues.Heating.ValveOpening, 0, 100);
+    commandedValues.Heating.BoostDuration = constrain(commandedValues.Heating.BoostDuration, 0, 86400);
+    NotifyValidHeatingCommand();
+    SetFeedTemperature();
+  }
+  return changed;
+}
+
+bool ApplyHotWaterCommand(JsonVariantConst json)
+{
+  if (json["Setpoint"].isNull())
+    return false;
+  commandedValues.HotWater.SetPoint = constrain(json["Setpoint"].as<int>(), 0, 100);
+  return true;
+}
+
+void ApplyBoostCommand(bool enabled)
+{
+  commandedValues.Heating.Boost = enabled;
+  commandedValues.Heating.BoostTimeCountdown = enabled ? commandedValues.Heating.BoostDuration : 0;
+  NotifyValidHeatingCommand();
+  SetFeedTemperature();
+}
+
+void ApplyFastHeatupCommand(bool enabled)
+{
+  commandedValues.Heating.FastHeatup = enabled;
+  commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+  NotifyValidHeatingCommand();
+  SetFeedTemperature();
+}
+
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
 {
@@ -202,48 +259,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       return;
     }
 
-    // Request Enable/Disable Heating and set the status of the heating accordingly
-    if (!doc["Enabled"].isNull())
-      commandedValues.Heating.Active = doc["Enabled"];
-    if (!doc["FeedSetpoint"].isNull())
-      commandedValues.Heating.FeedSetpoint = doc["FeedSetpoint"];
-    if (!doc["FeedBaseSetpoint"].isNull())
-      commandedValues.Heating.BasepointTemperature = doc["FeedBaseSetpoint"];
-    if (!doc["FeedCutOff"].isNull())
-      commandedValues.Heating.EndpointTemperature = doc["FeedCutOff"];
-    if (!doc["FeedMinimum"].isNull())
-      commandedValues.Heating.MinimumFeedTemperature = doc["FeedMinimum"];
-    if (!doc["AuxiliaryTemperature"].isNull())
-      commandedValues.Heating.AuxiliaryTemperature = doc["AuxiliaryTemperature"];
-    if (!doc["AmbientTemperature"].isNull())
-      commandedValues.Heating.AmbientTemperature = doc["AmbientTemperature"];
-    if (!doc["TargetAmbientTemperature"].isNull())
-      commandedValues.Heating.TargetAmbientTemperature = doc["TargetAmbientTemperature"];
-    if (!doc["Adaption"].isNull())
-      commandedValues.Heating.FeedAdaption = doc["Adaption"];
-    if (!doc["ValveScaling"].isNull())
-      commandedValues.Heating.ValveScaling = doc["ValveScaling"];
-    if (!doc["ValveScalingMaxOpening"].isNull())
-      commandedValues.Heating.MaxValveOpening = doc["ValveScalingMaxOpening"];
-    if (!doc["ValveScalingOpening"].isNull())
-      commandedValues.Heating.ValveOpening = doc["ValveScalingOpening"];
-    if (!doc["DynamicAdaption"].isNull())
-      commandedValues.Heating.DynamicAdaption = doc["DynamicAdaption"];
-    if (!doc["OverrideSetpoint"].isNull())
-      commandedValues.Heating.OverrideSetpoint = doc["OverrideSetpoint"];
-    if (!doc["OnDemandBoostDuration"].isNull())
-      commandedValues.Heating.BoostDuration = doc["OnDemandBoostDuration"];
-    const bool containsHeatingCommand =
-        !doc["Enabled"].isNull() || !doc["FeedSetpoint"].isNull() ||
-        !doc["FeedBaseSetpoint"].isNull() || !doc["FeedCutOff"].isNull() ||
-        !doc["FeedMinimum"].isNull() || !doc["AuxiliaryTemperature"].isNull() ||
-        !doc["AmbientTemperature"].isNull() || !doc["TargetAmbientTemperature"].isNull() ||
-        !doc["Adaption"].isNull() || !doc["ValveScaling"].isNull() ||
-        !doc["ValveScalingMaxOpening"].isNull() || !doc["ValveScalingOpening"].isNull() ||
-        !doc["DynamicAdaption"].isNull() || !doc["OverrideSetpoint"].isNull() ||
-        !doc["OnDemandBoostDuration"].isNull();
-    if (containsHeatingCommand)
-      NotifyValidHeatingCommand();
+    ApplyHeatingCommand(doc.as<JsonVariantConst>());
 
   }
   // Receiving Water Parameters
@@ -266,8 +282,7 @@ void callback(char *topic, byte *payload, unsigned int length)
         return;
       }
 
-      if (!doc["Setpoint"].isNull())
-        commandedValues.HotWater.SetPoint = doc["Setpoint"]; // 22.1
+      ApplyHotWaterCommand(doc.as<JsonVariantConst>());
   }
 
   // On-Demand Boost
@@ -276,10 +291,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     if (payloadBuf != "0" && payloadBuf != "1")
       return;
     int i = payloadBuf.toInt();
-    commandedValues.Heating.Boost = i == 1;
-    commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
-    NotifyValidHeatingCommand();
-    SetFeedTemperature();
+    ApplyBoostCommand(i == 1);
   }
 
   // Fast Heatup
@@ -288,10 +300,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     if (payloadBuf != "0" && payloadBuf != "1")
       return;
     int i = payloadBuf.toInt();
-    commandedValues.Heating.FastHeatup = i == 1;
-    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
-    NotifyValidHeatingCommand();
-    SetFeedTemperature();
+    ApplyFastHeatupCommand(i == 1);
   }
 }
 

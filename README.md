@@ -1,9 +1,9 @@
-# JunkersControl
+# Cerasmarter
 [![CI](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml/badge.svg)](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml)
 ## NOTE: Documentation is mostly accurate right now.
 **Feel free to open an issue if something is unclear.**
 ## Table of contents
-- [JunkersControl](#junkerscontrol)
+- [Cerasmarter](#cerasmarter)
   - [NOTE: Documentation is mostly accurate right now.](#note-documentation-is-mostly-accurate-right-now)
   - [Table of contents](#table-of-contents)
   - [Community](#community)
@@ -136,6 +136,18 @@ Startup reports filesystem problems separately:
 Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json). After uploading `/configuration.json` in the file manager, use **Reload Configuration** to validate and activate it without a power cycle.
 
 If MDNS is working properly on your end, you will be able to open the web UI using http://cerasmarter/
+
+### Web interface preferences
+
+The navigation bar provides English and German language selection and a sun/moon light/dark appearance toggle. Both preferences are stored in the current browser and apply to every web-interface page. On first use, the browser language selects German when appropriate, and the operating-system color preference selects the initial appearance.
+
+Translations are maintained as one JSON resource per locale in `data/frontend/i18n/` (`en.json`, `de.json`). Keys are grouped by their UI area, for example `menu.home`, `dashboard.system_status`, `mqtt.prefix`, and `filemanager.reload`. Markup can opt into automatic translation with `data-i18n="area.key"`; translated attributes use `data-i18n-placeholder`, `data-i18n-title`, or `data-i18n-aria-label`. JavaScript uses `translate("area.key", values)`. English is the fallback locale, and new locales only require a new resource plus an entry in `UiLocales`.
+
+The CAN Message Analyzer under **Utilities** reads the active CAN address configuration and displays names such as `Heating · Feed Current` beside their hexadecimal IDs. This makes captures usable with customized address maps while unknown IDs remain clearly identified.
+
+The home page is a live heating dashboard. It shows burner, feed, outside, and hot-water values plus a lightweight five-minute temperature chart that runs entirely in the browser without an external chart service. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These commands take effect immediately, refresh the fail-safe command lease, and are deliberately not written to `configuration.json`; MQTT or Home Assistant can replace them later.
+
+The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers.
 
 ## Features
 
@@ -388,8 +400,8 @@ The standard "Arduino OTA" procedure is included which means you can upload the 
 You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
 
 - A firmware-only update preserves the existing LittleFS configuration.
-- Before uploading `littlefs.bin`, download `/configuration.json` from the file manager as a backup. Replacing the filesystem erases the active configuration and installs the credential-free template.
-- After a filesystem update, upload the backup as `/configuration.json` and click **Reload Configuration**. A successful reload activates WiFi, MQTT, CAN, auxiliary-sensor, and LED settings without requiring a power cycle. Without a backup, connect to the `CERASMARTER` setup access point and configure the template values through the web UI.
+- A `littlefs.bin` update performed through the web interface validates and copies the active configuration to the separate NVS partition before replacing LittleFS. On the next boot it restores the configuration once, before normal configuration loading. The update is cancelled if a safe backup cannot be made.
+- Keep a downloaded `/configuration.json` backup for recovery. Direct PlatformIO, esptool, or programmer-based filesystem flashing cannot be intercepted by the running firmware and therefore still installs the credential-free template. After such an update, upload the backup as `/configuration.json` and click **Reload Configuration**.
 - Configuration saves from the web UI are written atomically and verified before they replace the previous file. If validation or writing fails, the previous configuration remains available as a backup.
 
 ## Telnet Console
@@ -412,7 +424,7 @@ Memory, filesystem and flash capacity, chip model and revision, CPU core count, 
 
 Discovery assigns purpose-specific Material Design icons to every entity. The **Flame Lit** binary sensor intentionally has no Home Assistant device class: it therefore reports plain **On/Off** while using a flame icon whose active color follows the burner state. MQTT discovery supports one static icon per entity, so using different custom glyphs for its on and off states would require a separate Home Assistant template entity.
 
-Runtime state and command topics use `junkerscontrol/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
+Runtime state and command topics use `cerasmarter/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
 
 Keep `DeviceId` stable after discovery. If it or the discovery prefix is changed through the web interface, the controller removes its previous retained discovery record and reconnects with the new identity. An old record only needs manual removal if the broker was unavailable during the change.
 
@@ -435,7 +447,7 @@ See the [configuration guide](assets/Configuration.md#home-assistant) for all se
 
 Do not place a real `configuration.json` in the repository's `data` directory when preparing releases. The filesystem build always copies the credential-free file from `assets/Templates/Configurations/configuration.json`; a device-specific file could contain WiFi and MQTT credentials.
 
-For local USB provisioning only, set `JUNKERSCONTROL_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The GitHub release workflow never sets this override and verifies that release images use the credential-free template.
+For local USB provisioning only, set `CERASMARTER_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The GitHub release workflow never sets this override and verifies that release images use the credential-free template.
 
 ### Configuration
 

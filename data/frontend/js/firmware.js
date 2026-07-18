@@ -17,7 +17,7 @@ function startUpdate(event) {
 
 function progressHandler(event) {
     //_("loaded_n_total").innerHTML = "Uploaded " + event.loaded + " bytes of " + event.total; // event.total doesnt show accurate total file size
-    _("loaded_n_total").innerHTML = "Uploaded " + humanReadableSize(event.loaded);
+    _("loaded_n_total").innerHTML = translate("Uploaded") + " " + humanReadableSize(event.loaded);
     const percent = (event.loaded / event.total) * 100;
     const roundedPercent = Math.round(percent);
     _("progressBar").style = "width: " + roundedPercent + "%;";
@@ -32,8 +32,14 @@ function completeHandler(event) {
     _("progressBar").style.width = 0;
     _("progressBar").setAttribute('aria-valuenow', 0);
     _("progressBar").innerHTML = "0%";
-    _("status").innerHTML = `<div class="alert alert-success alert-dismissible fade show" role="alert">
-    <strong>Firmware Uploaded! </strong>Firmware is installed and will become active on the next reboot.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    let result = {};
+    try { result = JSON.parse(event.target.responseText || "{}"); } catch (_) {}
+    const successful = event.target.status >= 200 && event.target.status < 300;
+    const message = result.msg || (successful
+        ? "Firmware is installed and will become active on the next reboot."
+        : `Update failed with HTTP status ${event.target.status}.`);
+    _("status").innerHTML = `<div class="alert ${successful ? "alert-success" : "alert-danger"} alert-dismissible fade show" role="alert">
+    <strong>${successful ? "Firmware Uploaded!" : "Firmware Update Failed!"}</strong> ${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`;
     _("upload_form").reset();
     _("loaded_n_total").innerHTML = "";

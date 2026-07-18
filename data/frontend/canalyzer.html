@@ -8,6 +8,7 @@
     <title>CERASMARTER Can Analyzer</title>
     <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
     <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
 </head>
 
 <body>
@@ -54,6 +55,9 @@
                         <th class="sticky-top"
                             style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">ID
                         </th>
+                        <th class="sticky-top text-nowrap"
+                            style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">Value name
+                        </th>
                         <th class="sticky-top"
                             style="box-shadow: inset 1px 1px var(--bs-border-color), 0 1px var(--bs-border-color);">1
                         </th>
@@ -91,6 +95,7 @@
     </div>
 </div>
 
+<script src="frontend/js/i18n.js"></script>
 <script src="frontend/js/framework.js"></script>
 <script src="frontend/js/api.js"></script>
 <script src="frontend/js/firmware.js"></script>
@@ -101,6 +106,7 @@
     loadKnownAddresses();
     let messages = [];
     let knownAddresses = [];
+    const knownAddressNames = new Map();
     let unknownAddresses = [];
     let previousMessage = [];
 
@@ -116,16 +122,26 @@
         const addresses = await getConfigJson("/api/config/canbus");
         const keys = getDeepKeys(addresses);
         keys.forEach(e => {
-            let value = jsonPathToValue(addresses, e);
-            knownAddresses.push(value);
+            const value = String(jsonPathToValue(addresses, e)).toUpperCase();
+            if (!knownAddressNames.has(value)) knownAddressNames.set(value, []);
+            knownAddressNames.get(value).push(formatCanValueName(e));
+            if (!knownAddresses.includes(value)) knownAddresses.push(value);
         })
         knownAddresses.sort();
         knownAddresses.forEach((e) => {
             _("known-addresses").innerHTML += `<div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="${e.toLowerCase()}-enabled" checked>
-                        <label class="form-check-label" for="${e}-enabled">${e}</label>
+                        <label class="form-check-label" for="${e.toLowerCase()}-enabled"><code>${e}</code> ${getCanValueName(e)}</label>
                     </div>`;
         })
+    }
+
+    function formatCanValueName(path) {
+        return path.split('.').map(part => part.replace(/([a-z0-9])([A-Z])/g, '$1 $2')).join(' · ');
+    }
+
+    function getCanValueName(id) {
+        return (knownAddressNames.get(id.toUpperCase()) || []).join(' / ');
     }
 
     function onSwitchAllAddresses() {
@@ -150,12 +166,12 @@
     function addToKnownAddress(id) {
         const msgId = `0x${id.toUpperCase()}`;
         const found = unknownAddresses.findIndex((e) => e === msgId);
-        unknownAddresses.slice(found, 1);
+        if (found > -1) unknownAddresses.splice(found, 1);
         _(`${id.toLowerCase()}-unknown`).remove();
         knownAddresses.push(`0x${id}`);
         _("known-addresses").innerHTML += `<div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="0x${id.toLowerCase()}-enabled" checked>
-                        <label class="form-check-label" for="${id}-enabled">${msgId}</label>
+                        <label class="form-check-label" for="0x${id.toLowerCase()}-enabled"><code>${msgId}</code> ${getCanValueName(msgId)}</label>
                     </div>`
     }
 
@@ -168,7 +184,7 @@
         const msgId = `0x${id.toUpperCase()}`;
         const found = knownAddresses.findIndex((e) => e === msgId);
         if (found > -1) {
-            unknownAddresses.slice(found, 1);
+            knownAddresses.splice(found, 1);
             _(`${id.toLowerCase()}-enabled`).remove();
         }
         unknownAddresses.push(`0x${id.toUpperCase()}`);
@@ -259,6 +275,7 @@
                                                 ${canIdKnown(`0x${msgId}`) ? "" : "*"}
                                                 <code>0x${msgId.toUpperCase()}</code>
                                             </td>
+                                            <td class="text-nowrap">${getCanValueName(`0x${msgId}`)}</td>
                                                 ${msgData}
                                             </tr>`;
             if (hasDifferentValues) {
@@ -274,7 +291,7 @@
                     diffMsg += `<td><code>${d === 0 ? "" : numberWithPrefix(d) + "(dec)"}</code></td>`;
                 })
                 _("can-msg").innerHTML += `<tr class="table-info">
-                                            <td colspan="2">
+                                            <td colspan="3">
                                                 &Delta;
                                             </td>                                                
                                                 ${diffMsg}

@@ -48,7 +48,8 @@ function loadNavigation() {
             } catch (error) {
                 console.log("Missing Nav-link to activate.");
             }
-            
+            applyUiTheme();
+            applyTranslations(nav);
         }
     }
 
@@ -156,7 +157,7 @@ function serializeForm(formId) {
 }
 
 function rebootButton() {
-    _("statusdetails").innerHTML = "Invoking Reboot ...";
+    _("statusdetails").innerHTML = translate("Invoking Reboot ...");
     const xhr = new XMLHttpRequest();
     xhr.open("GET", "/reboot", true);
     xhr.send();

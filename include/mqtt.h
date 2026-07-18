@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <wifi_config.h>
 
 //——————————————————————————————————————————————————————————————————————————————
@@ -94,5 +95,9 @@ extern void PublishAuxiliaryTemperatures();
 extern void ShowActivityLed();
 extern String boolToString(bool src);
 extern void PublishLog(const char *msg, const char *func, LogLevel level);
+extern bool ApplyHeatingCommand(JsonVariantConst json);
+extern bool ApplyHotWaterCommand(JsonVariantConst json);
+extern void ApplyBoostCommand(bool enabled);
+extern void ApplyFastHeatupCommand(bool enabled);
 
 #endif
