@@ -18,6 +18,8 @@ extern WiFiClient espClient;
 //——————————————————————————————————————————————————————————————————————————————
 
 extern void connectWifi();
+extern bool beginManualWifiScan();
+extern void endManualWifiScan();
 
 
 #endif

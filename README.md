@@ -94,7 +94,7 @@ If your are missing a cable to plug in your self-made controller, don't install 
 ## Prerequisites
 Now that we have sorted out the serious bits, lets check if we got everything together to pull this off...
 
-1) A compatible Bosch-Junkers central gas heating system with Bosch Heatronic controller and BM1 or BM2 Bus Module equipped.
+1) A compatible Bosch-Junkers central gas heating system with Bosch Heatronic controller and a BM1 Bus Module. BM2 installations are intentionally outside this project's scope.
 2) Access to the data line that exits the bus module. Most of the time you will find a "room thermostat" like TA250 or TA270 which in fact is the control unit for you, the consumer. **It won't work with 1-2-4 style room thermostats like the TR200**
 Again, when in doubt, ask a technician.
 3) Awareness to short circuits and bus failures due to wrong wiring
@@ -145,9 +145,11 @@ The navigation bar provides English and German language selection and a sun/moon
 
 Translations are maintained as one JSON resource per locale in `data/frontend/i18n/` (`en.json`, `de.json`). Keys are grouped by their UI area, for example `menu.home`, `dashboard.system_status`, `mqtt.prefix`, and `filemanager.reload`. Markup can opt into automatic translation with `data-i18n="area.key"`; translated attributes use `data-i18n-placeholder`, `data-i18n-title`, or `data-i18n-aria-label`. JavaScript uses `translate("area.key", values)`. English is the fallback locale, and new locales only require a new resource plus an entry in `UiLocales`.
 
-The CAN Message Analyzer under **Utilities** reads the active CAN address configuration and displays names such as `Heating · Feed Current` beside their hexadecimal IDs. This makes captures usable with customized address maps while unknown IDs remain clearly identified.
+The CAN Message Analyzer under **Utilities** receives live bus events independently of verbose console sniffing. It groups traffic by ID, displays configured value names, frame counts, DLCs, mean intervals, last payloads, byte deltas, and common candidate interpretations. Captures can be paused, filtered, limited on screen, and exported as JSON or CSV for comparison. Unknown IDs remain clearly identified. See the [CAN Message Analyzer guide](assets/CANAnalyzer.md) for a safe capture workflow, field descriptions, interpretation guidance, and troubleshooting.
 
-The home page is a live heating dashboard. It shows burner, feed, outside, and hot-water values plus a lightweight five-minute temperature chart that runs entirely in the browser without an external chart service. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These commands take effect immediately and are deliberately not written to `configuration.json`; MQTT or Home Assistant can replace them later.
+![Cerasmarter web dashboard](/assets/webui-dashboard-dark.png)
+
+The home page is a live heating dashboard organized into heating, mixed-circuit, domestic-hot-water, auxiliary-sensor, runtime-control, and system categories. It presents every value returned by `GET /api/runtime`, uses equipment-appropriate state icons, and plots a five-minute temperature history with the locally bundled Chart.js 4.5.1 library. No CDN or internet access is required. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These commands take effect immediately and are deliberately not written to `configuration.json`; MQTT or Home Assistant can replace them later.
 
 The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers.
 
@@ -441,7 +443,7 @@ Keep `DeviceId` stable after discovery. If it or the discovery prefix is changed
 See the [configuration guide](assets/Configuration.md#home-assistant) for all settings.
 
 ## Hints
-- If you just wanna read then usually you have nothing to modify. The program will see other controllers on the bus and will go into "read-only" mode by itself. If you're not wanting to take any risks, you have to set the variable `OverrideControl` in [main.cpp](src/main.cpp) to `false`. This way nothing will be sent on the bus udner any circumstances but you can read everything.
+- Automatic takeover is suppressed while messages are observed in the configurable controller-address range. For capture-only installations, enable `CAN.ReadOnly` in the web interface or configuration file; this hard interlock cannot time out and re-enable transmission.
 - For debug purposes the `configuration.General.Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
@@ -496,3 +498,4 @@ WIP
 - Rop Gonggrijp and contributors of the ezTime library: https://github.com/ropg/ezTime
 - The maintainers of the ArduinoJSON library: https://arduinojson.org/
 - The maintainers of the Async ESP Webserver and AsyncTCP library: https://github.com/me-no-dev/ESPAsyncWebServer
+- The Chart.js contributors. Chart.js 4.5.1 is bundled locally under the MIT license for dashboard history charts: https://www.chartjs.org/

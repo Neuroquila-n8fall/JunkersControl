@@ -164,6 +164,8 @@ Control some global settings
     "General": {
         "BusMessageTimeout": 30,
         "SetpointOffDelaySeconds": 300,
+        "BasepointTemperature": -10.0,
+        "EndpointTemperature": 31.0,
         "Debug": false,
         "Sniffing": false
     },
@@ -178,6 +180,10 @@ Control some global settings
 Specifies the time in seconds(!) when we should take over control over the system after the last message from a TAxxx Controller has been received. 
 
 The program will stop issuing control messages immediately after another controller has been seen on the bus. If the foreign controller stops sending messages for `30` seconds, we will take over control
+
+###### Normal-operation Heating Curve
+
+`BasepointTemperature` and `EndpointTemperature` are the normal heating-curve defaults restored into the runtime command state on every startup. They are independent from the values in `FailSafe`; MQTT, Home Assistant, and the fallback web controls can still override them until the next restart.
 
 ###### Low-setpoint Off Delay
 
@@ -308,6 +314,20 @@ Discovery and state payloads are retained. The controller publishes retained onl
 ```json
     "CAN": {
         "Quartz": 16,
+        "Profiles": {
+            "Heating": true,
+            "MixedCircuit": false,
+            "DomesticHotWater": true
+        },
+        "ReadOnly": false,
+        "ControllerDetection": {
+            "MinimumAddress": "0x250",
+            "MaximumAddress": "0x25F"
+        },
+        "Heartbeat": {
+            "Address": "0x0F9",
+            "IntervalSeconds": 30
+        },
         "Addresses": {
             "Controller": {
                 "FlameStatus": "0x209",
@@ -350,6 +370,18 @@ Discovery and state payloads are retained. The controller publishes retained onl
         "Quartz": 16,
 ```
 Your CAN-Module might have a 8MHz or 16MHz oscillator (quartz) installed. Adjust the frequency here accordingly.
+
+###### Functional profiles and bus safety
+
+`Profiles.Heating`, `Profiles.MixedCircuit`, and `Profiles.DomesticHotWater` describe the functional parts actually installed. Disabled profiles are neither decoded nor driven. They intentionally do not identify TA250, TA270, or another room controller: BM1 installations vary by boiler and hydraulic configuration, while all CAN addresses remain independently editable.
+
+`ReadOnly` is a hard transmission interlock. When enabled, received frames remain available to MQTT, the web API, and CAN Analyzer, but no CAN frame can be sent and the normal controller timeout cannot restore write access.
+
+`ControllerDetection.MinimumAddress` and `MaximumAddress` form an inclusive standard-CAN-ID range. Receiving a frame in this range identifies another active controller and suppresses automatic takeover. The default includes `0x250` through `0x25F`.
+
+`Heartbeat.Address` and `IntervalSeconds` configure the zero-length keepalive frame. The default `0x0F9` at approximately 30-second intervals agrees with observed BM1 traffic. Both values are editable because this is empirical behavior rather than a manufacturer protocol specification.
+
+The web interface offers two domestic-hot-water address presets. The established mapping remains the default. The alternative BM1 mapping swaps the meanings of `0x203`, `0x20B`, `0x254`, and `0x255`. Applying a preset only fills the editable form; it must be reviewed and saved explicitly. Use the CAN Analyzer to capture an idle period and controlled hot-water changes before selecting it.
 
 ###### Addresses
 
