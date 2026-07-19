@@ -12,7 +12,13 @@ Configuration forms in the web UI save directly to `/configuration.json`. Saves 
 
 Uploading a complete `/configuration.json` does not merge it with the current in-memory values. Use **Reload Configuration** in the file manager after the upload. If the file is invalid, the controller keeps the current configuration and reports the error.
 
-Before replacing the LittleFS filesystem, download `/configuration.json`. Upload the backup and reload it after the filesystem update.
+For compatibility with older configuration files, settings added by newer firmware are copied from the running device only when the corresponding key is absent from the uploaded file. Explicit uploaded values always win. For example, an omitted `FailSafe.EndpointTemperature` retains the current endpoint, while `HomeAssistant.Enabled: false` deliberately disables discovery after the configuration is reloaded. Until reload or reboot, configuration pages continue showing the currently loaded in-memory values rather than the staged upload.
+
+Every valid configuration is mirrored to NVS after it is loaded or saved. If LittleFS is replaced through the WebUI, PlatformIO, esptool, or a programmer, startup recognizes the credential-free provisioning template and restores the persistent copy automatically. A deliberately uploaded valid configuration takes precedence and refreshes the mirror after loading. Keep a downloaded copy for recovery from a full-flash or NVS erase.
+
+The filesystem pipeline records intent with the root-level `ProvisioningTemplate` field. Release images use `true`; an external configuration selected through `CERASMARTER_CONFIG_FILE` is automatically stamped `false` and therefore takes precedence over an older NVS mirror. Set the marker explicitly when constructing images outside the supplied pipeline. Never publish a custom image containing device credentials.
+
+For an intentional factory reset, hold the BOOT button continuously for 10 seconds during startup. This clears both the persistent NVS mirror and the LittleFS configuration copies, retains the web frontend, and enters Setup Mode. A normal short BOOT press still enters Setup Mode without deleting anything.
 
 ### Wifi
 
@@ -146,7 +152,7 @@ This block is for time related configuration
     }
 ```
 
-The command timeout is a lease on remote heating control. It is refreshed only by a valid heating, boost, or fast-heatup command. When it expires, the controller clears remote overrides and follows the daily start/stop window using the configured curve and hard maximum. MQTT reconnection does not end fail-safe mode; a fresh valid command does.
+For configuration-file compatibility, `CommandTimeoutSeconds` retains its existing name. It defines the grace period for a continuous MQTT disconnection; the frequency of heating commands does not affect fail-safe mode. When the grace period expires, the current runtime controls are saved and the local profile is applied. MQTT reconnection restores those controls and leaves fail-safe mode, without requiring a fresh command or a Node-RED-style heartbeat.
 
 The schedule uses boiler-reported time first, then locally synchronized time. With no valid clock it applies `HeatWhenTimeUnknown`: `true` holds the minimum feed temperature, while `false` disables heating.
 
@@ -157,6 +163,7 @@ Control some global settings
 ```json
     "General": {
         "BusMessageTimeout": 30,
+        "SetpointOffDelaySeconds": 300,
         "Debug": false,
         "Sniffing": false
     },
@@ -171,6 +178,14 @@ Control some global settings
 Specifies the time in seconds(!) when we should take over control over the system after the last message from a TAxxx Controller has been received. 
 
 The program will stop issuing control messages immediately after another controller has been seen on the bus. If the foreign controller stops sending messages for `30` seconds, we will take over control
+
+###### Low-setpoint Off Delay
+
+```json
+        "SetpointOffDelaySeconds": 300,
+```
+
+The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating off. Calculated values below 10 °C are clamped to exactly 10 °C before CAN conversion and transmission. If that request remains continuously active for this many seconds, Cerasmarter disables the heating operation flag. The controller-side latch applies to every command transport and prevents repeated `Enabled: true` messages from defeating the shutdown. An effective setpoint above 10 °C clears the latch; a client that explicitly manages `Enabled` should send `Enabled: true` with the higher demand. Values from 10 through 86400 seconds are accepted.
 
 ###### Debug
 

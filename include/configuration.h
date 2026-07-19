@@ -21,6 +21,10 @@ extern bool BackupConfigurationForFilesystemUpdate(String &errorMessage);
 
 extern bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage);
 
+extern bool PersistConfigurationBackup(String &errorMessage);
+
+extern bool ClearPersistentConfigurationBackup(String &errorMessage);
+
 extern String IntToHex(int value);
 
 extern unsigned long convertHexString(const char *src);
@@ -82,6 +86,7 @@ struct Configuration
         char PosixTimezone[128] = "CET-1CEST,M3.5.0,M10.5.0/3"; // Offline-capable local time rules
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
+        unsigned long SetpointOffDelaySeconds = 300; // Grace period before a 10 C feed request disables heating
         bool Debug;            // Output debug messages, true|false
         bool Sniffing;         // Output every CAN message von the bus
     } General;

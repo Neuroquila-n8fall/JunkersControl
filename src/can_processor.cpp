@@ -37,7 +37,10 @@ void SetFeedTemperature()
   int feedSetpoint;
 
   // Get raw Setpoint
-  commandedValues.Heating.CalculatedFeedSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
+  double effectiveSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
+  if (EnforceHeatingSetpointShutdown(effectiveSetpoint))
+    effectiveSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
+  commandedValues.Heating.CalculatedFeedSetpoint = effectiveSetpoint;
 
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);

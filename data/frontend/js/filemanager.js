@@ -76,7 +76,7 @@ function deleteFile(path) {
 }
 
 function downloadDeleteButton(filename, action) {
-    const urltocall = "/filemanager/file?name=" + filename + "&action=" + action;
+    const urltocall = "/filemanager/file?name=" + encodeURIComponent(filename) + "&action=" + encodeURIComponent(action);
     let xmlhttp = new XMLHttpRequest();
     if (action === "delete") {
         xmlhttp.open("GET", urltocall, false);
@@ -96,7 +96,12 @@ function downloadDeleteButton(filename, action) {
     }
     if (action === "download") {
         _("status").innerHTML = "";
-        window.open(urltocall, "_blank");
+        const link = document.createElement("a");
+        link.href = urltocall;
+        link.download = filename.split("/").pop() || "download";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
     }
 }
 

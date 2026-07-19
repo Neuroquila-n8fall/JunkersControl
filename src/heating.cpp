@@ -6,13 +6,75 @@
 
 CeraValues ceraValues;
 
+namespace
+{
+constexpr double manufacturerHeatingOffSetpointC = 10.0;
+constexpr double setpointComparisonTolerance = 0.01;
+unsigned long lowSetpointSince = 0;
+bool lowSetpointPending = false;
+bool setpointShutdownActive = false;
+
+void activateSetpointShutdown()
+{
+    if (!setpointShutdownActive)
+        Log.printf("Feed setpoint remained at %.1f C for %lu seconds. Switching heating off.\r\n",
+                   manufacturerHeatingOffSetpointC,
+                   configuration.General.SetpointOffDelaySeconds);
+    setpointShutdownActive = true;
+}
+} // namespace
+
+// Applies the manufacturer's convention that a 10 C feed setpoint means off.
+// The latch prevents repeated Enabled=true traffic from restarting the heating
+// until a genuinely higher effective setpoint is requested.
+bool EnforceHeatingSetpointShutdown(double effectiveSetpoint)
+{
+    if (effectiveSetpoint > manufacturerHeatingOffSetpointC + setpointComparisonTolerance)
+    {
+        lowSetpointPending = false;
+        setpointShutdownActive = false;
+        return false;
+    }
+
+    if (!lowSetpointPending)
+    {
+        lowSetpointPending = true;
+        lowSetpointSince = millis();
+    }
+
+    if (!setpointShutdownActive &&
+        millis() - lowSetpointSince >= configuration.General.SetpointOffDelaySeconds * 1000UL)
+        activateSetpointShutdown();
+
+    if (!setpointShutdownActive || !commandedValues.Heating.Active)
+        return false;
+
+    commandedValues.Heating.Active = false;
+    return true;
+}
+
+void UpdateHeatingSetpointShutdown()
+{
+    if (!lowSetpointPending || setpointShutdownActive ||
+        millis() - lowSetpointSince < configuration.General.SetpointOffDelaySeconds * 1000UL)
+        return;
+
+    activateSetpointShutdown();
+    if (!commandedValues.Heating.Active)
+        return;
+
+    commandedValues.Heating.Active = false;
+    SetFeedTemperature();
+    PublishHeatingTemperaturesAndStatus();
+}
+
 //-- Takes the parameters and calculates the desired feed temperature.
 //   This calculation takes in the desired base temperature at which the heating
 //   should perform 100% of the reported maximum feed temperature and when it should perform at the minimum temperature.
 //   The calculation maps endpoint and basepoint to minimum temperature and maximum feed temperature
 //   The original controller takes a different approach: It lets you decide which temperature should be set when the outside temperature is -15°C or -20°C for some models
 //   The calculation for the original controller is: map 25° and -15° to Off-Temperature and maximum temperature.
-double CalculateFeedTemperature()
+static double calculateUnclampedFeedTemperature()
 {
     // Use the reference temperature for outside by user preference.
     double outsideTemperature = configuration.Features.UseAuxiliaryOutsideTempReference ? commandedValues.Heating.AuxiliaryTemperature : ceraValues.General.OutsideTemperature;
@@ -182,6 +244,21 @@ double CalculateFeedTemperature()
         Log.printf("DEBUG MAP VALUE: %.2f >> from %.2f to %.2f to %.2f and %.2f >> %.2f >> Half-Step Round: %.2f\r\n", outsideTemperature, commandedValues.Heating.EndpointTemperature, commandedValues.Heating.BasepointTemperature, commandedValues.Heating.MinimumFeedTemperature, ceraValues.Heating.FeedMaximum, linearTemp, halfRounded);
     }
     return halfRounded;
+}
+
+double CalculateFeedTemperature()
+{
+    const double rawSetpoint = calculateUnclampedFeedTemperature();
+    const double clampedSetpoint = rawSetpoint < manufacturerHeatingOffSetpointC
+                                       ? manufacturerHeatingOffSetpointC
+                                       : rawSetpoint;
+    if (configuration.General.Debug && clampedSetpoint != rawSetpoint)
+    {
+        Log.printf("DEBUG MINIMUM FEED: Raw setpoint %.2f C clamped to manufacturer minimum %.2f C.\r\n",
+                   rawSetpoint,
+                   clampedSetpoint);
+    }
+    return clampedSetpoint;
 }
 
 // Converts the value to its half-step representation (= value times two)

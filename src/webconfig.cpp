@@ -122,6 +122,90 @@ static bool validateConfigurationFile(const char *path, String &errorMessage)
     return true;
 }
 
+// Keep settings introduced after older configuration files were created.
+// Explicit values in the uploaded document always win; only missing keys are
+// populated from the configuration that is currently active on the device.
+static bool migrateUploadedConfiguration(const char *path, bool &changed, String &errorMessage)
+{
+    changed = false;
+    File file = LittleFS.open(path, FILE_READ);
+    if (!file)
+    {
+        errorMessage = "Uploaded configuration could not be opened for migration.";
+        return false;
+    }
+
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    if (error)
+    {
+        errorMessage = "Uploaded configuration could not be parsed for migration: " + String(error.c_str());
+        return false;
+    }
+
+    auto preserveMissing = [&changed](JsonObject object, const char *key, const auto &value)
+    {
+        if (object[key].isNull())
+        {
+            object[key] = value;
+            changed = true;
+        }
+    };
+
+    JsonObject general = doc["General"].as<JsonObject>();
+    preserveMissing(general, "SetpointOffDelaySeconds", configuration.General.SetpointOffDelaySeconds);
+
+    JsonObject time = doc["Time"].as<JsonObject>();
+    preserveMissing(time, "PosixTimezone", configuration.General.PosixTimezone);
+
+    JsonObject failSafe;
+    if (doc["FailSafe"].is<JsonObject>())
+        failSafe = doc["FailSafe"].as<JsonObject>();
+    else
+    {
+        failSafe = doc["FailSafe"].to<JsonObject>();
+        changed = true;
+    }
+    preserveMissing(failSafe, "Enabled", configuration.FailSafe.Enabled);
+    preserveMissing(failSafe, "CommandTimeoutSeconds", configuration.FailSafe.CommandTimeoutSeconds);
+    preserveMissing(failSafe, "StartHour", configuration.FailSafe.StartHour);
+    preserveMissing(failSafe, "StartMinute", configuration.FailSafe.StartMinute);
+    preserveMissing(failSafe, "StopHour", configuration.FailSafe.StopHour);
+    preserveMissing(failSafe, "StopMinute", configuration.FailSafe.StopMinute);
+    preserveMissing(failSafe, "HeatWhenTimeUnknown", configuration.FailSafe.HeatWhenTimeUnknown);
+    preserveMissing(failSafe, "BasepointTemperature", configuration.FailSafe.BasepointTemperature);
+    preserveMissing(failSafe, "EndpointTemperature", configuration.FailSafe.EndpointTemperature);
+    preserveMissing(failSafe, "MinimumFeedTemperature", configuration.FailSafe.MinimumFeedTemperature);
+    preserveMissing(failSafe, "MaximumFeedTemperature", configuration.FailSafe.MaximumFeedTemperature);
+
+    JsonObject homeAssistant = doc["HomeAssistant"].as<JsonObject>();
+    preserveMissing(homeAssistant, "AutoDiscoveryPrefix", configuration.HomeAssistant.AutoDiscoveryPrefix);
+    preserveMissing(homeAssistant, "OffDelay", configuration.HomeAssistant.OffDelay);
+    preserveMissing(homeAssistant, "Enabled", configuration.HomeAssistant.Enabled);
+    preserveMissing(homeAssistant, "DeviceId", configuration.HomeAssistant.DeviceId);
+    preserveMissing(homeAssistant, "TempUnit", configuration.HomeAssistant.TempUnit);
+
+    if (!changed)
+        return true;
+
+    file = LittleFS.open(path, FILE_WRITE, true);
+    if (!file)
+    {
+        errorMessage = "Migrated configuration could not be opened for writing.";
+        return false;
+    }
+    const size_t written = serializeJsonPretty(doc, file);
+    file.flush();
+    file.close();
+    if (written == 0)
+    {
+        errorMessage = "Migrated configuration could not be written.";
+        return false;
+    }
+    return true;
+}
+
 static bool sendConfigurationSaveResult(AsyncWebServerRequest *request, const char *successMessage)
 {
     if (WriteConfiguration())
@@ -305,6 +389,7 @@ void getGeneralConfig(AsyncWebServerRequest *request)
     doc["tz"] = configuration.General.Timezone;
     doc["posix-tz"] = configuration.General.PosixTimezone;
     doc["busmsgtimeout"] = configuration.General.BusMessageTimeout;
+    doc["setpoint-off-delay"] = configuration.General.SetpointOffDelaySeconds;
     doc["debug"] = configuration.General.Debug;
     doc["sniffing"] = configuration.General.Sniffing;
     doc["failsafe-enabled"] = configuration.FailSafe.Enabled;
@@ -340,6 +425,7 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     int failSafeStopHour = configuration.FailSafe.StopHour;
     int failSafeStopMinute = configuration.FailSafe.StopMinute;
     unsigned long failSafeTimeout = configuration.FailSafe.CommandTimeoutSeconds;
+    unsigned long setpointOffDelay = configuration.General.SetpointOffDelaySeconds;
     double failSafeBasepoint = configuration.FailSafe.BasepointTemperature;
     double failSafeEndpoint = configuration.FailSafe.EndpointTemperature;
     double failSafeMinimum = configuration.FailSafe.MinimumFeedTemperature;
@@ -356,6 +442,8 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 
     if (!doc["failsafe-timeout"].isNull())
         failSafeTimeout = doc["failsafe-timeout"].as<unsigned long>();
+    if (!doc["setpoint-off-delay"].isNull())
+        setpointOffDelay = doc["setpoint-off-delay"].as<unsigned long>();
     if (!doc["failsafe-basepoint"].isNull())
         failSafeBasepoint = doc["failsafe-basepoint"].as<double>();
     if (!doc["failsafe-endpoint"].isNull())
@@ -370,11 +458,12 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     const bool stopValid = doc["failsafe-stop"].isNull() ||
                            parseTime(doc["failsafe-stop"].as<String>(), failSafeStopHour, failSafeStopMinute);
     if (!startValid || !stopValid || failSafeTimeout < 10 || failSafeTimeout > 86400 ||
+        setpointOffDelay < 10 || setpointOffDelay > 86400 ||
         !isfinite(failSafeBasepoint) || !isfinite(failSafeEndpoint) ||
         !isfinite(failSafeMinimum) || !isfinite(failSafeMaximum) ||
         failSafeMinimum < 0 || failSafeMaximum > 100 || failSafeMinimum > failSafeMaximum)
     {
-        request->send(400, "application/json", R"({"status":400,"msg":"Invalid fail-safe time, timeout, or temperature range."})");
+        request->send(400, "application/json", R"({"status":400,"msg":"Invalid heating delay, fail-safe time, timeout, or temperature range."})");
         return;
     }
 
@@ -398,6 +487,7 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 
     if (!doc["busmsgtimeout"].isNull())
         configuration.General.BusMessageTimeout = doc["busmsgtimeout"];
+    configuration.General.SetpointOffDelaySeconds = setpointOffDelay;
 
     if (!doc["debug"].isNull())
         configuration.General.Debug = doc["debug"] == "true";
@@ -897,16 +987,18 @@ void configureFilemanagerEndpoints()
                {
 
       if (request->hasParam("name") && request->hasParam("action")) {
-        const char *fileName = request->getParam("name")->value().c_str();
-        const char *fileAction = request->getParam("action")->value().c_str();
+        const String fileName = request->getParam("name")->value();
+        const String fileAction = request->getParam("action")->value();
         if (!LittleFS.exists(fileName)) {
           request->send(400, "text/plain", "ERROR: file does not exist");
         } else {
-          if (strcmp(fileAction, "download") == 0) {
-            request->send(LittleFS, fileName, "application/octet-stream");
-          } else if (strcmp(fileAction, "delete") == 0) {
+          if (fileAction == "download") {
+            // The download flag produces an attachment Content-Disposition
+            // containing the basename instead of the endpoint name "file".
+            request->send(LittleFS, fileName, "application/octet-stream", true);
+          } else if (fileAction == "delete") {
             LittleFS.remove(fileName);
-            request->send(200, "text/plain", "Deleted File: " + String(fileName));
+            request->send(200, "text/plain", "Deleted File: " + fileName);
           } else {
             request->send(400, "text/plain", "ERROR: invalid action param supplied");
           }
@@ -1024,6 +1116,16 @@ void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t
             return;
         }
 
+        bool configurationMigrated = false;
+        if (!migrateUploadedConfiguration(configurationUploadFileName, configurationMigrated, validationError) ||
+            !validateConfigurationFile(configurationUploadFileName, validationError))
+        {
+            LittleFS.remove(configurationUploadFileName);
+            result->status = 400;
+            result->message = R"({"status":400,"msg":"Uploaded configuration could not be migrated safely."})";
+            return;
+        }
+
         // Use the same recovery path as normal configuration saves so boot can
         // restore it if power is lost between the two renames.
         const char *uploadBackupFileName = "/configuration.bak";
@@ -1045,8 +1147,21 @@ void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t
         }
 
         LittleFS.remove(uploadBackupFileName);
+        String persistenceError;
+        if (!PersistConfigurationBackup(persistenceError))
+        {
+            Log.println("Warning: uploaded configuration was committed, but its persistent backup could not be refreshed: " + persistenceError);
+            result->message = R"({"status":200,"msg":"Configuration uploaded. Reload Configuration or reboot to apply it; pages continue showing the current in-memory values until then. Warning: the persistent backup could not be refreshed."})";
+        }
+        else if (configurationMigrated)
+        {
+            result->message = R"({"status":200,"msg":"Configuration uploaded and backed up. Settings absent from the older file were carried forward from the running device. Reload Configuration or reboot to apply it; pages continue showing the current in-memory values until then."})";
+        }
+        else
+        {
+            result->message = R"({"status":200,"msg":"Configuration uploaded and backed up. Reload Configuration or reboot to apply it; pages continue showing the current in-memory values until then."})";
+        }
         SetConfigurationUploadPending(true);
-        result->message = R"({"status":200,"msg":"Configuration uploaded. Reboot to apply it."})";
     }
 }
 

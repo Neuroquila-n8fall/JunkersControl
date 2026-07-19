@@ -12,6 +12,7 @@ import gzip
 import shutil
 import glob
 import pathlib
+import json
 
 # HELPER TO GZIP A FILE
 def gzip_file( src_path, dst_path ):
@@ -39,6 +40,10 @@ def gzip_webfiles( source, target, env ):
     # ever placing credentials in the repository. CI intentionally leaves this unset.
     configuration_source_path = os.environ.get(
         'CERASMARTER_CONFIG_FILE', configuration_template_path
+    )
+    using_configuration_template = (
+        os.path.normcase(os.path.abspath(configuration_source_path)) ==
+        os.path.normcase(os.path.abspath(configuration_template_path))
     )
 
     # CHECK DATA DIR
@@ -100,11 +105,17 @@ def gzip_webfiles( source, target, env ):
     # A release filesystem must be directly provisionable, but must never copy
     # a developer's device-specific configuration. Always use the credential-free
     # template unless local provisioning explicitly selected an external file.
-    if configuration_source_path == configuration_template_path:
+    if using_configuration_template:
         print('  Copying credential-free configuration template')
+        shutil.copyfile(configuration_source_path, target_configuration_path)
     else:
-        print('  Copying explicitly selected local device configuration')
-    shutil.copyfile(configuration_source_path, target_configuration_path)
+        print('  Copying explicitly selected authoritative local device configuration')
+        with open(configuration_source_path, 'r', encoding='utf-8') as source_config:
+            staged_configuration = json.load(source_config)
+        staged_configuration['ProvisioningTemplate'] = False
+        with open(target_configuration_path, 'w', encoding='utf-8', newline='\n') as target_config:
+            json.dump(staged_configuration, target_config, ensure_ascii=False, indent=4)
+            target_config.write('\n')
 
     # Copy files not included in gzip extension list
     for file in files_to_copy:        

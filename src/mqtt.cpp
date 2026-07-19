@@ -19,44 +19,102 @@ String PayloadBuf;
 static unsigned long lastMqttAttempt = 0;
 static const unsigned long mqttRetryInterval = 30000;
 
+namespace
+{
+bool readBoolean(JsonVariantConst json, const char *key, bool &target)
+{
+  JsonVariantConst value = json[key];
+  if (value.isNull())
+    return false;
+
+  if (value.is<bool>())
+  {
+    target = value.as<bool>();
+    return true;
+  }
+
+  // Existing Node-RED examples use JSON 0/1 for several flags.
+  if (value.is<int>())
+  {
+    const int numeric = value.as<int>();
+    if (numeric == 0 || numeric == 1)
+    {
+      target = numeric == 1;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template <typename T>
+bool readConstrainedNumber(JsonVariantConst json, const char *key, T &target, double minimum, double maximum)
+{
+  JsonVariantConst value = json[key];
+  if (value.isNull() || (!value.is<int>() && !value.is<long>() &&
+                         !value.is<unsigned int>() && !value.is<unsigned long>() &&
+                         !value.is<float>() && !value.is<double>()))
+    return false;
+
+  const double parsed = value.as<double>();
+  if (!isfinite(parsed))
+    return false;
+
+  target = static_cast<T>(constrain(parsed, minimum, maximum));
+  return true;
+}
+} // namespace
+
 bool ApplyHeatingCommand(JsonVariantConst json)
 {
   bool changed = false;
-#define APPLY_VALUE(KEY, TARGET) if (!json[KEY].isNull()) { TARGET = json[KEY]; changed = true; }
-  APPLY_VALUE("Enabled", commandedValues.Heating.Active)
-  APPLY_VALUE("FeedSetpoint", commandedValues.Heating.FeedSetpoint)
-  APPLY_VALUE("FeedBaseSetpoint", commandedValues.Heating.BasepointTemperature)
-  APPLY_VALUE("FeedCutOff", commandedValues.Heating.EndpointTemperature)
-  APPLY_VALUE("FeedMinimum", commandedValues.Heating.MinimumFeedTemperature)
-  APPLY_VALUE("AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature)
-  APPLY_VALUE("AmbientTemperature", commandedValues.Heating.AmbientTemperature)
-  APPLY_VALUE("TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature)
-  APPLY_VALUE("Adaption", commandedValues.Heating.FeedAdaption)
-  APPLY_VALUE("ValveScaling", commandedValues.Heating.ValveScaling)
-  APPLY_VALUE("ValveScalingMaxOpening", commandedValues.Heating.MaxValveOpening)
-  APPLY_VALUE("ValveScalingOpening", commandedValues.Heating.ValveOpening)
-  APPLY_VALUE("DynamicAdaption", commandedValues.Heating.DynamicAdaption)
-  APPLY_VALUE("OverrideSetpoint", commandedValues.Heating.OverrideSetpoint)
-  APPLY_VALUE("OnDemandBoostDuration", commandedValues.Heating.BoostDuration)
-#undef APPLY_VALUE
+  changed |= readBoolean(json, "Enabled", commandedValues.Heating.Active);
+  changed |= readConstrainedNumber(json, "FeedSetpoint", commandedValues.Heating.FeedSetpoint, 0.0, 100.0);
+  changed |= readConstrainedNumber(json, "FeedBaseSetpoint", commandedValues.Heating.BasepointTemperature, -50.0, 50.0);
+  changed |= readConstrainedNumber(json, "FeedCutOff", commandedValues.Heating.EndpointTemperature, -50.0, 50.0);
+  changed |= readConstrainedNumber(json, "FeedMinimum", commandedValues.Heating.MinimumFeedTemperature, 0.0, 100.0);
+  changed |= readConstrainedNumber(json, "AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature, -50.0, 100.0);
+  changed |= readConstrainedNumber(json, "AmbientTemperature", commandedValues.Heating.AmbientTemperature, -50.0, 100.0);
+  changed |= readConstrainedNumber(json, "TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature, 5.0, 35.0);
+  changed |= readConstrainedNumber(json, "Adaption", commandedValues.Heating.FeedAdaption, -30.0, 30.0);
+  changed |= readBoolean(json, "ValveScaling", commandedValues.Heating.ValveScaling);
+  changed |= readConstrainedNumber(json, "ValveScalingMaxOpening", commandedValues.Heating.MaxValveOpening, 1.0, 100.0);
+  changed |= readConstrainedNumber(json, "ValveScalingOpening", commandedValues.Heating.ValveOpening, 0.0, 100.0);
+  changed |= readBoolean(json, "DynamicAdaption", commandedValues.Heating.DynamicAdaption);
+  changed |= readBoolean(json, "OverrideSetpoint", commandedValues.Heating.OverrideSetpoint);
+  changed |= readConstrainedNumber(json, "OnDemandBoostDuration", commandedValues.Heating.BoostDuration, 0.0, 86400.0);
+
+  bool boost = commandedValues.Heating.Boost;
+  if (readBoolean(json, "OnDemandBoost", boost) || readBoolean(json, "Boost", boost))
+  {
+    commandedValues.Heating.Boost = boost;
+    commandedValues.Heating.BoostTimeCountdown = boost ? commandedValues.Heating.BoostDuration : 0;
+    changed = true;
+  }
+
+  bool fastHeatup = commandedValues.Heating.FastHeatup;
+  if (readBoolean(json, "FastHeatup", fastHeatup))
+  {
+    if (fastHeatup && !commandedValues.Heating.FastHeatup)
+      commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+    commandedValues.Heating.FastHeatup = fastHeatup;
+    changed = true;
+  }
+
   if (changed)
   {
-    commandedValues.Heating.FeedSetpoint = constrain(commandedValues.Heating.FeedSetpoint, 0.0, 100.0);
-    commandedValues.Heating.MinimumFeedTemperature = constrain(commandedValues.Heating.MinimumFeedTemperature, 0.0, 100.0);
-    commandedValues.Heating.MaxValveOpening = constrain(commandedValues.Heating.MaxValveOpening, 0, 100);
-    commandedValues.Heating.ValveOpening = constrain(commandedValues.Heating.ValveOpening, 0, 100);
-    commandedValues.Heating.BoostDuration = constrain(commandedValues.Heating.BoostDuration, 0, 86400);
     NotifyValidHeatingCommand();
     SetFeedTemperature();
+    PublishHeatingTemperaturesAndStatus();
   }
   return changed;
 }
 
 bool ApplyHotWaterCommand(JsonVariantConst json)
 {
-  if (json["Setpoint"].isNull())
+  if (!readConstrainedNumber(json, "Setpoint", commandedValues.HotWater.SetPoint, 0.0, 100.0))
     return false;
-  commandedValues.HotWater.SetPoint = constrain(json["Setpoint"].as<int>(), 0, 100);
+  PublishWaterTemperatures();
   return true;
 }
 
@@ -66,14 +124,17 @@ void ApplyBoostCommand(bool enabled)
   commandedValues.Heating.BoostTimeCountdown = enabled ? commandedValues.Heating.BoostDuration : 0;
   NotifyValidHeatingCommand();
   SetFeedTemperature();
+  PublishHeatingTemperaturesAndStatus();
 }
 
 void ApplyFastHeatupCommand(bool enabled)
 {
   commandedValues.Heating.FastHeatup = enabled;
-  commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+  if (enabled)
+    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
   NotifyValidHeatingCommand();
   SetFeedTemperature();
+  PublishHeatingTemperaturesAndStatus();
 }
 
 // \brief (Re)connect to MQTT broker
@@ -148,7 +209,10 @@ void setupMqttClient()
   // The ESP TCP connect and MQTT CONNACK waits must not stall boiler control.
   espClient.setConnectionTimeout(250);
   client.setSocketTimeout(1);
-  if (!client.setBufferSize(16384))
+  // Device discovery is intentionally emitted as one Home Assistant device
+  // document. The complete command surface currently serializes to about
+  // 20 KiB, so leave enough room for the MQTT topic and future components.
+  if (!client.setBufferSize(24576))
     Log.println("Unable to allocate the MQTT buffer required for Home Assistant discovery.");
 }
 
@@ -394,6 +458,23 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
   jsonObj["Enabled"] = boolToString(commandedValues.Heating.Active);
+  jsonObj["FeedSetpoint"] = commandedValues.Heating.FeedSetpoint;
+  jsonObj["FeedBaseSetpoint"] = commandedValues.Heating.BasepointTemperature;
+  jsonObj["FeedCutOff"] = commandedValues.Heating.EndpointTemperature;
+  jsonObj["FeedMinimum"] = commandedValues.Heating.MinimumFeedTemperature;
+  jsonObj["AuxiliaryTemperature"] = commandedValues.Heating.AuxiliaryTemperature;
+  jsonObj["AmbientTemperature"] = commandedValues.Heating.AmbientTemperature;
+  jsonObj["TargetAmbientTemperature"] = commandedValues.Heating.TargetAmbientTemperature;
+  jsonObj["Adaption"] = commandedValues.Heating.FeedAdaption;
+  jsonObj["ValveScaling"] = boolToString(commandedValues.Heating.ValveScaling);
+  jsonObj["ValveScalingMaxOpening"] = commandedValues.Heating.MaxValveOpening;
+  jsonObj["ValveScalingOpening"] = commandedValues.Heating.ValveOpening;
+  jsonObj["DynamicAdaption"] = boolToString(commandedValues.Heating.DynamicAdaption);
+  jsonObj["OverrideSetpoint"] = boolToString(commandedValues.Heating.OverrideSetpoint);
+  jsonObj["OnDemandBoostDuration"] = commandedValues.Heating.BoostDuration;
+
+  // Compatibility aliases retained for existing dashboards and discovery
+  // documents that predate the complete command-state mirror.
   jsonObj["RequestedFeedSetpoint"] = commandedValues.Heating.FeedSetpoint;
   jsonObj["BoostDuration"] = commandedValues.Heating.BoostDuration;
   jsonObj["RoomReferenceT"] = commandedValues.Heating.AmbientTemperature;
@@ -403,7 +484,7 @@ void PublishHeatingTemperaturesAndStatus()
     return;
 
   // Publish Data on MQTT
-  char buffer[768];
+  char buffer[1536];
   size_t n = serializeJson(doc, buffer);
 
   // Send to HA state topic or the configured topic, when HA is disabled.
