@@ -30,6 +30,25 @@ static bool validateConfigurationDocument(JsonDocument &doc, String &errorMessag
     return true;
 }
 
+static bool isProvisioningTemplate(JsonDocument &doc)
+{
+    const String ssid = doc["Wifi"]["SSID"] | "";
+    JsonVariant marker = doc["ProvisioningTemplate"];
+    if (!marker.isNull())
+    {
+        // A custom filesystem build is explicitly stamped false. A true marker
+        // still requires empty Wi-Fi credentials so a customized/uploaded copy
+        // of the template is not mistaken for a release provisioning image.
+        return marker.as<bool>() && ssid.isEmpty();
+    }
+
+    // Filesystem images produced before the explicit marker was introduced
+    // used this credential-free combination.
+    const String mqttServer = doc["MQTT"]["Server"] | "";
+    const String mqttUser = doc["MQTT"]["User"] | "";
+    return ssid.isEmpty() && mqttServer == "1.2.3.4" && mqttUser == "mqtt";
+}
+
 bool BackupConfigurationForFilesystemUpdate(String &errorMessage)
 {
     File file = LittleFS.open(configFileName, FILE_READ);
@@ -67,11 +86,45 @@ bool BackupConfigurationForFilesystemUpdate(String &errorMessage)
         errorMessage = "NVS backup storage could not be opened; filesystem update cancelled.";
         return false;
     }
+    const size_t existingSize = preferences.getBytesLength(filesystemBackupKey);
+    if (existingSize == size)
+    {
+        std::unique_ptr<uint8_t[]> existingData(new (std::nothrow) uint8_t[size]);
+        if (existingData && preferences.getBytes(filesystemBackupKey, existingData.get(), size) == size &&
+            memcmp(existingData.get(), data.get(), size) == 0)
+        {
+            preferences.end();
+            return true;
+        }
+    }
     const size_t written = preferences.putBytes(filesystemBackupKey, data.get(), size);
     preferences.end();
     if (written != size)
     {
         errorMessage = "The configuration could not be backed up to NVS; filesystem update cancelled.";
+        return false;
+    }
+    return true;
+}
+
+bool PersistConfigurationBackup(String &errorMessage)
+{
+    return BackupConfigurationForFilesystemUpdate(errorMessage);
+}
+
+bool ClearPersistentConfigurationBackup(String &errorMessage)
+{
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+    {
+        errorMessage = "NVS backup storage could not be opened.";
+        return false;
+    }
+    const bool cleared = preferences.clear();
+    preferences.end();
+    if (!cleared)
+    {
+        errorMessage = "The persistent configuration backup could not be cleared.";
         return false;
     }
     return true;
@@ -112,6 +165,24 @@ bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage)
             errorMessage = "Discarded an invalid configuration backup from NVS.";
         return false;
     }
+
+    // A deliberately uploaded, valid device configuration is authoritative.
+    // Restore only over a release provisioning template, a missing file, or an
+    // invalid file left by an interrupted/raw filesystem replacement.
+    File currentFile = LittleFS.open(configFileName, FILE_READ);
+    if (currentFile)
+    {
+        JsonDocument currentDoc;
+        String currentValidationError;
+        const DeserializationError currentJsonError = deserializeJson(currentDoc, currentFile);
+        currentFile.close();
+        if (!currentJsonError && validateConfigurationDocument(currentDoc, currentValidationError) &&
+            !isProvisioningTemplate(currentDoc))
+        {
+            preferences.end();
+            return true;
+        }
+    }
     const char *restoreFileName = "/configuration.restore";
     File restored = LittleFS.open(restoreFileName, FILE_WRITE, true);
     if (!restored || restored.write(data.get(), size) != size)
@@ -140,9 +211,8 @@ bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage)
         return false;
     }
     LittleFS.remove(backupConfigFileName);
-    preferences.remove(filesystemBackupKey);
     preferences.end();
-    Log.println("Restored configuration preserved across the filesystem update.");
+    Log.println("Restored the persistent configuration backup after the filesystem was replaced.");
     return true;
 }
 
@@ -239,8 +309,11 @@ bool ReadConfiguration()
 
     JsonObject GeneralSettings = doc["General"];
     configuration.General.BusMessageTimeout = GeneralSettings["BusMessageTimeout"];
+    configuration.General.SetpointOffDelaySeconds = GeneralSettings["SetpointOffDelaySeconds"] | configuration.General.SetpointOffDelaySeconds;
     configuration.General.Debug = GeneralSettings["Debug"];
     configuration.General.Sniffing = GeneralSettings["Sniffing"];
+    if (configuration.General.SetpointOffDelaySeconds < 10 || configuration.General.SetpointOffDelaySeconds > 86400)
+        configuration.General.SetpointOffDelaySeconds = 300;
 
     JsonObject FailSafeSettings = doc["FailSafe"];
     if (!FailSafeSettings.isNull())
@@ -400,6 +473,9 @@ bool ReadConfiguration()
         }
     }
     file.close();
+    String backupError;
+    if (!PersistConfigurationBackup(backupError))
+        Log.println("Warning: configuration loaded, but its persistent backup could not be refreshed: " + backupError);
     return true;
 }
 
@@ -448,6 +524,7 @@ bool WriteConfiguration()
 
     JsonObject General = doc["General"].to<JsonObject>();
     General["BusMessageTimeout"] = configuration.General.BusMessageTimeout;
+    General["SetpointOffDelaySeconds"] = configuration.General.SetpointOffDelaySeconds;
     General["Debug"] = configuration.General.Debug;
     General["Sniffing"] = configuration.General.Sniffing;
 
@@ -586,5 +663,8 @@ bool WriteConfiguration()
     }
 
     LittleFS.remove(backupConfigFileName);
+    String backupError;
+    if (!PersistConfigurationBackup(backupError))
+        Log.println("Warning: configuration saved, but its persistent backup could not be refreshed: " + backupError);
     return true;
 }

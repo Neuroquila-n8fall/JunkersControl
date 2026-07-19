@@ -1,4 +1,5 @@
 {
+    "ProvisioningTemplate": true,
     "Wifi": {
         "SSID": "",
         "Password": "",
@@ -33,6 +34,7 @@
     },
     "General": {
         "BusMessageTimeout": 30,
+        "SetpointOffDelaySeconds": 300,
         "Debug": false,
         "Sniffing": false
     },

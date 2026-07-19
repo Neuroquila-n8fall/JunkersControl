@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+- Migrated older uploaded configurations by carrying forward newly introduced fail-safe, Home Assistant, timezone, and low-setpoint settings only when their keys are absent; explicit uploaded values remain authoritative. Upload responses now clarify that staged values become visible after configuration reload or reboot.
+- Clamped every internally calculated feed setpoint to the manufacturer's exact 10 °C minimum before shutdown evaluation and CAN transmission.
+- Made the validated NVS configuration backup persistent and refreshed it after every successful load or save, allowing raw LittleFS flashes to restore device settings while deliberate configuration uploads remain authoritative. Filesystem builds now stamp release templates and custom bundled configurations explicitly so edge-case provisioning intent is preserved. Added a 10-second BOOT-button factory-reset gesture that clears both NVS and LittleFS configuration copies.
+- Fixed file-manager downloads to retain the original filename and extension instead of being saved as `file`.
+- Added manufacturer-compatible low-setpoint shutdown: an effective 10 °C (50 °F) feed request disables heating after a configurable grace period, with a controller-side latch that cannot be defeated by repeated external enable commands.
+- Changed offline fail-safe activation from a periodic-command lease to sustained MQTT disconnection. Home Assistant and other MQTT clients no longer need a Node-RED-style heartbeat, and reconnecting restores the previous runtime controls.
 - Added a live home dashboard for boiler, heating, hot-water, connectivity, and fail-safe state, including a dependency-free five-minute temperature chart.
 - Restored percentage progress bars for RAM and application flash usage, and added a separate LittleFS usage indicator to the dashboard.
 - Made the manual configuration reload action prominent in the file manager and clarified when it is still required.
 - Added complete web fallback controls for every MQTT-controlled runtime value and consolidated both transports behind the same command handlers.
 - Added `GET /api/runtime` and `POST /api/control` for current values and immediate heating control.
-- Preserved valid device configuration automatically across LittleFS images uploaded through the web interface by using a one-shot NVS backup and boot-time restore. Raw serial filesystem flashing remains outside firmware control.
+- Preserved valid device configuration automatically across LittleFS images uploaded through the web interface by using an NVS backup and boot-time restore.
 - Added English and German web-interface localization with automatic browser-language defaults and persisted preferences.
 - Reworked localization into one JSON resource per language with maintainable, area-based keys and explicit `data-i18n` attribute support, following the structure documented by the Javascript i18n core project.
 - Added a persistent light/dark appearance switch to every web-interface page, with the operating-system preference used as the initial default.
@@ -20,6 +26,9 @@
 - Added discovery for heating, hot-water, controller-status, and dynamic auxiliary-temperature entities under one device.
 - Added MQTT number controls for requested feed temperature, boost duration, and room-reference temperature.
 - Added MQTT switches for heating enablement, boost, and fast heatup.
+- Completed the Home Assistant heating command surface with heating-curve, manual and dynamic adaptation, target and auxiliary temperatures, direct-setpoint override, and valve-scaling controls.
+- Added a Home Assistant sensor for the controller's remaining boost time and mirrored all accepted heating command values in the retained heating state payload.
+- Centralized MQTT, Home Assistant, and web command validation, including safe temperature ranges and a nonzero maximum valve opening.
 - Added retained online/offline availability through MQTT Last Will and automatic rediscovery after Home Assistant restarts.
 - Added Home Assistant configuration to the web interface and automatic MQTT reconnection after saving it.
 - Added cleanup of retained discovery records when Home Assistant discovery is disabled or its device identity changes.

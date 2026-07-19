@@ -236,6 +236,9 @@ void addCoreComponents(JsonObject components)
     addSensor(components, "heating_outside", "Outside Temperature", "Heating",
               "{{ value_json.Heating.Outside | float(default=0) }}", "temperature", temperatureUnit,
               "mdi:sun-thermometer-outline");
+    addSensor(components, "heating_boost_time_left", "Boost Time Remaining", "Heating",
+              "{{ value_json.Heating.BoostTimeLeft | int(default=0) }}", "duration", "s",
+              "mdi:timer-sand");
 
     addSensor(components, "water_maximum", "Maximum Water Temperature", "Water",
               "{{ value_json.Water.Maximum | float(default=0) }}", "temperature", temperatureUnit,
@@ -263,18 +266,47 @@ void addCoreComponents(JsonObject components)
     addBinarySensor(components, "water_buffer", "Hot Water Buffer Mode", "Water",
                     "{{ value_json.Water.Buffer }}", "running", "mdi:water-boiler-auto");
 
-    addNumber(components, "heating_requested_setpoint", "Requested Feed Setpoint", "Heating", "Setpoint",
-              "{{ value_json.Heating.RequestedFeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
+    addNumber(components, "heating_requested_setpoint", "Requested Feed Setpoint", "Heating", "FeedSetpoint",
+              "{{ value_json.Heating.FeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
               "slider", "mdi:thermometer-chevron-up");
-    addNumber(components, "heating_boost_duration", "Boost Duration", "Heating", "BoostDuration",
-              "{{ value_json.Heating.BoostDuration | int(default=0) }}", 0, 86400, 1, "s", "box",
+    addNumber(components, "heating_curve_basepoint", "Heating Curve Basepoint", "Heating", "FeedBaseSetpoint",
+              "{{ value_json.Heating.FeedBaseSetpoint | float(default=0) }}", -50, 50, 0.5, temperatureUnit,
+              "box", "mdi:chart-bell-curve-cumulative");
+    addNumber(components, "heating_curve_cutoff", "Heating Curve Cutoff", "Heating", "FeedCutOff",
+              "{{ value_json.Heating.FeedCutOff | float(default=0) }}", -50, 50, 0.5, temperatureUnit,
+              "box", "mdi:chart-bell-curve");
+    addNumber(components, "heating_feed_minimum", "Minimum Feed Temperature", "Heating", "FeedMinimum",
+              "{{ value_json.Heating.FeedMinimum | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
+              "slider", "mdi:thermometer-low");
+    addNumber(components, "heating_manual_adaptation", "Manual Adaptation", "Heating", "Adaption",
+              "{{ value_json.Heating.Adaption | float(default=0) }}", -30, 30, 0.5, temperatureUnit,
+              "box", "mdi:tune-variant");
+    addNumber(components, "heating_auxiliary_temperature", "Auxiliary Outside Temperature", "Heating", "AuxiliaryTemperature",
+              "{{ value_json.Heating.AuxiliaryTemperature | float(default=0) }}", -50, 100, 0.1, temperatureUnit,
+              "box", "mdi:sun-thermometer");
+    addNumber(components, "heating_boost_duration", "Boost Duration", "Heating", "OnDemandBoostDuration",
+              "{{ value_json.Heating.OnDemandBoostDuration | int(default=0) }}", 0, 86400, 1, "s", "box",
               "mdi:timer-outline");
-    addNumber(components, "heating_room_reference", "Room Reference Temperature", "Heating", "RoomReferenceT",
-              "{{ value_json.Heating.RoomReferenceT | float(default=0) }}", -50, 100, 0.1, temperatureUnit,
+    addNumber(components, "heating_room_reference", "Room Reference Temperature", "Heating", "AmbientTemperature",
+              "{{ value_json.Heating.AmbientTemperature | float(default=0) }}", -50, 100, 0.1, temperatureUnit,
               "slider", "mdi:home-thermometer");
-
+    addNumber(components, "heating_target_ambient", "Target Ambient Temperature", "Heating", "TargetAmbientTemperature",
+              "{{ value_json.Heating.TargetAmbientTemperature | float(default=0) }}", 5, 35, 0.1, temperatureUnit,
+              "slider", "mdi:home-thermometer-outline");
+    addNumber(components, "heating_valve_opening", "Valve Opening", "Heating", "ValveScalingOpening",
+              "{{ value_json.Heating.ValveScalingOpening | int(default=0) }}", 0, 100, 1, "%",
+              "slider", "mdi:valve");
+    addNumber(components, "heating_valve_max_opening", "Maximum Valve Opening", "Heating", "ValveScalingMaxOpening",
+              "{{ value_json.Heating.ValveScalingMaxOpening | int(default=0) }}", 1, 100, 1, "%",
+              "slider", "mdi:valve-open");
     addSwitch(components, "heating_enabled", "Heating Enabled", "Heating", "Enabled",
               "{{ value_json.Heating.Enabled }}", "mdi:radiator");
+    addSwitch(components, "heating_override_setpoint", "Use Requested Feed Setpoint", "Heating", "OverrideSetpoint",
+              "{{ value_json.Heating.OverrideSetpoint }}", "mdi:thermometer-lock");
+    addSwitch(components, "heating_dynamic_adaptation", "Dynamic Adaptation", "Heating", "DynamicAdaption",
+              "{{ value_json.Heating.DynamicAdaption }}", "mdi:auto-fix");
+    addSwitch(components, "heating_valve_scaling", "Valve Scaling", "Heating", "ValveScaling",
+              "{{ value_json.Heating.ValveScaling }}", "mdi:valve");
     addSwitch(components, "heating_boost", "Heating Boost", "Heating", "Boost",
               "{{ value_json.Heating.Boost }}", "mdi:fire-circle");
     addSwitch(components, "heating_fast_heatup", "Fast Heatup", "Heating", "FastHeatup",
@@ -305,72 +337,104 @@ bool parseNumber(const String &payload, double &value)
     return end != payload.c_str() && *end == '\0' && isfinite(value);
 }
 
+bool parseBoolean(const String &payload, bool &value)
+{
+    String normalized = payload;
+    normalized.toLowerCase();
+    if (normalized == "true" || normalized == "on" || normalized == "1")
+    {
+        value = true;
+        return true;
+    }
+    if (normalized == "false" || normalized == "off" || normalized == "0")
+    {
+        value = false;
+        return true;
+    }
+    return false;
+}
+
+bool isHeatingBooleanKey(const String &key)
+{
+    return key == "Enabled" || key == "ValveScaling" || key == "DynamicAdaption" ||
+           key == "OverrideSetpoint" || key == "Boost" || key == "FastHeatup";
+}
+
+bool isHeatingNumberKey(const String &key)
+{
+    return key == "FeedSetpoint" || key == "FeedBaseSetpoint" || key == "FeedCutOff" ||
+           key == "FeedMinimum" || key == "AuxiliaryTemperature" || key == "AmbientTemperature" ||
+           key == "TargetAmbientTemperature" || key == "Adaption" ||
+           key == "ValveScalingMaxOpening" || key == "ValveScalingOpening" ||
+           key == "OnDemandBoostDuration";
+}
+
 bool handleHomeAssistantCommand(const String &relativeTopic, const String &payload)
 {
-    if (relativeTopic == "Heating/Enabled/set" ||
-        relativeTopic == "Heating/Boost/set" ||
-        relativeTopic == "Heating/FastHeatup/set")
+    if (!relativeTopic.endsWith("/set"))
+        return false;
+
+    const int separator = relativeTopic.indexOf('/');
+    if (separator <= 0)
+        return false;
+
+    const String category = relativeTopic.substring(0, separator);
+    String key = relativeTopic.substring(separator + 1, relativeTopic.length() - 4);
+
+    if (category == "Water" && key == "Setpoint")
     {
-        String normalizedPayload = payload;
-        normalizedPayload.toLowerCase();
-        const bool enabled = normalizedPayload == "true" || normalizedPayload == "on" || normalizedPayload == "1";
-        const bool disabled = normalizedPayload == "false" || normalizedPayload == "off" || normalizedPayload == "0";
-        if (!enabled && !disabled)
+        double value = 0;
+        if (!parseNumber(payload, value))
+        {
+            Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
+            return true;
+        }
+
+        JsonDocument command;
+        command["Setpoint"] = value;
+        ApplyHotWaterCommand(command.as<JsonVariantConst>());
+        Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
+        return true;
+    }
+
+    if (category != "Heating")
+        return false;
+
+    // Accept command topics from the first HA implementation while publishing
+    // canonical command names in current discovery documents.
+    if (key == "Setpoint")
+        key = "FeedSetpoint";
+    else if (key == "BoostDuration")
+        key = "OnDemandBoostDuration";
+    else if (key == "RoomReferenceT")
+        key = "AmbientTemperature";
+
+    JsonDocument command;
+    if (isHeatingBooleanKey(key))
+    {
+        bool value = false;
+        if (!parseBoolean(payload, value))
         {
             Log.printf("Ignoring invalid HA switch payload on %s\r\n", relativeTopic.c_str());
             return true;
         }
-
-        if (relativeTopic == "Heating/Enabled/set")
-            commandedValues.Heating.Active = enabled;
-        else if (relativeTopic == "Heating/Boost/set")
+        command[key] = value;
+    }
+    else if (isHeatingNumberKey(key))
+    {
+        double value = 0;
+        if (!parseNumber(payload, value))
         {
-            commandedValues.Heating.Boost = enabled;
-            commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+            Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
+            return true;
         }
-        else
-        {
-            commandedValues.Heating.FastHeatup = enabled;
-            commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
-        }
-
-        SetFeedTemperature();
-        NotifyValidHeatingCommand();
-        Log.printf("Applied HA command: %s\r\n", relativeTopic.c_str());
-        PublishHeatingTemperaturesAndStatus();
-        return true;
-    }
-
-    double value = 0;
-    if (!parseNumber(payload, value))
-    {
-        Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
-        return true;
-    }
-
-    if (relativeTopic == "Heating/Setpoint/set")
-    {
-        commandedValues.Heating.FeedSetpoint = constrain(value, 0.0, 100.0);
-        commandedValues.Heating.OverrideSetpoint = true;
-        SetFeedTemperature();
-    }
-    else if (relativeTopic == "Heating/BoostDuration/set")
-    {
-        commandedValues.Heating.BoostDuration = constrain(static_cast<int>(value), 0, 86400);
-    }
-    else if (relativeTopic == "Heating/RoomReferenceT/set")
-    {
-        commandedValues.Heating.AmbientTemperature = constrain(value, -50.0, 100.0);
-        SetFeedTemperature();
+        command[key] = value;
     }
     else
-    {
         return false;
-    }
 
-    NotifyValidHeatingCommand();
-    Log.printf("Applied HA command: %s\r\n", relativeTopic.c_str());
-    PublishHeatingTemperaturesAndStatus();
+    ApplyHeatingCommand(command.as<JsonVariantConst>());
+    Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
     return true;
 }
 } // namespace

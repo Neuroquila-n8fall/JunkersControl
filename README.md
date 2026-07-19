@@ -120,11 +120,13 @@ Release filesystem images contain the credential-free configuration template as 
 
 If everything went well you should see the following output on the console:
 ```log
-Press the "BOOT" button within the next 5 seconds to enable Setup Mode!
+Press BOOT within 5 seconds for Setup Mode; hold it for 10 seconds to factory-reset configuration.
 Setup Mode not enabled. You can enable it at every time by pressing the "BOOT" button once.
 Invalid WiFi configuration. Launching AP mode.
 WiFi AP launched. Find me @ 192.168.4.1
 ```
+
+A short BOOT-button press during the startup window enters Setup Mode without changing configuration. Holding BOOT continuously for 10 seconds performs a deliberate factory reset: it clears the persistent NVS mirror and all LittleFS configuration copies, then starts the provisioning access point. The frontend and other filesystem assets are retained.
 
 Startup reports filesystem problems separately:
 
@@ -145,7 +147,7 @@ Translations are maintained as one JSON resource per locale in `data/frontend/i1
 
 The CAN Message Analyzer under **Utilities** reads the active CAN address configuration and displays names such as `Heating · Feed Current` beside their hexadecimal IDs. This makes captures usable with customized address maps while unknown IDs remain clearly identified.
 
-The home page is a live heating dashboard. It shows burner, feed, outside, and hot-water values plus a lightweight five-minute temperature chart that runs entirely in the browser without an external chart service. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These commands take effect immediately, refresh the fail-safe command lease, and are deliberately not written to `configuration.json`; MQTT or Home Assistant can replace them later.
+The home page is a live heating dashboard. It shows burner, feed, outside, and hot-water values plus a lightweight five-minute temperature chart that runs entirely in the browser without an external chart service. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These commands take effect immediately and are deliberately not written to `configuration.json`; MQTT or Home Assistant can replace them later.
 
 The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers.
 
@@ -249,7 +251,11 @@ There are two ways to switch the economy mode.
 
 See [Night/Economy Mode](#nighteconomy-mode)
 
-Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
+The manufacturer-defined 10 °C (50 °F) effective feed setpoint represents an off request. Every calculated result below that minimum is normalized to exactly 10 °C before shutdown evaluation, CAN conversion, or transmission. Cerasmarter then switches the heating operation flag off if the effective setpoint remains at 10 °C for `General.SetpointOffDelaySeconds`. The default grace period is 300 seconds, avoiding short demand changes that could repeatedly cycle the igniter, valves, or pump.
+
+This guard is part of the controller core rather than the Home Assistant integration. It applies equally to MQTT, Home Assistant, WebUI, and locally calculated setpoints. Once active, repeated `Enabled: true` commands cannot override the off state while the effective feed request remains at 10 °C. A higher effective setpoint clears the guard; clients that explicitly manage `Enabled` should send it as `true` with the new demand.
+
+Temperatures remain Celsius internally. Home Assistant performs the equivalent Fahrenheit display conversion when the installation uses imperial units.
 
 ### Boost
 Boost function sets the feed temperature to the maximum reported value (`ceraValues.Heating.FeedMaximum`) for a selected period of time (default: 300 seconds). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
@@ -275,7 +281,9 @@ Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTem
 
 ### Fallback and Failsafe
 
-The controller starts in local fail-safe mode after every boot and leaves it only after a recognized heating command arrives. That command refreshes the `CommandTimeoutSeconds` lease; broker reconnection alone does not leave fail-safe mode.
+The controller starts in local fail-safe mode after every boot and leaves it as soon as MQTT connects. No periodic command heartbeat is required, and the controller does not assume that Node-RED or any other particular automation system is present.
+
+For configuration-file compatibility, the setting remains named `CommandTimeoutSeconds`. It now defines how long MQTT may remain continuously disconnected before fail-safe mode starts. When that grace period expires, the controller saves the current runtime controls and applies the local fail-safe profile. Reconnecting to MQTT leaves fail-safe mode and restores those saved controls; command frequency does not affect activation.
 
 ```json
 "FailSafe": {
@@ -400,8 +408,8 @@ The standard "Arduino OTA" procedure is included which means you can upload the 
 You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
 
 - A firmware-only update preserves the existing LittleFS configuration.
-- A `littlefs.bin` update performed through the web interface validates and copies the active configuration to the separate NVS partition before replacing LittleFS. On the next boot it restores the configuration once, before normal configuration loading. The update is cancelled if a safe backup cannot be made.
-- Keep a downloaded `/configuration.json` backup for recovery. Direct PlatformIO, esptool, or programmer-based filesystem flashing cannot be intercepted by the running firmware and therefore still installs the credential-free template. After such an update, upload the backup as `/configuration.json` and click **Reload Configuration**.
+- Every successfully loaded or saved device configuration is mirrored to the separate NVS partition. After a WebUI, PlatformIO, esptool, or programmer-based LittleFS replacement, startup recognizes the credential-free provisioning template and restores the last valid device configuration before normal loading. WebUI filesystem updates still refresh and validate the backup before writing the image.
+- A deliberately uploaded valid `/configuration.json` remains authoritative and replaces the persistent mirror after it loads. Keep a downloaded backup for manual disaster recovery. To intentionally start over, hold BOOT for 10 seconds during startup; erasing the NVS partition or the whole flash also produces a genuine factory reset.
 - Configuration saves from the web UI are written atomically and verified before they replace the previous file. If validation or writing fails, the previous configuration remains available as a backup.
 
 ## Telnet Console
@@ -418,7 +426,9 @@ Set `HomeAssistant.Enabled` to `true`, configure the same discovery prefix used 
 <AutoDiscoveryPrefix>/device/<DeviceId>/config
 ```
 
-Home Assistant groups the heating, hot-water, status, and auxiliary-temperature entities under one device. The integration provides temperature and status sensors, binary operating-state sensors, dynamically generated auxiliary-sensor entities, number controls for requested feed temperature, boost duration, and room-reference temperature, plus switches for heating enablement, boost, and fast heatup.
+Home Assistant groups the heating, hot-water, status, and auxiliary-temperature entities under one device. The integration provides temperature and status sensors, binary operating-state sensors, dynamically generated auxiliary-sensor entities, and a read-only sensor for the remaining boost time reported by the controller logic.
+
+Heating controls cover the complete runtime command contract used by the default `cerasmarter/heating/parameters` topic: heating enablement, requested feed setpoint and direct-setpoint override, heating-curve basepoint/cutoff/minimum, manual and dynamic adaptation, room-reference/target/auxiliary temperatures, valve-scaling enablement/current/max opening, boost duration, boost, and fast heatup. Home Assistant uses individual command topics below `cerasmarter/<DeviceId>/Heating/`, while legacy clients can continue publishing the existing combined JSON document. Both paths use the same validation and immediately publish the accepted state back to Home Assistant.
 
 Memory, filesystem and flash capacity, chip model and revision, CPU core count, CPU frequency, and auxiliary-sensor connectivity are exposed as diagnostic entities. Home Assistant keeps these on the device's diagnostic card instead of treating them as normal heating controls or measurements.
 
@@ -447,7 +457,9 @@ See the [configuration guide](assets/Configuration.md#home-assistant) for all se
 
 Do not place a real `configuration.json` in the repository's `data` directory when preparing releases. The filesystem build always copies the credential-free file from `assets/Templates/Configurations/configuration.json`; a device-specific file could contain WiFi and MQTT credentials.
 
-For local USB provisioning only, set `CERASMARTER_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The GitHub release workflow never sets this override and verifies that release images use the credential-free template.
+For local USB provisioning only, set `CERASMARTER_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The pipeline stamps it with `"ProvisioningTemplate": false`, making the bundled configuration authoritative over an older NVS mirror on first boot; it then becomes the new persistent backup. The GitHub release workflow never sets this override and verifies that release images use the credential-free template stamped `true`.
+
+This distinction also covers unusual provisioning edge cases: a custom filesystem configuration may intentionally have empty Wi-Fi credentials, but the explicit `false` marker still prevents it from being replaced. If constructing a LittleFS image outside the supplied pipeline, set the root-level marker yourself. Be aware that custom images contain the selected configuration in recoverable form—including Wi-Fi or MQTT secrets—and must not be published as release artifacts.
 
 ### Configuration
 

@@ -121,5 +121,7 @@ extern CeraValues ceraValues;
 
 extern double CalculateFeedTemperature();
 extern int ConvertFeedTemperature(double temperature);
+extern bool EnforceHeatingSetpointShutdown(double effectiveSetpoint);
+extern void UpdateHeatingSetpointShutdown();
 
 #endif

@@ -67,18 +67,43 @@ void setup()
   if (!RestoreConfigurationAfterFilesystemUpdate(restoreError))
     Serial.printf("\e[1;31m%s\e[0m\r\n", restoreError.c_str());
 
-  Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
+  Serial.println("\e[1;36mPress BOOT within 5 seconds for Setup Mode; hold it for 10 seconds to factory-reset configuration.\e[0m");
 
 #pragma region "Setup Mode"
 
-  unsigned long curmils = millis();
-  // Give the user the chance to push the "BOOT" button.
-  while (millis() - curmils <= 5000)
+  bool factoryResetRequested = false;
+  const unsigned long setupWindowStarted = millis();
+  // A short press selects Setup Mode. A deliberately long hold additionally
+  // clears both persistent NVS configuration and the LittleFS copy.
+  while (millis() - setupWindowStarted <= 5000)
   {
-    SetupMode = !digitalRead(GPIO_NUM_0);
-    if (SetupMode)
+    if (!digitalRead(GPIO_NUM_0))
     {
+      SetupMode = true;
+      const unsigned long buttonHeldSince = millis();
+      while (!digitalRead(GPIO_NUM_0) && millis() - buttonHeldSince < 10000)
+        delay(20);
+      factoryResetRequested = millis() - buttonHeldSince >= 10000;
       break;
+    }
+    delay(10);
+  }
+
+  if (factoryResetRequested)
+  {
+    String resetError;
+    if (!ClearPersistentConfigurationBackup(resetError))
+    {
+      Serial.printf("\e[1;31mFactory reset aborted: %s\e[0m\r\n", resetError.c_str());
+    }
+    else
+    {
+      LittleFS.remove("/configuration.json");
+      LittleFS.remove("/configuration.bak");
+      LittleFS.remove("/configuration.tmp");
+      LittleFS.remove("/configuration.restore");
+      SetConfigurationUploadPending(false);
+      Serial.println("\e[1;33mFactory reset complete. Persistent and LittleFS configuration were cleared.\e[0m");
     }
   }
 
@@ -228,6 +253,9 @@ void loop()
   processCan();
   // Apply the local safety profile before the next CAN command-chain step.
   UpdateFailSafe();
+  // A sustained manufacturer-defined 10 C feed request means heating off.
+  // This is a millis-based state machine and does not add a task or scheduler.
+  UpdateHeatingSetpointShutdown();
   // MQTT maintenance follows CAN work and is bounded by the configured socket
   // timeout, so network traffic cannot take priority over boiler traffic.
   client.loop();
