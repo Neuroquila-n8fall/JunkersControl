@@ -114,14 +114,14 @@
 
         async function saveConfig(event) {
             event.preventDefault();
+            const formData = new FormData(event.target);
+            const formEntries = Object.fromEntries(formData.entries());
+            const json = JSON.stringify(formEntries);
+
             _("form-fieldset").disabled = true;
             _("config-saving").hidden = false;
             _("save-config-label").innerHTML = "Saving Configuration...";
             _("save-config").disabled = true;
-
-            const formData = new FormData(event.target);
-            const formEntries = Object.fromEntries(formData.entries());
-            const json = JSON.stringify(formEntries);
 
             const response = await fetch('/api/config/leds', {
                 method: 'POST',

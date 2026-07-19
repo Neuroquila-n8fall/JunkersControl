@@ -295,12 +295,13 @@
             // Prevent the form from submitting.
             event.preventDefault();
             event.disabled = true;
+            syncSensors();
+            const isValid = validateSensors();
+
             _("form-fieldset").disabled = true;
             _("config-saving").hidden = false;
             _("save-config-label").innerHTML = "Saving Configuration...";
             _("save-config").disabled = true;
-            syncSensors();
-            const isValid = validateSensors();
             console.log(sensors);
             if (isValid) {
                 const json = JSON.stringify(sensors);            

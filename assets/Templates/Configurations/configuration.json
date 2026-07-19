@@ -35,6 +35,8 @@
     "General": {
         "BusMessageTimeout": 30,
         "SetpointOffDelaySeconds": 300,
+        "BasepointTemperature": -10.0,
+        "EndpointTemperature": 31.0,
         "Debug": false,
         "Sniffing": false
     },
@@ -61,6 +63,20 @@
     },
     "CAN": {
         "Quartz": 16,
+        "Profiles": {
+            "Heating": true,
+            "MixedCircuit": false,
+            "DomesticHotWater": true
+        },
+        "ReadOnly": false,
+        "ControllerDetection": {
+            "MinimumAddress": "0x250",
+            "MaximumAddress": "0x25F"
+        },
+        "Heartbeat": {
+            "Address": "0x0F9",
+            "IntervalSeconds": 30
+        },
         "Addresses": {
             "Controller": {
                 "FlameStatus": "0x209",

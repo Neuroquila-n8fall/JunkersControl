@@ -103,13 +103,15 @@ void processCan()
   {
     unsigned long curMillis = millis();
 
-    if (configuration.General.Debug || configuration.General.Sniffing)
-    {
-      WriteMessage(Message);
-    }
+    // Always publish the compact event for the web analyzer. WriteMessage
+    // keeps verbose console output behind Debug/Sniffing.
+    WriteMessage(Message);
 
-    // Check for other controllers on the network by watching out for messages that are greater than 0x250
-    if (Message.id > 0x250 && Message.id < 0x260)
+    // Controller-frame ranges differ between BM1 installations. Keep the
+    // range configurable and inclusive so the standard 0x250 operation frame
+    // also suppresses takeover.
+    if (Message.id >= configuration.CanModuleConfig.ControllerAddressMin &&
+        Message.id <= configuration.CanModuleConfig.ControllerAddressMax)
     {
       controllerMessageTimer = curMillis;
 
@@ -136,7 +138,8 @@ void processCan()
     
 
     // Take note of the last time we received a message from the boiler
-    if (Message.id < 0x250 || Message.id > 0x260)
+    if (Message.id < configuration.CanModuleConfig.ControllerAddressMin ||
+        Message.id > configuration.CanModuleConfig.ControllerAddressMax)
     {
       lastHeatingMessageTime = millis();
     }
@@ -144,7 +147,7 @@ void processCan()
     //[HC] - [Controller] - Max. possible feed temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.Heating.FeedMax)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.FeedMax)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedMaximum = temp;
@@ -153,7 +156,7 @@ void processCan()
     //[HC] - [Controller] - Current feed temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.Heating.FeedCurrent)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.FeedCurrent)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedCurrent = temp;
@@ -162,7 +165,7 @@ void processCan()
     //[DHW] - [Controller] - Max. possible water temperature -or- target temperature when running in heating battery mode
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.BufferWaterTemperatureMaximum = temp;
@@ -171,7 +174,7 @@ void processCan()
     //[DHW] - [Controller] - Current water temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.BufferWaterTemperatureCurrent = temp;
@@ -180,7 +183,7 @@ void processCan()
     //[DHW] - [Controller] - Max. water temperature (limited by boiler dial setting)
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.MaxTemperature)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.MaximumTemperature = temp;
@@ -189,7 +192,7 @@ void processCan()
     //[DHW] - [Controller] - Current water feed or battery temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.CurrentTemperature)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.TemperatureCurrent = temp;
@@ -207,7 +210,7 @@ void processCan()
     //[Controller] - Current outside temperature
     // Data Type: Byte Concat
     // Value: (Data[0] & Data[1]) / 100.0
-    if (Message.id == configuration.CanAddresses.Heating.OutsideTemperature)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.OutsideTemperature)
     {
       // Concat payload and divide the resulting INT by 100
       short rawTemp = (Message.data[0] << 8) + Message.data[1];  
@@ -246,7 +249,7 @@ void processCan()
     //[HC] - [Controller] - HC Pump Operation
     // Data Type: Bit
     // Value: 1 = On | 0 = Off
-    if (Message.id == configuration.CanAddresses.Heating.Pump)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.Pump)
     {
       ceraValues.Heating.PumpActive = Message.data[0];
     }
@@ -254,7 +257,7 @@ void processCan()
     //[DHW] - [Controller] - Hot Water Buffer Operation
     // Data Type: Bit
     // Value: 1 = Enabled | 0 = Disabled
-    if (Message.id == configuration.CanAddresses.HotWater.BufferOperation)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.BufferOperation)
     {
       ceraValues.Hotwater.BufferMode = Message.data[0];
     }
@@ -262,7 +265,7 @@ void processCan()
     //[HC] - [Controller] - Current Seasonal Operation Mode (Set by Dial on the boiler panel)
     // Data Type: Bit
     // Value: 1 = Winter | 0 = Summer
-    if (Message.id == configuration.CanAddresses.Heating.Season)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.Season)
     {
       ceraValues.Heating.Season = Message.data[0];
     }
@@ -270,7 +273,7 @@ void processCan()
     //[HC] - [RC] - Heating Operating
     // Data Type: Bit
     // Value: 1 = On | 0 = Off
-    if (Message.id == configuration.CanAddresses.Heating.Operation)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.Operation)
     {
       ceraValues.Heating.Active = Message.data[0];
     }
@@ -278,7 +281,7 @@ void processCan()
     //[HC] - [RC] - Heating Power
     // Data Type: INT
     // Value: 0-255 = 0-100%
-    if (Message.id == configuration.CanAddresses.Heating.Power)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.Power)
     {
       ceraValues.Heating.HeatingPower = Message.data[0];
     }
@@ -287,7 +290,7 @@ void processCan()
     // Data Type: INT
     // Value: Value / 2.0
     // Set: Value as half-centigrade steps i.e. 35.5
-    if (Message.id == configuration.CanAddresses.Heating.FeedSetpoint)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.FeedSetpoint)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedSetpoint = temp;
@@ -297,7 +300,7 @@ void processCan()
     // Data Type: INT
     // Value: Data / 2.0
     // Set: Value as half-centigrade steps i.e. 45.5
-    if (Message.id == configuration.CanAddresses.HotWater.SetpointTemperature)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.SetpointTemperature)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.SetPoint = temp;
@@ -306,7 +309,7 @@ void processCan()
     //[DHW] - [RC] - "Hot Water Now" (Warmwasser SOFORT in German)
     // Data Type: Bit
     // Value: 1 = Enabled | 0 = Disabled
-    if (Message.id == configuration.CanAddresses.HotWater.Now)
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration.CanAddresses.HotWater.Now)
     {
       ceraValues.Hotwater.Now = Message.data[0];
     }
@@ -331,7 +334,7 @@ void processCan()
     //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration
+    if (configuration.CanModuleConfig.Profiles.DomesticHotWater && Message.id == configuration
                           .CanAddresses
                           .HotWater
                           .ContinousFlowSetpointTemperature)
@@ -343,7 +346,7 @@ void processCan()
     //[MC] - [Controller] - Mixed-Circuit Pump Operation
     // Data Type: Bit
     // Value: 1 = On | 0 = Off
-    if (Message.id == configuration.CanAddresses.MixedCircuit.Pump)
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.Pump)
     {
       ceraValues.MixedCircuit.PumpActive = Message.data[0];
     }
@@ -351,7 +354,7 @@ void processCan()
     //[MC] - [RC] - Setpoint Mixed-Circuit Feed Temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.MixedCircuit.FeedSetpoint)
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.FeedSetpoint)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.MixedCircuit.FeedSetpoint = temp;
@@ -360,7 +363,7 @@ void processCan()
     //[MC] - [RC] - Mixed-Circuit Economy Setting
     // Data Type: Bit
     // Value: 1 = On | 0 = Off
-    if (Message.id == configuration.CanAddresses.MixedCircuit.Economy)
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.Economy)
     {
       ceraValues.MixedCircuit.Economy = Message.data[0];
     }
@@ -368,7 +371,7 @@ void processCan()
     //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (Message.id == configuration.CanAddresses.MixedCircuit.FeedCurrent)
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.FeedCurrent)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.MixedCircuit.FeedCurrent = temp;

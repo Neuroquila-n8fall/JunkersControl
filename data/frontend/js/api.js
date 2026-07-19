@@ -136,24 +136,37 @@ async function sendGeneralConfig(event) {
     // Prevent the form from submitting.
     event.preventDefault();
     event.disabled = true;
+
+    // Build a typed payload before disabling the fieldset. Disabled controls
+    // are omitted by FormData, which previously removed most settings.
+    const formJSON = {
+        "heatingvalues": _("heatingvalues").checked,
+        "watervalues": _("watervalues").checked,
+        "auxvalues": _("auxvalues").checked,
+        "overrideot": _("overrideot").checked,
+        "tz": _("tz").value,
+        "posix-tz": _("posix-tz").value,
+        "busmsgtimeout": Number(_("busmsgtimeout").value),
+        "setpoint-off-delay": Number(_("setpoint-off-delay").value),
+        "normal-basepoint": Number(_("normal-basepoint").value),
+        "normal-endpoint": Number(_("normal-endpoint").value),
+        "debug": _("debug").checked,
+        "sniffing": _("sniffing").checked,
+        "failsafe-enabled": _("failsafe-enabled").checked,
+        "failsafe-timeout": Number(_("failsafe-timeout").value),
+        "failsafe-start": _("failsafe-start").value,
+        "failsafe-stop": _("failsafe-stop").value,
+        "failsafe-unknown-time-heat": _("failsafe-unknown-time-heat").checked,
+        "failsafe-basepoint": Number(_("failsafe-basepoint").value),
+        "failsafe-endpoint": Number(_("failsafe-endpoint").value),
+        "failsafe-minimum-feed": Number(_("failsafe-minimum-feed").value),
+        "failsafe-maximum-feed": Number(_("failsafe-maximum-feed").value)
+    };
+
     _("form-fieldset").disabled = true;
     _("general-saving").hidden = false;
     _("save-general-label").innerHTML = "Saving Settings...";
     _("save-general").disabled = true;
-    const formData = new FormData(event.target);
-
-    // We have to get the values of the form by ourselves when options and selects are involved
-    formData.append("heatingvalues", _("heatingvalues").checked);
-    formData.append("watervalues", _("watervalues").checked);
-    formData.append("auxvalues", _("auxvalues").checked);
-    formData.append("overrideot", _("overrideot").checked);
-    formData.append("failsafe-enabled", _("failsafe-enabled").checked);
-    formData.append("failsafe-unknown-time-heat", _("failsafe-unknown-time-heat").checked);
-    formData.append("tz", _("tz").value);
-    formData.append("debug", _("debug").checked);
-    formData.append("sniffing", _("sniffing").checked);
-    const formJSON = Object.fromEntries(formData.entries());
-
     const json = JSON.stringify(formJSON);
     const response = await fetch('/api/config/general', {
         method: 'POST',

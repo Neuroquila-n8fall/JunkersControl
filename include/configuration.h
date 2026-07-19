@@ -87,6 +87,8 @@ struct Configuration
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
         unsigned long SetpointOffDelaySeconds = 300; // Grace period before a 10 C feed request disables heating
+        double BasepointTemperature = -10.0F; // Normal-operation heating-curve basepoint restored at startup
+        double EndpointTemperature = 31.0F;   // Normal-operation heating-curve endpoint restored at startup
         bool Debug;            // Output debug messages, true|false
         bool Sniffing;         // Output every CAN message von the bus
     } General;
@@ -127,6 +129,19 @@ struct Configuration
     struct CanModuleConfig_
     {
         int CAN_Quartz;
+        struct Profiles_
+        {
+            bool Heating = true;
+            bool MixedCircuit = false;
+            bool DomesticHotWater = true;
+        } Profiles;
+        // Hard safety interlock. Unlike automatic controller detection this
+        // can never time out and re-enable CAN writes.
+        bool ReadOnly = false;
+        uint16_t ControllerAddressMin = 0x250;
+        uint16_t ControllerAddressMax = 0x25F;
+        uint16_t HeartbeatAddress = 0x0F9;
+        unsigned long HeartbeatIntervalSeconds = 30;
     } CanModuleConfig;
 
     struct CanAddresses_

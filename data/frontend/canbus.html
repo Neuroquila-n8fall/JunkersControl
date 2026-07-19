@@ -27,6 +27,20 @@
                 <div class="row text-start">
                     <form id="canbus-form">
                         <fieldset id="form-fieldset">
+                            <div class="mb-4 text-start">
+                                <h4 data-i18n="can_setup.profiles">Installation profiles</h4>
+                                <p class="text-muted" data-i18n="can_setup.profiles_help">Enable only the functional parts present in this heating installation.</p>
+                                <div class="row g-2">
+                                    <div class="col-md-4 form-check form-switch"><input class="form-check-input" type="checkbox" id="profile-heating"><label class="form-check-label" for="profile-heating" data-i18n="can_setup.profile_heating">Heating circuit</label></div>
+                                    <div class="col-md-4 form-check form-switch"><input class="form-check-input" type="checkbox" id="profile-mixed"><label class="form-check-label" for="profile-mixed" data-i18n="can_setup.profile_mixed">Mixed circuit</label></div>
+                                    <div class="col-md-4 form-check form-switch"><input class="form-check-input" type="checkbox" id="profile-hotwater"><label class="form-check-label" for="profile-hotwater" data-i18n="can_setup.profile_hotwater">Domestic hot water</label></div>
+                                </div>
+                            </div>
+                            <div class="form-check form-switch mb-3 text-start">
+                                <input class="form-check-input" type="checkbox" role="switch" id="read-only">
+                                <label class="form-check-label" for="read-only" data-i18n="can_setup.read_only">Read-only CAN mode</label>
+                                <div class="form-text" data-i18n="can_setup.read_only_help">Hard-block every CAN transmission while retaining receive, analyzer, web, and MQTT functionality.</div>
+                            </div>
                             <label class="col-sm-6 col-form-label" for="quartz">CAN-Module Frequency</label>
                             <div class="input-group mb-3">
                                 <input name="quartz" id="quartz" placeholder="Default: 16" type="number" class="form-control"
@@ -35,6 +49,24 @@
                                 <span id="statusHelpBlock" class="form-text text-muted">Enter the frequency of the quartz (oscillator) which is used
                                     by your CAN-Module. Usually it's 8MHz or 16MHz in some rare cases, though, 16MHz has been found to be more
                                     stable but your mileage may vary.</span>
+                            </div>
+                            <div class="row g-3 mb-4 text-start">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="controller-min" data-i18n="can_setup.controller_min">Controller range start</label>
+                                    <input id="controller-min" class="form-control" value="0x250" maxlength="5" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="controller-max" data-i18n="can_setup.controller_max">Controller range end</label>
+                                    <input id="controller-max" class="form-control" value="0x25F" maxlength="5" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="heartbeat-address" data-i18n="can_setup.heartbeat_address">Heartbeat address</label>
+                                    <input id="heartbeat-address" class="form-control" value="0x0F9" maxlength="5" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="heartbeat-interval" data-i18n="can_setup.heartbeat_interval">Heartbeat interval (seconds)</label>
+                                    <input id="heartbeat-interval" class="form-control" value="30" type="number" min="5" max="3600" required>
+                                </div>
                             </div>
                             <!-- CAN Addresses -->
                             <div class="mb-3 row">
@@ -113,6 +145,14 @@
                                         aria-describedby="lbl.Heating.Economy" required>
                                 </div>
                                 <h5>Hot Water</h5>
+                                <div class="input-group mb-3">
+                                    <select id="hotwater-address-preset" class="form-select">
+                                        <option value="established" data-i18n="can_setup.dhw_preset_established">Established address mapping</option>
+                                        <option value="alternative" data-i18n="can_setup.dhw_preset_alternative">Alternative BM1 mapping</option>
+                                    </select>
+                                    <button id="apply-hotwater-preset" class="btn btn-outline-secondary" type="button" data-i18n="can_setup.apply_dhw_preset">Apply DHW preset</button>
+                                </div>
+                                <div class="form-text mb-3" data-i18n="can_setup.dhw_preset_help">This changes only the editable domestic-hot-water addresses. Review and save them explicitly.</div>
                                 <div class="input-group mb-3">
                                     <span class="input-group-text col-sm-10" id="lbl.HotWater.SetpointTemperature">Setpoint</span>
                                     <input name="HotWater.SetpointTemperature" maxlength="5" type="text" class="form-control" placeholder="0x203" aria-label="Setpoint"
@@ -197,25 +237,59 @@
         loadCanAddresses();
 
         _("canbus-form").addEventListener('submit', saveCanbusData);
+        _("apply-hotwater-preset").addEventListener('click', applyHotWaterPreset);
+
+        const hotWaterAddressPresets = {
+            established: {"HotWater.SetpointTemperature":"0x203", "HotWater.Now":"0x254", "HotWater.BufferOperation":"0x20B", "HotWater.ContinousFlow.SetpointTemperature":"0x255"},
+            alternative: {"HotWater.SetpointTemperature":"0x255", "HotWater.Now":"0x20B", "HotWater.BufferOperation":"0x254", "HotWater.ContinousFlow.SetpointTemperature":"0x203"}
+        };
+
+        function applyHotWaterPreset() {
+            const preset = hotWaterAddressPresets[_('hotwater-address-preset').value];
+            const form = document.forms["canbus-form"];
+            Object.entries(preset).forEach(([name, value]) => form.elements[name].value = value);
+            _("status").innerHTML = `<div class="alert alert-info">${translate("can_setup.dhw_preset_applied")}</div>`;
+        }
 
         async function loadCanAddresses() {
             const form = document.forms["canbus-form"];
             const result = await getConfigJson("/api/config/canbus");
-            var keys = getDeepKeys(result);
+            _("profile-heating").checked = Boolean(result.Profiles.Heating);
+            _("profile-mixed").checked = Boolean(result.Profiles.MixedCircuit);
+            _("profile-hotwater").checked = Boolean(result.Profiles.DomesticHotWater);
+            _("read-only").checked = Boolean(result.ReadOnly);
+            _("quartz").value = result.Quartz;
+            _("controller-min").value = result.ControllerDetection.MinimumAddress;
+            _("controller-max").value = result.ControllerDetection.MaximumAddress;
+            _("heartbeat-address").value = result.Heartbeat.Address;
+            _("heartbeat-interval").value = result.Heartbeat.IntervalSeconds;
+            const keys = getDeepKeys(result.Addresses);
             keys.forEach(e => {
-                form.elements[e].value = jsonPathToValue(result, e);
+                form.elements[e].value = jsonPathToValue(result.Addresses, e);
             })
         } 
 
         async function saveCanbusData(event) {
             // Prevent the form from submitting.
             event.preventDefault();
+            const formValues = serializeForm("canbus-form");
+            const result = {
+                Profiles: {Heating: _("profile-heating").checked, MixedCircuit: _("profile-mixed").checked, DomesticHotWater: _("profile-hotwater").checked},
+                ReadOnly: _("read-only").checked,
+                Quartz: Number(_("quartz").value),
+                ControllerDetection: {MinimumAddress: _("controller-min").value, MaximumAddress: _("controller-max").value},
+                Heartbeat: {Address: _("heartbeat-address").value, IntervalSeconds: Number(_("heartbeat-interval").value)},
+                Addresses: {
+                    Controller: formValues.Controller,
+                    Heating: formValues.Heating,
+                    HotWater: formValues.HotWater,
+                    MixedCircuit: formValues.MixedCircuit
+                }
+            };
             _("form-fieldset").disabled = true;
             _("config-saving").hidden = false;
             _("save-config-label").innerHTML = "Saving Configuration...";
             _("save-config").disabled = true;
-            const formData = new FormData(event.target);
-            let result = serializeForm("canbus-form");
             await sendCanbusConfig(JSON.stringify(result));
             _("config-saving").hidden = true;
             _("save-config-label").innerHTML = "Save Configuration";

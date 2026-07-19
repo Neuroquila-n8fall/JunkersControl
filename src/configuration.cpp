@@ -1,5 +1,6 @@
 #include <configuration.h>
 #include <Preferences.h>
+#include <mqtt.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
@@ -310,10 +311,23 @@ bool ReadConfiguration()
     JsonObject GeneralSettings = doc["General"];
     configuration.General.BusMessageTimeout = GeneralSettings["BusMessageTimeout"];
     configuration.General.SetpointOffDelaySeconds = GeneralSettings["SetpointOffDelaySeconds"] | configuration.General.SetpointOffDelaySeconds;
+    configuration.General.BasepointTemperature = GeneralSettings["BasepointTemperature"] | configuration.General.BasepointTemperature;
+    configuration.General.EndpointTemperature = GeneralSettings["EndpointTemperature"] | configuration.General.EndpointTemperature;
     configuration.General.Debug = GeneralSettings["Debug"];
     configuration.General.Sniffing = GeneralSettings["Sniffing"];
     if (configuration.General.SetpointOffDelaySeconds < 10 || configuration.General.SetpointOffDelaySeconds > 86400)
         configuration.General.SetpointOffDelaySeconds = 300;
+    if (!isfinite(configuration.General.BasepointTemperature) ||
+        configuration.General.BasepointTemperature < -50 || configuration.General.BasepointTemperature > 50)
+        configuration.General.BasepointTemperature = -10;
+    if (!isfinite(configuration.General.EndpointTemperature) ||
+        configuration.General.EndpointTemperature < -50 || configuration.General.EndpointTemperature > 50)
+        configuration.General.EndpointTemperature = 31;
+
+    // Runtime commands remain externally adjustable, but every startup begins
+    // from the explicitly persisted normal-operation heating curve.
+    commandedValues.Heating.BasepointTemperature = configuration.General.BasepointTemperature;
+    commandedValues.Heating.EndpointTemperature = configuration.General.EndpointTemperature;
 
     JsonObject FailSafeSettings = doc["FailSafe"];
     if (!FailSafeSettings.isNull())
@@ -385,6 +399,30 @@ bool ReadConfiguration()
 
     JsonObject CAN = doc["CAN"];
     configuration.CanModuleConfig.CAN_Quartz = CAN["Quartz"];
+    JsonObject CAN_Profiles = CAN["Profiles"];
+    configuration.CanModuleConfig.Profiles.Heating = CAN_Profiles["Heating"] | true;
+    configuration.CanModuleConfig.Profiles.MixedCircuit = CAN_Profiles["MixedCircuit"] | false;
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = CAN_Profiles["DomesticHotWater"] | true;
+    configuration.CanModuleConfig.ReadOnly = CAN["ReadOnly"] | false;
+
+    JsonObject CAN_ControllerDetection = CAN["ControllerDetection"];
+    configuration.CanModuleConfig.ControllerAddressMin = convertHexString(CAN_ControllerDetection["MinimumAddress"] | "0x250");
+    configuration.CanModuleConfig.ControllerAddressMax = convertHexString(CAN_ControllerDetection["MaximumAddress"] | "0x25F");
+    if (configuration.CanModuleConfig.ControllerAddressMin > 0x7FF ||
+        configuration.CanModuleConfig.ControllerAddressMax > 0x7FF ||
+        configuration.CanModuleConfig.ControllerAddressMin > configuration.CanModuleConfig.ControllerAddressMax)
+    {
+        configuration.CanModuleConfig.ControllerAddressMin = 0x250;
+        configuration.CanModuleConfig.ControllerAddressMax = 0x25F;
+    }
+
+    JsonObject CAN_Heartbeat = CAN["Heartbeat"];
+    configuration.CanModuleConfig.HeartbeatAddress = convertHexString(CAN_Heartbeat["Address"] | "0x0F9");
+    configuration.CanModuleConfig.HeartbeatIntervalSeconds = CAN_Heartbeat["IntervalSeconds"] | 30;
+    if (configuration.CanModuleConfig.HeartbeatAddress > 0x7FF)
+        configuration.CanModuleConfig.HeartbeatAddress = 0x0F9;
+    if (configuration.CanModuleConfig.HeartbeatIntervalSeconds < 5 || configuration.CanModuleConfig.HeartbeatIntervalSeconds > 3600)
+        configuration.CanModuleConfig.HeartbeatIntervalSeconds = 30;
 
     JsonObject CAN_Addresses = CAN["Addresses"];
 
@@ -525,6 +563,8 @@ bool WriteConfiguration()
     JsonObject General = doc["General"].to<JsonObject>();
     General["BusMessageTimeout"] = configuration.General.BusMessageTimeout;
     General["SetpointOffDelaySeconds"] = configuration.General.SetpointOffDelaySeconds;
+    General["BasepointTemperature"] = configuration.General.BasepointTemperature;
+    General["EndpointTemperature"] = configuration.General.EndpointTemperature;
     General["Debug"] = configuration.General.Debug;
     General["Sniffing"] = configuration.General.Sniffing;
 
@@ -550,6 +590,14 @@ bool WriteConfiguration()
 
     JsonObject CAN = doc["CAN"].to<JsonObject>();
     CAN["Quartz"] = configuration.CanModuleConfig.CAN_Quartz;
+    CAN["Profiles"]["Heating"] = configuration.CanModuleConfig.Profiles.Heating;
+    CAN["Profiles"]["MixedCircuit"] = configuration.CanModuleConfig.Profiles.MixedCircuit;
+    CAN["Profiles"]["DomesticHotWater"] = configuration.CanModuleConfig.Profiles.DomesticHotWater;
+    CAN["ReadOnly"] = configuration.CanModuleConfig.ReadOnly;
+    CAN["ControllerDetection"]["MinimumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMin);
+    CAN["ControllerDetection"]["MaximumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMax);
+    CAN["Heartbeat"]["Address"] = IntToHex(configuration.CanModuleConfig.HeartbeatAddress);
+    CAN["Heartbeat"]["IntervalSeconds"] = configuration.CanModuleConfig.HeartbeatIntervalSeconds;
 
     JsonObject CAN_Addresses = CAN["Addresses"].to<JsonObject>();
 

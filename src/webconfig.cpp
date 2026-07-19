@@ -32,6 +32,10 @@ static void populateRuntimeJson(JsonDocument &doc)
     system["FailSafe"] = IsFailSafeActive();
     system["CanErrors"] = CanSendErrorCount;
     system["Uptime"] = millis() / 1000UL;
+    system["CanReadOnly"] = configuration.CanModuleConfig.ReadOnly;
+    system["CanProfiles"]["Heating"] = configuration.CanModuleConfig.Profiles.Heating;
+    system["CanProfiles"]["MixedCircuit"] = configuration.CanModuleConfig.Profiles.MixedCircuit;
+    system["CanProfiles"]["DomesticHotWater"] = configuration.CanModuleConfig.Profiles.DomesticHotWater;
 
     JsonObject general = doc["General"].to<JsonObject>();
     general["FlameLit"] = ceraValues.General.FlameLit;
@@ -49,6 +53,8 @@ static void populateRuntimeJson(JsonDocument &doc)
     heating["Power"] = ceraValues.Heating.HeatingPower;
     heating["Season"] = ceraValues.Heating.Season;
     heating["Economy"] = ceraValues.Heating.Economy;
+    heating["BufferMaximum"] = ceraValues.Heating.BufferWaterTemperatureMaximum;
+    heating["BufferCurrent"] = ceraValues.Heating.BufferWaterTemperatureCurrent;
 
     JsonObject water = doc["HotWater"].to<JsonObject>();
     water["Current"] = ceraValues.Hotwater.TemperatureCurrent;
@@ -56,6 +62,13 @@ static void populateRuntimeJson(JsonDocument &doc)
     water["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
     water["Now"] = ceraValues.Hotwater.Now;
     water["Buffer"] = ceraValues.Hotwater.BufferMode;
+    water["ContinuousFlowSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+
+    JsonObject mixed = doc["MixedCircuit"].to<JsonObject>();
+    mixed["Pump"] = ceraValues.MixedCircuit.PumpActive;
+    mixed["Economy"] = ceraValues.MixedCircuit.Economy;
+    mixed["FeedSetpoint"] = ceraValues.MixedCircuit.FeedSetpoint;
+    mixed["FeedCurrent"] = ceraValues.MixedCircuit.FeedCurrent;
 
     JsonArray auxiliary = doc["Auxiliary"].to<JsonArray>();
     for (size_t i = 0; i < configuration.TemperatureSensors.SensorCount; ++i)
@@ -155,6 +168,8 @@ static bool migrateUploadedConfiguration(const char *path, bool &changed, String
 
     JsonObject general = doc["General"].as<JsonObject>();
     preserveMissing(general, "SetpointOffDelaySeconds", configuration.General.SetpointOffDelaySeconds);
+    preserveMissing(general, "BasepointTemperature", configuration.General.BasepointTemperature);
+    preserveMissing(general, "EndpointTemperature", configuration.General.EndpointTemperature);
 
     JsonObject time = doc["Time"].as<JsonObject>();
     preserveMissing(time, "PosixTimezone", configuration.General.PosixTimezone);
@@ -390,6 +405,8 @@ void getGeneralConfig(AsyncWebServerRequest *request)
     doc["posix-tz"] = configuration.General.PosixTimezone;
     doc["busmsgtimeout"] = configuration.General.BusMessageTimeout;
     doc["setpoint-off-delay"] = configuration.General.SetpointOffDelaySeconds;
+    doc["normal-basepoint"] = configuration.General.BasepointTemperature;
+    doc["normal-endpoint"] = configuration.General.EndpointTemperature;
     doc["debug"] = configuration.General.Debug;
     doc["sniffing"] = configuration.General.Sniffing;
     doc["failsafe-enabled"] = configuration.FailSafe.Enabled;
@@ -430,6 +447,52 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     double failSafeEndpoint = configuration.FailSafe.EndpointTemperature;
     double failSafeMinimum = configuration.FailSafe.MinimumFeedTemperature;
     double failSafeMaximum = configuration.FailSafe.MaximumFeedTemperature;
+    double normalBasepoint = configuration.General.BasepointTemperature;
+    double normalEndpoint = configuration.General.EndpointTemperature;
+
+    auto readBoolean = [](JsonVariantConst value, bool &destination)
+    {
+        if (value.isNull())
+            return true;
+        if (value.is<bool>())
+        {
+            destination = value.as<bool>();
+            return true;
+        }
+        if (value.is<int>())
+        {
+            const int numeric = value.as<int>();
+            if (numeric == 0 || numeric == 1)
+            {
+                destination = numeric == 1;
+                return true;
+            }
+        }
+        if (value.is<const char *>())
+        {
+            const String text = value.as<const char *>();
+            if (text == "true" || text == "1" || text == "on")
+            {
+                destination = true;
+                return true;
+            }
+            if (text == "false" || text == "0" || text == "off")
+            {
+                destination = false;
+                return true;
+            }
+        }
+        return false;
+    };
+
+    bool heatingValues = configuration.Features.HeatingParameters;
+    bool waterValues = configuration.Features.WaterParameters;
+    bool auxiliaryValues = configuration.Features.AuxiliaryParameters;
+    bool overrideOutside = configuration.Features.UseAuxiliaryOutsideTempReference;
+    bool debug = configuration.General.Debug;
+    bool sniffing = configuration.General.Sniffing;
+    bool failSafeEnabled = configuration.FailSafe.Enabled;
+    bool heatWhenTimeUnknown = configuration.FailSafe.HeatWhenTimeUnknown;
 
     auto parseTime = [](const String &value, int &hour, int &minute)
     {
@@ -452,13 +515,30 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         failSafeMinimum = doc["failsafe-minimum-feed"].as<double>();
     if (!doc["failsafe-maximum-feed"].isNull())
         failSafeMaximum = doc["failsafe-maximum-feed"].as<double>();
+    if (!doc["normal-basepoint"].isNull())
+        normalBasepoint = doc["normal-basepoint"].as<double>();
+    if (!doc["normal-endpoint"].isNull())
+        normalEndpoint = doc["normal-endpoint"].as<double>();
 
     const bool startValid = doc["failsafe-start"].isNull() ||
                             parseTime(doc["failsafe-start"].as<String>(), failSafeStartHour, failSafeStartMinute);
     const bool stopValid = doc["failsafe-stop"].isNull() ||
                            parseTime(doc["failsafe-stop"].as<String>(), failSafeStopHour, failSafeStopMinute);
-    if (!startValid || !stopValid || failSafeTimeout < 10 || failSafeTimeout > 86400 ||
+    const bool booleansValid =
+        readBoolean(doc["heatingvalues"], heatingValues) &&
+        readBoolean(doc["watervalues"], waterValues) &&
+        readBoolean(doc["auxvalues"], auxiliaryValues) &&
+        readBoolean(doc["overrideot"], overrideOutside) &&
+        readBoolean(doc["debug"], debug) &&
+        readBoolean(doc["sniffing"], sniffing) &&
+        readBoolean(doc["failsafe-enabled"], failSafeEnabled) &&
+        readBoolean(doc["failsafe-unknown-time-heat"], heatWhenTimeUnknown);
+
+    if (!booleansValid || !startValid || !stopValid || failSafeTimeout < 10 || failSafeTimeout > 86400 ||
         setpointOffDelay < 10 || setpointOffDelay > 86400 ||
+        !isfinite(normalBasepoint) || !isfinite(normalEndpoint) ||
+        normalBasepoint < -50 || normalBasepoint > 50 ||
+        normalEndpoint < -50 || normalEndpoint > 50 ||
         !isfinite(failSafeBasepoint) || !isfinite(failSafeEndpoint) ||
         !isfinite(failSafeMinimum) || !isfinite(failSafeMaximum) ||
         failSafeMinimum < 0 || failSafeMaximum > 100 || failSafeMinimum > failSafeMaximum)
@@ -467,17 +547,10 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         return;
     }
 
-    if (!doc["heatingvalues"].isNull())
-        configuration.Features.HeatingParameters = doc["heatingvalues"] == "true";
-
-    if (!doc["watervalues"].isNull())
-        configuration.Features.WaterParameters = doc["watervalues"] == "true";
-
-    if (!doc["auxvalues"].isNull())
-        configuration.Features.AuxiliaryParameters = doc["auxvalues"] == "true";
-
-    if (!doc["overrideot"].isNull())
-        configuration.Features.UseAuxiliaryOutsideTempReference = doc["overrideot"] == "true";
+    configuration.Features.HeatingParameters = heatingValues;
+    configuration.Features.WaterParameters = waterValues;
+    configuration.Features.AuxiliaryParameters = auxiliaryValues;
+    configuration.Features.UseAuxiliaryOutsideTempReference = overrideOutside;
 
     if (!doc["tz"].isNull())
         strlcpy(configuration.General.Timezone, doc["tz"], sizeof(configuration.General.Timezone));
@@ -488,17 +561,13 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     if (!doc["busmsgtimeout"].isNull())
         configuration.General.BusMessageTimeout = doc["busmsgtimeout"];
     configuration.General.SetpointOffDelaySeconds = setpointOffDelay;
+    configuration.General.BasepointTemperature = normalBasepoint;
+    configuration.General.EndpointTemperature = normalEndpoint;
+    configuration.General.Debug = debug;
+    configuration.General.Sniffing = sniffing;
 
-    if (!doc["debug"].isNull())
-        configuration.General.Debug = doc["debug"] == "true";
-
-    if (!doc["sniffing"].isNull())
-        configuration.General.Sniffing = doc["sniffing"] == "true";
-
-    if (!doc["failsafe-enabled"].isNull())
-        configuration.FailSafe.Enabled = doc["failsafe-enabled"] == "true";
-    if (!doc["failsafe-unknown-time-heat"].isNull())
-        configuration.FailSafe.HeatWhenTimeUnknown = doc["failsafe-unknown-time-heat"] == "true";
+    configuration.FailSafe.Enabled = failSafeEnabled;
+    configuration.FailSafe.HeatWhenTimeUnknown = heatWhenTimeUnknown;
     configuration.FailSafe.CommandTimeoutSeconds = failSafeTimeout;
     configuration.FailSafe.StartHour = failSafeStartHour;
     configuration.FailSafe.StartMinute = failSafeStartMinute;
@@ -508,8 +577,6 @@ void onGeneralConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
     configuration.FailSafe.EndpointTemperature = failSafeEndpoint;
     configuration.FailSafe.MinimumFeedTemperature = failSafeMinimum;
     configuration.FailSafe.MaximumFeedTemperature = failSafeMaximum;
-
-    configuration.General.Debug = configuration.General.Debug;
 
     sendConfigurationSaveResult(request, R"({"status":200, "msg":"Feature configuration has been saved."})");
 }
@@ -607,9 +674,22 @@ void getWifiNetworks(AsyncWebServerRequest *request)
 {
     JsonDocument doc;
 
-    int count = WiFi.scanNetworks();
-    if (count == 0)
+    // Do not collide with the asynchronous roaming scan maintained by the
+    // main loop. The UI may retry this request after that short scan finishes.
+    if (!beginManualWifiScan())
+    {
         sendJson(doc, request);
+        return;
+    }
+
+    int count = WiFi.scanNetworks();
+    if (count <= 0)
+    {
+        WiFi.scanDelete();
+        endManualWifiScan();
+        sendJson(doc, request);
+        return;
+    }
     for (size_t i = 0; i < count; i++)
     {
         JsonObject network = doc.add<JsonObject>();
@@ -617,6 +697,8 @@ void getWifiNetworks(AsyncWebServerRequest *request)
         network["RSSI"] = WiFi.RSSI(i);
         network["Encryption"] = WiFi.encryptionType(i);
     }
+    WiFi.scanDelete();
+    endManualWifiScan();
     sendJson(doc, request);
 }
 
@@ -1194,12 +1276,23 @@ void getCanbusConfig(AsyncWebServerRequest *request)
 {
     // Take values directly from configuration
     JsonDocument doc;
-    JsonObject CAN_Addresses_Controller = doc["Controller"].to<JsonObject>();
+    doc["Profiles"]["Heating"] = configuration.CanModuleConfig.Profiles.Heating;
+    doc["Profiles"]["MixedCircuit"] = configuration.CanModuleConfig.Profiles.MixedCircuit;
+    doc["Profiles"]["DomesticHotWater"] = configuration.CanModuleConfig.Profiles.DomesticHotWater;
+    doc["ReadOnly"] = configuration.CanModuleConfig.ReadOnly;
+    doc["Quartz"] = configuration.CanModuleConfig.CAN_Quartz;
+    doc["ControllerDetection"]["MinimumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMin);
+    doc["ControllerDetection"]["MaximumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMax);
+    doc["Heartbeat"]["Address"] = IntToHex(configuration.CanModuleConfig.HeartbeatAddress);
+    doc["Heartbeat"]["IntervalSeconds"] = configuration.CanModuleConfig.HeartbeatIntervalSeconds;
+
+    JsonObject addresses = doc["Addresses"].to<JsonObject>();
+    JsonObject CAN_Addresses_Controller = addresses["Controller"].to<JsonObject>();
     CAN_Addresses_Controller["FlameStatus"] = IntToHex(configuration.CanAddresses.General.FlameLit);
     CAN_Addresses_Controller["Error"] = IntToHex(configuration.CanAddresses.General.Error);
     CAN_Addresses_Controller["DateTime"] = IntToHex(configuration.CanAddresses.General.DateTime);
 
-    JsonObject CAN_Addresses_Heating = doc["Heating"].to<JsonObject>();
+    JsonObject CAN_Addresses_Heating = addresses["Heating"].to<JsonObject>();
     CAN_Addresses_Heating["FeedCurrent"] = IntToHex(configuration.CanAddresses.Heating.FeedCurrent);
     CAN_Addresses_Heating["FeedMax"] = IntToHex(configuration.CanAddresses.Heating.FeedMax);
     CAN_Addresses_Heating["FeedSetpoint"] = IntToHex(configuration.CanAddresses.Heating.FeedSetpoint);
@@ -1211,7 +1304,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_Heating["Mode"] = IntToHex(configuration.CanAddresses.Heating.Mode);
     CAN_Addresses_Heating["Economy"] = IntToHex(configuration.CanAddresses.Heating.Economy);
 
-    JsonObject CAN_Addresses_HotWater = doc["HotWater"].to<JsonObject>();
+    JsonObject CAN_Addresses_HotWater = addresses["HotWater"].to<JsonObject>();
     CAN_Addresses_HotWater["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.SetpointTemperature);
     CAN_Addresses_HotWater["MaxTemperature"] = IntToHex(configuration.CanAddresses.HotWater.MaxTemperature);
     CAN_Addresses_HotWater["CurrentTemperature"] = IntToHex(configuration.CanAddresses.HotWater.CurrentTemperature);
@@ -1219,7 +1312,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_HotWater["BufferOperation"] = IntToHex(configuration.CanAddresses.HotWater.BufferOperation);
     CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"] = IntToHex(configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature);
 
-    JsonObject CAN_Addresses_MixedCircuit = doc["MixedCircuit"].to<JsonObject>();
+    JsonObject CAN_Addresses_MixedCircuit = addresses["MixedCircuit"].to<JsonObject>();
     CAN_Addresses_MixedCircuit["Pump"] = IntToHex(configuration.CanAddresses.MixedCircuit.Pump);
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
@@ -1230,57 +1323,96 @@ void getCanbusConfig(AsyncWebServerRequest *request)
 
 void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 {
-    JsonDocument doc;
-    if (json.is<JsonArray>())
+    if (!json.is<JsonObject>())
     {
-        doc = json.as<JsonArray>();
-    }
-    else if (json.is<JsonObject>())
-    {
-        doc = json.as<JsonObject>();
+        request->send(400, "application/json", R"({"status":400,"msg":"Expected a CAN configuration object."})");
+        return;
     }
 
-    // Quartz setting is added at top of the document
-    configuration.CanModuleConfig.CAN_Quartz = doc["quartz"];
+    JsonObject doc = json.as<JsonObject>();
+    const int quartz = doc["Quartz"] | 0;
+    const unsigned long heartbeatInterval = doc["Heartbeat"]["IntervalSeconds"] | 0;
+    if ((quartz != 8 && quartz != 16) || heartbeatInterval < 5 || heartbeatInterval > 3600)
+    {
+        request->send(400, "application/json", R"({"status":400,"msg":"Invalid oscillator frequency or heartbeat interval."})");
+        return;
+    }
+
+    auto parseAddress = [](JsonVariantConst value, uint16_t &destination) -> bool
+    {
+        if (!value.is<const char *>())
+            return false;
+        const char *text = value.as<const char *>();
+        if (!text || !*text)
+            return false;
+        char *end = nullptr;
+        const unsigned long parsed = strtoul(text, &end, 0);
+        if (end == text || *end != '\0' || parsed > 0x7FF)
+            return false;
+        destination = static_cast<uint16_t>(parsed);
+        return true;
+    };
+
+    auto newAddresses = configuration.CanAddresses;
+    uint16_t controllerMin = 0;
+    uint16_t controllerMax = 0;
+    uint16_t heartbeatAddress = 0;
+    JsonObject CAN_Addresses = doc["Addresses"];
+    JsonObject CAN_Addresses_Controller = CAN_Addresses["Controller"];
+    JsonObject CAN_Addresses_Heating = CAN_Addresses["Heating"];
+    JsonObject CAN_Addresses_HotWater = CAN_Addresses["HotWater"];
+    JsonObject CAN_Addresses_MixedCircuit = CAN_Addresses["MixedCircuit"];
+
+    const bool validAddresses =
+        parseAddress(doc["ControllerDetection"]["MinimumAddress"], controllerMin) &&
+        parseAddress(doc["ControllerDetection"]["MaximumAddress"], controllerMax) &&
+        parseAddress(doc["Heartbeat"]["Address"], heartbeatAddress) &&
+        parseAddress(CAN_Addresses_Controller["FlameStatus"], newAddresses.General.FlameLit) &&
+        parseAddress(CAN_Addresses_Controller["Error"], newAddresses.General.Error) &&
+        parseAddress(CAN_Addresses_Controller["DateTime"], newAddresses.General.DateTime) &&
+        parseAddress(CAN_Addresses_Heating["FeedCurrent"], newAddresses.Heating.FeedCurrent) &&
+        parseAddress(CAN_Addresses_Heating["FeedMax"], newAddresses.Heating.FeedMax) &&
+        parseAddress(CAN_Addresses_Heating["FeedSetpoint"], newAddresses.Heating.FeedSetpoint) &&
+        parseAddress(CAN_Addresses_Heating["OutsideTemperature"], newAddresses.Heating.OutsideTemperature) &&
+        parseAddress(CAN_Addresses_Heating["Pump"], newAddresses.Heating.Pump) &&
+        parseAddress(CAN_Addresses_Heating["Season"], newAddresses.Heating.Season) &&
+        parseAddress(CAN_Addresses_Heating["Operation"], newAddresses.Heating.Operation) &&
+        parseAddress(CAN_Addresses_Heating["Power"], newAddresses.Heating.Power) &&
+        parseAddress(CAN_Addresses_Heating["Mode"], newAddresses.Heating.Mode) &&
+        parseAddress(CAN_Addresses_Heating["Economy"], newAddresses.Heating.Economy) &&
+        parseAddress(CAN_Addresses_HotWater["SetpointTemperature"], newAddresses.HotWater.SetpointTemperature) &&
+        parseAddress(CAN_Addresses_HotWater["MaxTemperature"], newAddresses.HotWater.MaxTemperature) &&
+        parseAddress(CAN_Addresses_HotWater["CurrentTemperature"], newAddresses.HotWater.CurrentTemperature) &&
+        parseAddress(CAN_Addresses_HotWater["Now"], newAddresses.HotWater.Now) &&
+        parseAddress(CAN_Addresses_HotWater["BufferOperation"], newAddresses.HotWater.BufferOperation) &&
+        parseAddress(CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"], newAddresses.HotWater.ContinousFlowSetpointTemperature) &&
+        parseAddress(CAN_Addresses_MixedCircuit["Pump"], newAddresses.MixedCircuit.Pump) &&
+        parseAddress(CAN_Addresses_MixedCircuit["FeedSetpoint"], newAddresses.MixedCircuit.FeedSetpoint) &&
+        parseAddress(CAN_Addresses_MixedCircuit["FeedCurrent"], newAddresses.MixedCircuit.FeedCurrent) &&
+        parseAddress(CAN_Addresses_MixedCircuit["Economy"], newAddresses.MixedCircuit.Economy);
+
+    if (!validAddresses || controllerMin > controllerMax)
+    {
+        request->send(400, "application/json", R"({"status":400,"msg":"Every CAN address must be a standard 0x000-0x7FF address and the detection range must be ordered."})");
+        return;
+    }
+
+    configuration.CanModuleConfig.CAN_Quartz = quartz;
+    configuration.CanModuleConfig.Profiles.Heating = doc["Profiles"]["Heating"] | true;
+    configuration.CanModuleConfig.Profiles.MixedCircuit = doc["Profiles"]["MixedCircuit"] | false;
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = doc["Profiles"]["DomesticHotWater"] | true;
+    configuration.CanModuleConfig.ReadOnly = doc["ReadOnly"] | false;
+    configuration.CanModuleConfig.ControllerAddressMin = controllerMin;
+    configuration.CanModuleConfig.ControllerAddressMax = controllerMax;
+    configuration.CanModuleConfig.HeartbeatAddress = heartbeatAddress;
+    configuration.CanModuleConfig.HeartbeatIntervalSeconds = heartbeatInterval;
+    configuration.CanAddresses = newAddresses;
+
+    if (configuration.CanModuleConfig.ReadOnly)
+        OverrideControl = false;
 
     // Now what follows is basically the same as in ReadConfiguration @configuration.cpp
-
-    JsonObject CAN_Addresses_Controller = doc["Controller"];
-    configuration.CanAddresses.General.FlameLit = convertHexString(CAN_Addresses_Controller["FlameStatus"].as<const char *>()); // "0x209"
-    configuration.CanAddresses.General.Error = convertHexString(CAN_Addresses_Controller["Error"].as<const char *>());          // "0x206"
-    configuration.CanAddresses.General.DateTime = convertHexString(CAN_Addresses_Controller["DateTime"].as<const char *>());    // "0x256"
-
-    JsonObject CAN_Addresses_Heating = doc["Heating"];
-    configuration.CanAddresses.Heating.FeedCurrent = convertHexString(CAN_Addresses_Heating["FeedCurrent"].as<const char *>());               // "0x201"
-    configuration.CanAddresses.Heating.FeedMax = convertHexString(CAN_Addresses_Heating["FeedMax"].as<const char *>());                       // "0x200"
-    configuration.CanAddresses.Heating.FeedSetpoint = convertHexString(CAN_Addresses_Heating["FeedSetpoint"].as<const char *>());             // "0x252"
-    configuration.CanAddresses.Heating.OutsideTemperature = convertHexString(CAN_Addresses_Heating["OutsideTemperature"].as<const char *>()); // "0x207"
-    configuration.CanAddresses.Heating.Pump = convertHexString(CAN_Addresses_Heating["Pump"].as<const char *>());                             // "0x20A"
-    configuration.CanAddresses.Heating.Season = convertHexString(CAN_Addresses_Heating["Season"].as<const char *>());                         // "0x20C"
-    configuration.CanAddresses.Heating.Operation = convertHexString(CAN_Addresses_Heating["Operation"].as<const char *>());                   // "0x250"
-    configuration.CanAddresses.Heating.Power = convertHexString(CAN_Addresses_Heating["Power"].as<const char *>());                           // "0x251"
-    configuration.CanAddresses.Heating.Mode = convertHexString(CAN_Addresses_Heating["Mode"].as<const char *>());                             // "0x258"
-    configuration.CanAddresses.Heating.Economy = convertHexString(CAN_Addresses_Heating["Economy"].as<const char *>());                       // "0x253"
-
-    JsonObject CAN_Addresses_HotWater = doc["HotWater"];
-    configuration.CanAddresses.HotWater.SetpointTemperature = convertHexString(CAN_Addresses_HotWater["SetpointTemperature"].as<const char *>()); // "0x203"
-    configuration.CanAddresses.HotWater.MaxTemperature = convertHexString(CAN_Addresses_HotWater["MaxTemperature"].as<const char *>());           // "0x204"
-    configuration.CanAddresses.HotWater.CurrentTemperature = convertHexString(CAN_Addresses_HotWater["CurrentTemperature"].as<const char *>());   // "0x205"
-    configuration.CanAddresses.HotWater.Now = convertHexString(CAN_Addresses_HotWater["Now"].as<const char *>());                                 // "0x254"
-    configuration.CanAddresses.HotWater.BufferOperation = convertHexString(CAN_Addresses_HotWater["BufferOperation"].as<const char *>());         // "0x20B"
-
-    configuration
-        .CanAddresses
-        .HotWater
-        .ContinousFlowSetpointTemperature = convertHexString(CAN_Addresses_HotWater["ContinousFlow"]["SetpointTemperature"].as<const char *>()); // "0x255"
-
-    JsonObject CAN_Addresses_MixedCircuit = doc["MixedCircuit"];
-    configuration.CanAddresses.MixedCircuit.Pump = convertHexString(CAN_Addresses_MixedCircuit["Pump"].as<const char *>());                 // "0x404"
-    configuration.CanAddresses.MixedCircuit.FeedSetpoint = convertHexString(CAN_Addresses_MixedCircuit["FeedSetpoint"].as<const char *>()); // "0x405"
-    configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char *>());   // "0x440"
-    configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char *>());           // "0x407"
-
-    sendConfigurationSaveResult(request, R"({"status":200, "msg":"CAN Config have been saved."})");
+    sendConfigurationSaveResult(request, R"({"status":200, "msg":"CAN configuration has been saved."})");
 }
 
 #pragma endregion
