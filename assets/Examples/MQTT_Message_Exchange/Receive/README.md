@@ -1,5 +1,6 @@
-# What's this?
-These are the example messages which can be processed by the application. These messages will, for example, trigger a message which is then received by your MQTT broker.
+# MQTT Command Messages
+
+These examples are JSON messages accepted by Cerasmarter's configured MQTT command topics.
 
 ## Heating Parameters
 
@@ -8,7 +9,7 @@ These are the example messages which can be processed by the application. These 
 ```json
 {
     "Enabled": false,
-    "FeedSetpoint": 0,
+    "FeedSetpoint": 10,
     "FeedBaseSetpoint": -10,
     "FeedCutOff": 22,
     "FeedMinimum": 10,
@@ -37,10 +38,10 @@ This setting instructs the controller to enable or disable heating operation.
 ###### Feed Setpoint
 
 ```json
-    "FeedSetpoint": 0,
+    "FeedSetpoint": 10,
 ```
 
-The feed temperature setpoint when ...
+The requested feed temperature setpoint when ...
 ```json
     "OverrideSetpoint": true
 ```
@@ -69,7 +70,7 @@ The heating will stop operation when the outside temperature has reached this va
     "FeedMinimum": 10,
 ```
 
-This is a more or less static value determined by your heating system. If the feed temperature goes below this point, the heating will resume operation to prevent pipes from freezing. You can now use this how you like but you can't go below 10°C
+This is a more or less static value determined by your heating system. If the feed temperature goes below this point, the heating will resume operation to prevent pipes from freezing. Internally calculated values below the manufacturer-defined 10 °C off value are clamped to exactly 10 °C.
 
 
 ###### Auxiliary Temperature
@@ -141,6 +142,18 @@ Ignore and Override any internal calculations and set the feed to the temperatur
 This is considered the completely manual method where you do your own calculations and just steer the temperature to your likings.
 
 Be aware, though, that you can only "suggest" temperatures to the heating. It will throttle itself to prevent any harm and malfunction on its own. It actively prevents setting unrealistic values that might break the boundaries of its internal parameters. So for example if you set the feed to 100°C but your system is only able to deliver 90°C, it will set 90°C. If the dial is set to allow 75°C, it will only go as far as 75°C.
+
+## Persistence
+
+Stable values accepted through the combined MQTT parameter topics or Home Assistant command topics are saved to `RuntimeControls` and restored after reboot:
+
+- `Enabled`, `FeedSetpoint`, `FeedMinimum`, `TargetAmbientTemperature`, `Adaption`, `ValveScaling`, `ValveScalingMaxOpening`, `DynamicAdaption`, `OverrideSetpoint`, and `OnDemandBoostDuration`.
+- `FeedBaseSetpoint` and `FeedCutOff`, stored as the normal-operation values in `General`.
+- Hot-water `Setpoint`.
+
+Writes are coalesced for three seconds and unchanged values are not written again. Live inputs (`AuxiliaryTemperature`, `AmbientTemperature`, and `ValveScalingOpening`) and momentary state (`OnDemandBoost`/`Boost` and `FastHeatup`) remain transient. The fallback web page and `POST /api/control` are also transient by design.
+
+See [Runtime Controls](../../../Configuration.md#runtime-controls) for the stored schema and the [API reference](../../../API.md#mqtt-api) for Home Assistant topic behavior.
 
 ## Water Parameters
 

@@ -1,55 +1,19 @@
 # Cerasmarter
 [![CI](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml/badge.svg)](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml)
-## NOTE: Documentation is mostly accurate right now.
-**Feel free to open an issue if something is unclear.**
-## Table of contents
-- [Cerasmarter](#cerasmarter)
-  - [NOTE: Documentation is mostly accurate right now.](#note-documentation-is-mostly-accurate-right-now)
-  - [Table of contents](#table-of-contents)
-  - [Community](#community)
-  - [Purpose and Aim](#purpose-and-aim)
-    - [Cerasmart-er](#cerasmart-er)
-  - [Contribution](#contribution)
-  - [Intended Audience](#intended-audience)
-    - [Disclaimer:](#disclaimer)
-  - [A word of warning](#a-word-of-warning)
-    - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
-  - [Prerequisites](#prerequisites)
-  - [Installation (Quick Start)](#installation-quick-start)
-  - [Features](#features)
-    - [MQTT](#mqtt)
-      - [Where?](#where)
-      - [How?](#how)
-      - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
-      - [Examples & Detailed Explanation](#examples--detailed-explanation)
-    - [Heating Parameters](#heating-parameters)
-    - [Night/Economy Mode](#nighteconomy-mode)
-      - [Option #1 (MQTT):](#option-1-mqtt)
-      - [Option #2 (Amend Code):](#option-2-amend-code)
-    - [Switch Off/On](#switch-offon)
-    - [Boost](#boost)
-    - [Fast Heatup](#fast-heatup)
-    - [Fallback and Failsafe](#fallback-and-failsafe)
-    - [Automatic Controller Detection](#automatic-controller-detection)
-    - [External Temperature Sensors](#external-temperature-sensors)
-      - [Where?](#where-1)
-    - [Dynamic Adaption](#dynamic-adaption)
-    - [Calculate yourself](#calculate-yourself)
-    - [Valve-based control](#valve-based-control)
-  - [Updating](#updating)
-  - [Telnet Console](#telnet-console)
-  - [Home Assistant Integration](#home-assistant-integration)
-  - [Hints](#hints)
-  - [Getting Started](#getting-started)
-    - [Configuration](#configuration)
-  - [Dedicated PCB](#dedicated-pcb)
-  - [Todo](#todo)
-  - [Special Thanks](#special-thanks)
 
-![Alt_Text](/assets/example_ha_dashboard.jpg)
+## Documentation
+
+- [Installation and feature overview](README.md#installation-quick-start)
+- [Configuration reference](assets/Configuration.md)
+- [Web, SSE, and MQTT API reference](assets/API.md)
+- [CAN Analyzer guide](assets/CANAnalyzer.md)
+- [MQTT command examples](assets/Examples/MQTT_Message_Exchange/Receive/README.md)
+- [MQTT state examples](assets/Examples/MQTT_Message_Exchange/Send/README.md)
+
+Documentation tracks the current development firmware. Please open an issue when controller-specific behavior differs from the documented BM1 installation profiles.
 
 ## Community
-You can reach out to us on [Discord](https://discord.gg/9Wrndbqu7t) where we can discuss and help eachother.
+You can reach out on [Discord](https://discord.gg/9Wrndbqu7t) to discuss the project and get help from the community.
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -58,7 +22,7 @@ Since the rise of modern and affordable "Smart Radiator Thermostats" we are able
 ### Cerasmart-er
 The Junkers/Bosch "Heatronic" controller of the "Cerasmart" type of boilers (yes they used that term back in pre-2000!) is by itself smart enough to keep your home warm without wasting too much energy, if properly equipped and configured, of course. You won't receive any benefits from this project if you are messing around with the parameters without knowing the concepts of a central heating system. Also if your heating isn't "tuned" to your home it will waste money nonetheless.
 **This also means you can't tell the boiler to perform unreasonable actions because the controller inside the boiler unit is in charge of controlling the actual temperatures within a safe, predefined range that has been set either by the manufacturer or the technician that maintains your heating.**
-We are, hoewever, able to suggest certain temperatures or switch the boiler on and off
+We are, however, able to suggest certain temperatures or switch the boiler on and off.
 
 With this project we can at least account for seasonal changes in temperature, humidity and the temperature as we feel it so we can adjust the power demand to what we actually need.
 
@@ -157,9 +121,13 @@ The CAN Message Analyzer under **Utilities** receives live bus events independen
 
 ![Cerasmarter web dashboard](/assets/webui-dashboard-dark.png)
 
+_Production-controller capture. The displayed `Burner power` label was renamed to `Feed temperature utilization` in the current development UI because it represents the feed-temperature range, not thermal burner output._
+
 The home page is a live heating dashboard organized into heating, mixed-circuit, domestic-hot-water, auxiliary-sensor, runtime-control, and system categories. It presents every value returned by `GET /api/runtime`, uses equipment-appropriate state icons, and plots a five-minute temperature history with the locally bundled Chart.js 4.5.1 library. No CDN or internet access is required. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These web fallback commands take effect immediately but are not persisted; stable settings received through MQTT or Home Assistant are stored in `RuntimeControls` and restored after reboot.
 
-The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers.
+![Fallback heating controls](/assets/webui-fallback-control-dark.png)
+
+The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers. See the [API reference](assets/API.md) for request schemas, ranges, persistence behavior, the CAN event stream, and security limitations.
 
 ## Features
 
@@ -182,20 +150,15 @@ The `MQTT` section has everything and this is where you define the topics:
         "User": "mqtt",
         "Password": "mqtt",
         "Topics": {
-            // Topic for receiving temperatures and status
             "HeatingValues": "cerasmarter/heating/values",
-            // Send values here to steer the heating circuit and functions
             "HeatingParameters": "cerasmarter/heating/parameters",
-            // Topic for receiving temperatures and status
             "WaterValues": "cerasmarter/water/values",
-            // Send values here to steer the hot water circuit and functions
             "WaterParameters": "cerasmarter/water/parameters",
-            // Topic for receiving temperatures from auxiliary sensors
             "AuxiliaryValues": "cerasmarter/auxiliary/values",
-            // Topic for receiving status information
             "Status": "cerasmarter/status",
-            // Send values here to receive values on demand
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
     },
 ```
@@ -203,10 +166,8 @@ The `MQTT` section has everything and this is where you define the topics:
 #### Example Parameter JSON for setting Heating Parameters:
 ```json
 {
-  //Enable the heating mode
   "Enabled": false,
-  //Setpoint for Feed Temperature
-  "FeedSetpoint": 0,
+  "FeedSetpoint": 10,
   "FeedBaseSetpoint": -10,
   "FeedCutOff": 22,
   "FeedMinimum": 10,
@@ -245,17 +206,12 @@ See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" t
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters)
 
 ### Night/Economy Mode
-There are two ways to switch the economy mode.
-#### Option #1 (MQTT):
- Set `Enabled` to `false` or `0` using the Parameters JSON file which you send to the Heating Parameters Topic defined in `/configuration.json`.
+Set `Enabled` to `false` using the JSON document sent to the configured Heating Parameters topic, the Home Assistant **Heating Enabled** switch, or **Utilities > Fallback Heating Control**.
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
 ```json
 "Enabled": true,
 ```
-
-#### Option #2 (Amend Code):
- Set `commandedValues.Heating.Active` to `false` or `true` depending on if you want to switch economy on or off.
 
 ### Switch Off/On
 
@@ -446,13 +402,15 @@ Discovery assigns purpose-specific Material Design icons to every entity. The **
 
 Runtime state and command topics use `cerasmarter/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
 
+![Home Assistant device created through MQTT discovery](/assets/home-assistant-autodiscovery-device.png)
+
 Keep `DeviceId` stable after discovery. If it or the discovery prefix is changed through the web interface, the controller removes its previous retained discovery record and reconnects with the new identity. An old record only needs manual removal if the broker was unavailable during the change.
 
-See the [configuration guide](assets/Configuration.md#home-assistant) for all settings.
+See the [configuration guide](assets/Configuration.md#home-assistant) for all settings and the [API reference](assets/API.md#mqtt-api) for topic behavior.
 
 ## Hints
 - Automatic takeover is suppressed while messages are observed in the configurable controller-address range. For capture-only installations, enable `CAN.ReadOnly` in the web interface or configuration file; this hard interlock cannot time out and re-enable transmission.
-- For debug purposes the `configuration.General.Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
+- For debug purposes the `configuration.General.Debug` variable controls whether you see verbose output from routines such as feed-temperature calculation and step-chain progress.
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
@@ -505,5 +463,5 @@ WIP
 - Nick O'Leary and contributors of the PubSubClient library: https://github.com/knolleary/pubsubclient
 - Rop Gonggrijp and contributors of the ezTime library: https://github.com/ropg/ezTime
 - The maintainers of the ArduinoJSON library: https://arduinojson.org/
-- The maintainers of the Async ESP Webserver and AsyncTCP library: https://github.com/me-no-dev/ESPAsyncWebServer
+- The maintainers of the ESP32Async ESPAsyncWebServer and AsyncTCP libraries: https://github.com/ESP32Async/ESPAsyncWebServer
 - The Chart.js contributors. Chart.js 4.5.1 is bundled locally under the MIT license for dashboard history charts: https://www.chartjs.org/

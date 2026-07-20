@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reworked the documentation around the current web UI, configuration persistence, MQTT/Home Assistant state, and CAN profiles. Added a consolidated HTTP/SSE/MQTT API reference with security and persistence notes, refreshed MQTT payload examples, and added current production-controller and Home Assistant discovery screenshots.
 - Persist stable heating and hot-water settings received through MQTT or Home Assistant and restore them after reboot. Writes are coalesced to protect flash, while live measurements and momentary boost/fast-heat-up actions remain transient.
 
 - Renamed the dashboard's derived burner-power percentage to "Feed temperature utilization" ("Vorlauftemperatur-Auslastung") to distinguish the feed-temperature ratio from the burner's actual thermal output.
