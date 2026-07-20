@@ -107,14 +107,22 @@ Again, when in doubt, ask a technician.
 10) Optional: DS18B20 Sensors
 
 ## Installation (Quick Start)
-Either clone the repository and build/upload yourself using Platformio and your IDE of choice or download the binaries and use esptool as follows:
-Example for Windows environments:
+Either clone the repository and build/upload it with PlatformIO, or download the release binaries. For a new board, a board that still contains factory firmware, or a board with an unknown partition table, flash the complete image at address `0x0`:
+
 ```shell
-esptool.exe --after no_reset --chip esp32 --baud 921600 --port <Serial port of your device> write_flash --verify 0x10000 firmware.bin
-esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash 0x307000 littlefs.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x0 cerasmarter-complete.bin
 ```
 
-The important part is the addresses `0x10000` for the firmware and `0x307000`for the filesystem.
+The complete image contains the bootloader, Cerasmarter partition table, OTA metadata, firmware, and LittleFS filesystem. Flashing only `firmware.bin` at `0x10000` does **not** install the required partition table and will not boot on a board carrying an incompatible factory layout.
+
+After the complete image has provisioned the board once, the component images can be used for updates while retaining the other flash regions:
+
+```shell
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x10000 firmware.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x307000 littlefs.bin
+```
+
+These component offsets are valid only with the matching `partitions_custom.csv` layout. The complete image is intended for first installation or deliberate full recovery; reflashing it also replaces the configuration stored in both NVS and LittleFS.
 
 Release filesystem images contain the credential-free configuration template as `/configuration.json`; they never contain a developer's device-specific configuration. Its empty WiFi credentials make a new controller start the `CERASMARTER` access point for provisioning through the web UI.
 
@@ -310,7 +318,7 @@ WiFi, MQTT, and NTP recovery are cooperative and bounded; they do not own or sus
 
 ### Automatic Controller Detection
 
-Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `BusMessageTimeOut` within `/configuration.json`) it will resume control and the `Override` flag returns to true.
+The controller starts in read-only mode and watches CAN IDs `0x250` through `0x25F` for another room controller. As soon as such a message is detected, the `Override` flag remains `false` and Cerasmarter does not send control messages. Only after a complete interval with no controller traffic (30 seconds by default, configured by `BusMessageTimeout` in `/configuration.json`) does it assume control and set `Override` to `true`.
 
 Example:
 ```json

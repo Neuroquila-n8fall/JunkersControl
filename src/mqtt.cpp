@@ -449,7 +449,12 @@ void PublishHeatingTemperaturesAndStatus()
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
-  jsonObj["FeedSetpoint"] = (OverrideControl) ? commandedValues.Heating.CalculatedFeedSetpoint : ceraValues.Heating.FeedSetpoint;
+  if (OverrideControl)
+    jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
+  else if (ceraValues.Heating.HasReceivedFeedSetpoint)
+    jsonObj["FeedSetpoint"] = ceraValues.Heating.FeedSetpoint;
+  else
+    jsonObj["FeedSetpoint"] = nullptr;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
   jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
   jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
@@ -458,7 +463,6 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
   jsonObj["FastHeatup"] = boolToString(commandedValues.Heating.FastHeatup);
   jsonObj["Enabled"] = boolToString(commandedValues.Heating.Active);
-  jsonObj["FeedSetpoint"] = commandedValues.Heating.FeedSetpoint;
   jsonObj["FeedBaseSetpoint"] = commandedValues.Heating.BasepointTemperature;
   jsonObj["FeedCutOff"] = commandedValues.Heating.EndpointTemperature;
   jsonObj["FeedMinimum"] = commandedValues.Heating.MinimumFeedTemperature;
@@ -525,8 +529,17 @@ void PublishWaterTemperatures()
 
   jsonObj["Maximum"] = ceraValues.Hotwater.MaximumTemperature;
   jsonObj["Current"] = ceraValues.Hotwater.TemperatureCurrent;
-  jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
-  jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+  if (OverrideControl)
+    jsonObj["Setpoint"] = commandedValues.HotWater.SetPoint;
+  else if (ceraValues.Hotwater.HasReceivedSetPoint)
+    jsonObj["Setpoint"] = ceraValues.Hotwater.SetPoint;
+  else
+    jsonObj["Setpoint"] = nullptr;
+
+  if (ceraValues.Hotwater.HasReceivedContinousFlowSetpoint)
+    jsonObj["CFSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+  else
+    jsonObj["CFSetpoint"] = nullptr;
   jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
   jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
 

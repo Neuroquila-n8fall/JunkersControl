@@ -38,15 +38,16 @@ jobs:
           python -m pip install "platformio==6.1.19"
       - name: Build Production Image
         run: pio run -e production
-      - name: Archive Firmware
-        uses: actions/upload-artifact@v7
-        with:
-          name: firmware.bin
-          path: .pio/build/production/firmware.bin
       - name: Build Production FS Image
         run: pio run -e production -t buildfs
-      - name: Archive Filesystem
+      - name: Create complete first-install image
+        run: python scripts/create_full_image.py --environment production
+      - name: Archive flash images
         uses: actions/upload-artifact@v7
         with:
-          name: littlefs.bin
-          path: .pio/build/production/littlefs.bin
+          name: Cerasmarter-images
+          path: |
+            .pio/build/production/firmware.bin
+            .pio/build/production/littlefs.bin
+            .pio/build/production/cerasmarter-complete.bin
+          if-no-files-found: error
