@@ -55,6 +55,9 @@ jobs:
         shell: bash
         run: cmp assets/Templates/Configurations/configuration.json data_build/configuration.json
 
+      - name: Create complete first-install image
+        run: python scripts/create_full_image.py --environment github
+
       - name: Archive release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -62,6 +65,7 @@ jobs:
           path: |
             .pio/build/github/firmware.bin
             .pio/build/github/littlefs.bin
+            .pio/build/github/cerasmarter-complete.bin
           if-no-files-found: error
 
       - name: Create draft GitHub release
@@ -72,6 +76,7 @@ jobs:
           gh release create "$RELEASE_TAG" \
             ".pio/build/github/firmware.bin#Firmware" \
             ".pio/build/github/littlefs.bin#LittleFS filesystem" \
+            ".pio/build/github/cerasmarter-complete.bin#Complete first-install image" \
             --draft \
             --verify-tag \
             --title "Release $RELEASE_TAG" \

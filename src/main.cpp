@@ -9,9 +9,9 @@
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
 
-// This flag enables the control of the heating. It will be automatically reset to FALSE if another controller sends messages
-//   It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
-bool OverrideControl = true;
+// Start read-only. Control is enabled only after a complete detection timeout
+// without room-controller traffic, preventing startup noise on an occupied bus.
+bool OverrideControl = false;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
@@ -211,6 +211,7 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
   ota();
   TelnetServer.begin();
   initSensors();
+  controllerMessageTimer = millis();
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
 
@@ -390,10 +391,10 @@ void loop()
         if (!configuration.CanModuleConfig.Profiles.DomesticHotWater)
           break;
         msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
-        msg.data[0] = 20;
+        msg.data[0] = static_cast<uint8_t>(commandedValues.HotWater.SetPoint * 2);
         if (configuration.General.Debug)
         {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %.2F\r\n", currentStep, ceraValues.Hotwater.SetPoint);
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, commandedValues.HotWater.SetPoint);
         }
         break;
 

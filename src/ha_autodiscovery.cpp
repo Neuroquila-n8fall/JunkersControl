@@ -267,7 +267,7 @@ void addCoreComponents(JsonObject components)
                     "{{ value_json.Water.Buffer }}", "running", "mdi:water-boiler-auto");
 
     addNumber(components, "heating_requested_setpoint", "Requested Feed Setpoint", "Heating", "FeedSetpoint",
-              "{{ value_json.Heating.FeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
+              "{{ value_json.Heating.RequestedFeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,
               "slider", "mdi:thermometer-chevron-up");
     addNumber(components, "heating_curve_basepoint", "Heating Curve Basepoint", "Heating", "FeedBaseSetpoint",
               "{{ value_json.Heating.FeedBaseSetpoint | float(default=0) }}", -50, 50, 0.5, temperatureUnit,
