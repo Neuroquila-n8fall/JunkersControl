@@ -51,7 +51,9 @@ This block configures the connection to your MQTT broker
             "WaterParameters": "cerasmarter/water/parameters",
             "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
     },
 ```
@@ -76,7 +78,9 @@ These should be self-explanatory.
             "WaterParameters": "cerasmarter/water/parameters",
             "AuxiliaryValues": "cerasmarter/auxiliary/values",
             "Status": "cerasmarter/status",
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
 ```
 
@@ -98,7 +102,9 @@ The ESP will subscribe to these topics in order to receive parameters.
 ```json
             "HeatingParameters": "cerasmarter/heating/parameters",
             "WaterParameters": "cerasmarter/water/parameters",
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
 ```
 
 ###### Status Request
@@ -115,11 +121,12 @@ This topic is used for requesting data on-demand. See [Status Request Explanatio
     "Features": {
         "HeatingParameters": true,
         "WaterParameters": false,
-        "AuxiliaryValues": false
+        "AuxiliaryValues": false,
+        "OverrideOT": false
     },
 ```
 
-Enables automatic transmission for each parameter-set. You can always trigger an update using a [Status Request](#status-request)
+`HeatingParameters`, `WaterParameters`, and `AuxiliaryValues` enable automatic MQTT publication for their respective data sets. You can always trigger an update using a [Status Request](#status-request). `OverrideOT` uses the externally supplied `AuxiliaryTemperature` as the outside-temperature reference for heating-curve calculations instead of the boiler's sensor.
 
 ### Time
 
@@ -155,6 +162,8 @@ This block is for time related configuration
 For configuration-file compatibility, `CommandTimeoutSeconds` retains its existing name. It defines the grace period for a continuous MQTT disconnection; the frequency of heating commands does not affect fail-safe mode. When the grace period expires, the current runtime controls are saved and the local profile is applied. MQTT reconnection restores those controls and leaves fail-safe mode, without requiring a fresh command or a Node-RED-style heartbeat.
 
 The schedule uses boiler-reported time first, then locally synchronized time. With no valid clock it applies `HeatWhenTimeUnknown`: `true` holds the minimum feed temperature, while `false` disables heating.
+
+![Normal-operation and offline fail-safe settings](webui-general-failsafe-dark.png)
 
 ### General Settings
 
@@ -192,6 +201,32 @@ The program will stop issuing control messages immediately after another control
 ```
 
 The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating off. Calculated values below 10 °C are clamped to exactly 10 °C before CAN conversion and transmission. If that request remains continuously active for this many seconds, Cerasmarter disables the heating operation flag. The controller-side latch applies to every command transport and prevents repeated `Enabled: true` messages from defeating the shutdown. An effective setpoint above 10 °C clears the latch; a client that explicitly manages `Enabled` should send `Enabled: true` with the higher demand. Values from 10 through 86400 seconds are accepted.
+
+### Runtime Controls
+
+`RuntimeControls` stores the last accepted stable command state so MQTT and Home Assistant settings survive reboots and firmware or LittleFS updates:
+
+```json
+    "RuntimeControls": {
+        "HeatingEnabled": true,
+        "FeedSetpoint": 40.0,
+        "MinimumFeedTemperature": 10.0,
+        "TargetAmbientTemperature": 21.5,
+        "FeedAdaption": 0.0,
+        "ValveScaling": false,
+        "MaxValveOpening": 80,
+        "DynamicAdaption": false,
+        "OverrideSetpoint": false,
+        "BoostDuration": 300,
+        "HotWaterSetpoint": 40
+    },
+```
+
+The firmware updates this block automatically after stable values are accepted through the combined MQTT parameter topics or Home Assistant command entities. Writes are delayed and coalesced for three seconds so a burst of related commands produces one atomic configuration update instead of unnecessary flash wear. Repeating an unchanged value does not write again.
+
+Live measurements and momentary actions are deliberately not persisted: `AuxiliaryTemperature`, `AmbientTemperature`, `ValveScalingOpening`, active boost state, and fast heat-up state must be supplied again by their source. Normal-operation heating-curve `FeedBaseSetpoint` and `FeedCutOff` are stored as `General.BasepointTemperature` and `General.EndpointTemperature` because they also define the startup defaults.
+
+The fallback web page and `POST /api/control` are emergency runtime controls and do not alter `RuntimeControls`. Use MQTT or Home Assistant when the accepted state should return after reboot. See the [API reference](API.md#post-apicontrol) for command ranges.
 
 ###### Debug
 
@@ -270,7 +305,7 @@ Example Output:
 
 ```
 
-Following the timestamp when the message has been received, you will find the ID of the message, i.e.: `CAN: [0x20D]` following the data bytes in hexadecimal representation and the decimal value in paranthesis `0x18 (24)`. Each Byte is separated by tab `\t`
+After the receive timestamp, the log shows the message ID, for example `CAN: [0x20D]`, followed by every data byte in hexadecimal and decimal form such as `0x18 (24)`. Bytes are separated by tabs.
 
 
 ### Home Assistant
@@ -304,10 +339,15 @@ The discovered device contains:
 - Hot-water temperatures and operating states.
 - A temperature entity and diagnostic connectivity entity for every configured auxiliary sensor.
 - Diagnostic entities for heap memory, filesystem and flash storage, chip model and revision, and CPU core count and frequency.
-- Number controls for requested feed temperature, boost duration, and room-reference temperature.
-- Switch controls for heating enablement, boost, and fast heatup.
+- Number controls for requested feed temperature, heating-curve basepoint/cutoff/minimum, manual adaptation, target/auxiliary/room-reference temperatures, valve opening/max opening, boost duration, and hot-water setpoint.
+- Switch controls for heating enablement, direct setpoint override, dynamic adaptation, valve scaling, boost, and fast heat-up.
+- A read-only remaining-boost-time sensor reported by the controller logic.
 
 Discovery and state payloads are retained. The controller publishes retained online/offline availability using MQTT Last Will and republishes discovery when Home Assistant sends its MQTT birth message.
+
+![Home Assistant device and discovered controls](home-assistant-autodiscovery-device.png)
+
+Home Assistant command entities and the combined legacy MQTT parameter topics use the same validation and stable-state persistence. See [Runtime Controls](#runtime-controls) and the [MQTT API](API.md#mqtt-api).
 
 ### CAN Configuration
 
@@ -342,7 +382,9 @@ Discovery and state payloads are retained. The controller publishes retained onl
                 "Pump": "0x20A",
                 "Season": "0x20C",
                 "Operation": "0x250",
-                "Power": "0x251"
+                "Power": "0x251",
+                "Mode": "0x258",
+                "Economy": "0x253"
             },
             "HotWater": {
                 "SetpointTemperature": "0x203",
@@ -400,7 +442,9 @@ The web interface offers two domestic-hot-water address presets. The established
                 "Pump": "0x20A",
                 "Season": "0x20C",
                 "Operation": "0x250",
-                "Power": "0x251"
+                "Power": "0x251",
+                "Mode": "0x258",
+                "Economy": "0x253"
             },
             "HotWater": {
                 "SetpointTemperature": "0x203",
@@ -425,12 +469,11 @@ This is where things get a little bit complicated. The addresses defined here mi
 
 ### Auxiliary Sensors
 
-You can setup your own set of external sensors to be sent on the mqtt topic [Auxiliary Temperatures](Examples/MQTT_Message_Exchange/Send/README.md#auxiliary-sensors)
+You can configure external sensors to be published on the MQTT [Auxiliary Sensors](Examples/MQTT_Message_Exchange/Send/README.md#auxiliary-sensors) topic.
 
 ```json
     "AuxiliarySensors":
     {
-        "Count": 4,
         "Sensors":
         [
             {
@@ -469,8 +512,7 @@ You can setup your own set of external sensors to be sent on the mqtt topic [Aux
     },
 ```
 
-**IMPORTANT**
-The `Count` has to be less or equal the amount of sensor you have defined under `Sensors` or else the program will crash!
+The firmware derives the number of sensors from the `Sensors` array; no separate `Count` field is required. Each address must contain exactly eight DS18B20 ROM bytes.
 
 Each sensor is defined by a label, if it's used to reference the return temperature and its address.
 In the following example the sensor is called "Feed" (`"Label": "Feed"`) and shouldn't be used as a reference temperature (`"IsReturnValue": false`) in [Dynamic Adaption](../README.md#dynamic-adaption) Mode.
@@ -498,7 +540,6 @@ Full example with 4 sensors:
 ```json
     "AuxiliarySensors":
     {
-        "Count": 4,
         "Sensors":
         [
             {
