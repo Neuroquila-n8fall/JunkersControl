@@ -285,6 +285,9 @@ void loop()
   // MQTT maintenance follows CAN work and is bounded by the configured socket
   // timeout, so network traffic cannot take priority over boiler traffic.
   client.loop();
+  // Coalesce stable MQTT/HA control changes before writing configuration. This
+  // stays in the main loop and avoids both flash churn and another task.
+  ProcessRuntimeControlPersistence();
   // Telnet Communication
   CheckForConnections();
   // Read Telnet commands

@@ -324,10 +324,45 @@ bool ReadConfiguration()
         configuration.General.EndpointTemperature < -50 || configuration.General.EndpointTemperature > 50)
         configuration.General.EndpointTemperature = 31;
 
-    // Runtime commands remain externally adjustable, but every startup begins
-    // from the explicitly persisted normal-operation heating curve.
+    JsonObject RuntimeControls = doc["RuntimeControls"];
+    if (!RuntimeControls.isNull())
+    {
+        configuration.RuntimeControls.HeatingEnabled = RuntimeControls["HeatingEnabled"] | configuration.RuntimeControls.HeatingEnabled;
+        configuration.RuntimeControls.FeedSetpoint = RuntimeControls["FeedSetpoint"] | configuration.RuntimeControls.FeedSetpoint;
+        configuration.RuntimeControls.MinimumFeedTemperature = RuntimeControls["MinimumFeedTemperature"] | configuration.RuntimeControls.MinimumFeedTemperature;
+        configuration.RuntimeControls.TargetAmbientTemperature = RuntimeControls["TargetAmbientTemperature"] | configuration.RuntimeControls.TargetAmbientTemperature;
+        configuration.RuntimeControls.FeedAdaption = RuntimeControls["FeedAdaption"] | configuration.RuntimeControls.FeedAdaption;
+        configuration.RuntimeControls.ValveScaling = RuntimeControls["ValveScaling"] | configuration.RuntimeControls.ValveScaling;
+        configuration.RuntimeControls.MaxValveOpening = RuntimeControls["MaxValveOpening"] | configuration.RuntimeControls.MaxValveOpening;
+        configuration.RuntimeControls.DynamicAdaption = RuntimeControls["DynamicAdaption"] | configuration.RuntimeControls.DynamicAdaption;
+        configuration.RuntimeControls.OverrideSetpoint = RuntimeControls["OverrideSetpoint"] | configuration.RuntimeControls.OverrideSetpoint;
+        configuration.RuntimeControls.BoostDuration = RuntimeControls["BoostDuration"] | configuration.RuntimeControls.BoostDuration;
+        configuration.RuntimeControls.HotWaterSetpoint = RuntimeControls["HotWaterSetpoint"] | configuration.RuntimeControls.HotWaterSetpoint;
+    }
+    configuration.RuntimeControls.FeedSetpoint = constrain(configuration.RuntimeControls.FeedSetpoint, 0.0, 100.0);
+    configuration.RuntimeControls.MinimumFeedTemperature = constrain(configuration.RuntimeControls.MinimumFeedTemperature, 0.0, 100.0);
+    configuration.RuntimeControls.TargetAmbientTemperature = constrain(configuration.RuntimeControls.TargetAmbientTemperature, 5.0, 35.0);
+    configuration.RuntimeControls.FeedAdaption = constrain(configuration.RuntimeControls.FeedAdaption, -30.0, 30.0);
+    configuration.RuntimeControls.MaxValveOpening = constrain(configuration.RuntimeControls.MaxValveOpening, 1, 100);
+    configuration.RuntimeControls.BoostDuration = constrain(configuration.RuntimeControls.BoostDuration, 0, 86400);
+    configuration.RuntimeControls.HotWaterSetpoint = constrain(configuration.RuntimeControls.HotWaterSetpoint, 0, 100);
+
+    // Restore stable external controls. Live inputs and momentary actions start
+    // from safe defaults and are never resurrected after a reboot.
+    commandedValues.Heating.Active = configuration.RuntimeControls.HeatingEnabled;
+    commandedValues.Heating.FeedSetpoint = configuration.RuntimeControls.FeedSetpoint;
     commandedValues.Heating.BasepointTemperature = configuration.General.BasepointTemperature;
     commandedValues.Heating.EndpointTemperature = configuration.General.EndpointTemperature;
+    commandedValues.Heating.MinimumFeedTemperature = configuration.RuntimeControls.MinimumFeedTemperature;
+    commandedValues.Heating.TargetAmbientTemperature = configuration.RuntimeControls.TargetAmbientTemperature;
+    commandedValues.Heating.FeedAdaption = configuration.RuntimeControls.FeedAdaption;
+    commandedValues.Heating.ValveScaling = configuration.RuntimeControls.ValveScaling;
+    commandedValues.Heating.MaxValveOpening = configuration.RuntimeControls.MaxValveOpening;
+    commandedValues.Heating.DynamicAdaption = configuration.RuntimeControls.DynamicAdaption;
+    commandedValues.Heating.OverrideSetpoint = configuration.RuntimeControls.OverrideSetpoint;
+    commandedValues.Heating.BoostDuration = configuration.RuntimeControls.BoostDuration;
+    commandedValues.Heating.BoostTimeCountdown = 0;
+    commandedValues.HotWater.SetPoint = configuration.RuntimeControls.HotWaterSetpoint;
 
     JsonObject FailSafeSettings = doc["FailSafe"];
     if (!FailSafeSettings.isNull())
@@ -567,6 +602,19 @@ bool WriteConfiguration()
     General["EndpointTemperature"] = configuration.General.EndpointTemperature;
     General["Debug"] = configuration.General.Debug;
     General["Sniffing"] = configuration.General.Sniffing;
+
+    JsonObject RuntimeControls = doc["RuntimeControls"].to<JsonObject>();
+    RuntimeControls["HeatingEnabled"] = configuration.RuntimeControls.HeatingEnabled;
+    RuntimeControls["FeedSetpoint"] = configuration.RuntimeControls.FeedSetpoint;
+    RuntimeControls["MinimumFeedTemperature"] = configuration.RuntimeControls.MinimumFeedTemperature;
+    RuntimeControls["TargetAmbientTemperature"] = configuration.RuntimeControls.TargetAmbientTemperature;
+    RuntimeControls["FeedAdaption"] = configuration.RuntimeControls.FeedAdaption;
+    RuntimeControls["ValveScaling"] = configuration.RuntimeControls.ValveScaling;
+    RuntimeControls["MaxValveOpening"] = configuration.RuntimeControls.MaxValveOpening;
+    RuntimeControls["DynamicAdaption"] = configuration.RuntimeControls.DynamicAdaption;
+    RuntimeControls["OverrideSetpoint"] = configuration.RuntimeControls.OverrideSetpoint;
+    RuntimeControls["BoostDuration"] = configuration.RuntimeControls.BoostDuration;
+    RuntimeControls["HotWaterSetpoint"] = configuration.RuntimeControls.HotWaterSetpoint;
 
     JsonObject FailSafe = doc["FailSafe"].to<JsonObject>();
     FailSafe["Enabled"] = configuration.FailSafe.Enabled;

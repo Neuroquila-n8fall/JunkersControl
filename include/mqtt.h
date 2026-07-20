@@ -95,8 +95,9 @@ extern void PublishAuxiliaryTemperatures();
 extern void ShowActivityLed();
 extern String boolToString(bool src);
 extern void PublishLog(const char *msg, const char *func, LogLevel level);
-extern bool ApplyHeatingCommand(JsonVariantConst json);
-extern bool ApplyHotWaterCommand(JsonVariantConst json);
+extern bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState = false);
+extern bool ApplyHotWaterCommand(JsonVariantConst json, bool persistStableState = false);
+extern void ProcessRuntimeControlPersistence();
 extern void ApplyBoostCommand(bool enabled);
 extern void ApplyFastHeatupCommand(bool enabled);
 

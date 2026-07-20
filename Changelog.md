@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Persist stable heating and hot-water settings received through MQTT or Home Assistant and restore them after reboot. Writes are coalesced to protect flash, while live measurements and momentary boost/fast-heat-up actions remain transient.
+
 - Renamed the dashboard's derived burner-power percentage to "Feed temperature utilization" ("Vorlauftemperatur-Auslastung") to distinguish the feed-temperature ratio from the burner's actual thermal output.
 - Fixed General Settings silently omitting disabled form fields and misreading typed JSON booleans, so every value now survives page reloads and is written to `configuration.json`. Added separately persisted normal-operation heating-curve basepoint and endpoint defaults, and audited the remaining configuration forms for the same disabled-field serialization error.
 - Added conservative, non-blocking Wi-Fi roaming: connection attempts now scan all channels and select by RSSI, while sustained signals below -75 dBm trigger an asynchronous same-SSID scan and handover only when another AP is at least 12 dB better. A five-minute cooldown prevents access-point flip-flopping.

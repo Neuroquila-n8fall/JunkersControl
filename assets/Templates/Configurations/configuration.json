@@ -40,6 +40,19 @@
         "Debug": false,
         "Sniffing": false
     },
+    "RuntimeControls": {
+        "HeatingEnabled": true,
+        "FeedSetpoint": 40.0,
+        "MinimumFeedTemperature": 10.0,
+        "TargetAmbientTemperature": 21.5,
+        "FeedAdaption": 0.0,
+        "ValveScaling": false,
+        "MaxValveOpening": 80,
+        "DynamicAdaption": false,
+        "OverrideSetpoint": false,
+        "BoostDuration": 300,
+        "HotWaterSetpoint": 40
+    },
     "FailSafe": {
         "Enabled": true,
         "CommandTimeoutSeconds": 300,

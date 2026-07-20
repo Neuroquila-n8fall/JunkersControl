@@ -18,6 +18,11 @@ String TopicBuf;
 String PayloadBuf;
 static unsigned long lastMqttAttempt = 0;
 static const unsigned long mqttRetryInterval = 30000;
+static bool runtimeControlSavePending = false;
+static unsigned long runtimeControlSaveRequestedAt = 0;
+static const unsigned long runtimeControlSaveDelay = 3000;
+static const unsigned long runtimeControlSaveRetryDelay = 30000;
+static unsigned long runtimeControlSaveWait = runtimeControlSaveDelay;
 
 namespace
 {
@@ -63,26 +68,81 @@ bool readConstrainedNumber(JsonVariantConst json, const char *key, T &target, do
   target = static_cast<T>(constrain(parsed, minimum, maximum));
   return true;
 }
+
+template <typename T>
+bool updateIfChanged(T &destination, const T &source)
+{
+  if (destination == source)
+    return false;
+  destination = source;
+  return true;
+}
+
+void scheduleRuntimeControlSave(bool stableStateChanged)
+{
+  if (!stableStateChanged)
+    return;
+  runtimeControlSavePending = true;
+  runtimeControlSaveRequestedAt = millis();
+  runtimeControlSaveWait = runtimeControlSaveDelay;
+}
 } // namespace
 
-bool ApplyHeatingCommand(JsonVariantConst json)
+bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState)
 {
   bool changed = false;
-  changed |= readBoolean(json, "Enabled", commandedValues.Heating.Active);
-  changed |= readConstrainedNumber(json, "FeedSetpoint", commandedValues.Heating.FeedSetpoint, 0.0, 100.0);
-  changed |= readConstrainedNumber(json, "FeedBaseSetpoint", commandedValues.Heating.BasepointTemperature, -50.0, 50.0);
-  changed |= readConstrainedNumber(json, "FeedCutOff", commandedValues.Heating.EndpointTemperature, -50.0, 50.0);
-  changed |= readConstrainedNumber(json, "FeedMinimum", commandedValues.Heating.MinimumFeedTemperature, 0.0, 100.0);
+  bool stableStateChanged = false;
+  bool accepted = readBoolean(json, "Enabled", commandedValues.Heating.Active);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.HeatingEnabled, commandedValues.Heating.Active);
+  accepted = readConstrainedNumber(json, "FeedSetpoint", commandedValues.Heating.FeedSetpoint, 0.0, 100.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.FeedSetpoint, commandedValues.Heating.FeedSetpoint);
+  accepted = readConstrainedNumber(json, "FeedBaseSetpoint", commandedValues.Heating.BasepointTemperature, -50.0, 50.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.General.BasepointTemperature, commandedValues.Heating.BasepointTemperature);
+  accepted = readConstrainedNumber(json, "FeedCutOff", commandedValues.Heating.EndpointTemperature, -50.0, 50.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.General.EndpointTemperature, commandedValues.Heating.EndpointTemperature);
+  accepted = readConstrainedNumber(json, "FeedMinimum", commandedValues.Heating.MinimumFeedTemperature, 0.0, 100.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.MinimumFeedTemperature, commandedValues.Heating.MinimumFeedTemperature);
   changed |= readConstrainedNumber(json, "AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature, -50.0, 100.0);
   changed |= readConstrainedNumber(json, "AmbientTemperature", commandedValues.Heating.AmbientTemperature, -50.0, 100.0);
-  changed |= readConstrainedNumber(json, "TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature, 5.0, 35.0);
-  changed |= readConstrainedNumber(json, "Adaption", commandedValues.Heating.FeedAdaption, -30.0, 30.0);
-  changed |= readBoolean(json, "ValveScaling", commandedValues.Heating.ValveScaling);
-  changed |= readConstrainedNumber(json, "ValveScalingMaxOpening", commandedValues.Heating.MaxValveOpening, 1.0, 100.0);
+  accepted = readConstrainedNumber(json, "TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature, 5.0, 35.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.TargetAmbientTemperature, commandedValues.Heating.TargetAmbientTemperature);
+  accepted = readConstrainedNumber(json, "Adaption", commandedValues.Heating.FeedAdaption, -30.0, 30.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.FeedAdaption, commandedValues.Heating.FeedAdaption);
+  accepted = readBoolean(json, "ValveScaling", commandedValues.Heating.ValveScaling);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.ValveScaling, commandedValues.Heating.ValveScaling);
+  accepted = readConstrainedNumber(json, "ValveScalingMaxOpening", commandedValues.Heating.MaxValveOpening, 1.0, 100.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.MaxValveOpening, commandedValues.Heating.MaxValveOpening);
   changed |= readConstrainedNumber(json, "ValveScalingOpening", commandedValues.Heating.ValveOpening, 0.0, 100.0);
-  changed |= readBoolean(json, "DynamicAdaption", commandedValues.Heating.DynamicAdaption);
-  changed |= readBoolean(json, "OverrideSetpoint", commandedValues.Heating.OverrideSetpoint);
-  changed |= readConstrainedNumber(json, "OnDemandBoostDuration", commandedValues.Heating.BoostDuration, 0.0, 86400.0);
+  accepted = readBoolean(json, "DynamicAdaption", commandedValues.Heating.DynamicAdaption);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.DynamicAdaption, commandedValues.Heating.DynamicAdaption);
+  accepted = readBoolean(json, "OverrideSetpoint", commandedValues.Heating.OverrideSetpoint);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.OverrideSetpoint, commandedValues.Heating.OverrideSetpoint);
+  accepted = readConstrainedNumber(json, "OnDemandBoostDuration", commandedValues.Heating.BoostDuration, 0.0, 86400.0);
+  changed |= accepted;
+  if (persistStableState && accepted)
+    stableStateChanged |= updateIfChanged(configuration.RuntimeControls.BoostDuration, commandedValues.Heating.BoostDuration);
 
   bool boost = commandedValues.Heating.Boost;
   if (readBoolean(json, "OnDemandBoost", boost) || readBoolean(json, "Boost", boost))
@@ -103,6 +163,8 @@ bool ApplyHeatingCommand(JsonVariantConst json)
 
   if (changed)
   {
+    if (persistStableState)
+      scheduleRuntimeControlSave(stableStateChanged);
     NotifyValidHeatingCommand();
     SetFeedTemperature();
     PublishHeatingTemperaturesAndStatus();
@@ -110,12 +172,33 @@ bool ApplyHeatingCommand(JsonVariantConst json)
   return changed;
 }
 
-bool ApplyHotWaterCommand(JsonVariantConst json)
+bool ApplyHotWaterCommand(JsonVariantConst json, bool persistStableState)
 {
   if (!readConstrainedNumber(json, "Setpoint", commandedValues.HotWater.SetPoint, 0.0, 100.0))
     return false;
+  if (persistStableState)
+    scheduleRuntimeControlSave(updateIfChanged(configuration.RuntimeControls.HotWaterSetpoint, commandedValues.HotWater.SetPoint));
   PublishWaterTemperatures();
   return true;
+}
+
+void ProcessRuntimeControlPersistence()
+{
+  if (!runtimeControlSavePending || millis() - runtimeControlSaveRequestedAt < runtimeControlSaveWait)
+    return;
+
+  if (WriteConfiguration())
+  {
+    runtimeControlSavePending = false;
+    runtimeControlSaveWait = runtimeControlSaveDelay;
+    Log.println("Persisted MQTT runtime control state.");
+  }
+  else
+  {
+    runtimeControlSaveRequestedAt = millis();
+    runtimeControlSaveWait = runtimeControlSaveRetryDelay;
+    Log.println("MQTT runtime control state save failed; retry scheduled.");
+  }
 }
 
 void ApplyBoostCommand(bool enabled)
@@ -323,7 +406,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       return;
     }
 
-    ApplyHeatingCommand(doc.as<JsonVariantConst>());
+    ApplyHeatingCommand(doc.as<JsonVariantConst>(), true);
 
   }
   // Receiving Water Parameters
@@ -346,7 +429,7 @@ void callback(char *topic, byte *payload, unsigned int length)
         return;
       }
 
-      ApplyHotWaterCommand(doc.as<JsonVariantConst>());
+      ApplyHotWaterCommand(doc.as<JsonVariantConst>(), true);
   }
 
   // On-Demand Boost

@@ -392,7 +392,7 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
 
         JsonDocument command;
         command["Setpoint"] = value;
-        ApplyHotWaterCommand(command.as<JsonVariantConst>());
+        ApplyHotWaterCommand(command.as<JsonVariantConst>(), true);
         Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
         return true;
     }
@@ -433,7 +433,7 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
     else
         return false;
 
-    ApplyHeatingCommand(command.as<JsonVariantConst>());
+    ApplyHeatingCommand(command.as<JsonVariantConst>(), true);
     Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
     return true;
 }

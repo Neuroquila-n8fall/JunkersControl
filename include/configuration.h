@@ -108,6 +108,23 @@ struct Configuration
         double MaximumFeedTemperature = 55.0F;
     } FailSafe;
 
+    // Last stable control state received through MQTT/Home Assistant. Live
+    // measurements and momentary actions are intentionally excluded.
+    struct RuntimeControls_
+    {
+        bool HeatingEnabled = true;
+        double FeedSetpoint = 40.0F;
+        double MinimumFeedTemperature = 10.0F;
+        double TargetAmbientTemperature = 21.5F;
+        double FeedAdaption = 0.0F;
+        bool ValveScaling = false;
+        int MaxValveOpening = 80;
+        bool DynamicAdaption = false;
+        bool OverrideSetpoint = false;
+        int BoostDuration = 300;
+        int HotWaterSetpoint = 40;
+    } RuntimeControls;
+
     struct HomeAssistant_
     {
         String AutoDiscoveryPrefix = "homeassistant";
