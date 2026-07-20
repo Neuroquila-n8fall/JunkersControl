@@ -1,150 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="en" class="dashboard-root">
 <head>
-    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CERASMARTER Configuration</title>
-    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
-    <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cerasmarter</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css"><link rel="stylesheet" href="frontend/css/bootstrap-icons.css"><link rel="stylesheet" href="frontend/css/theme.css">
 </head>
-
-<body>
-    <div id="navigation-container">
-        <!-- Navigation Placeholder -->                    
-    </div>
-    <div class="container text-center">
-        <div class="row">
-            <div class="col-md-3">
-            </div>
-            <div class="col-md-6">
-                <div class="row mt-5">
-                    <h3>System Status</h3>
-                </div>
-                <div class="row mt-5">
-                    <ul class="list-group" id="status-list">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Model
-                            <span class="badge bg-primary rounded-pill" id="model"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Revision
-                            <span class="badge bg-primary rounded-pill" id="revision"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Cores
-                            <span class="badge bg-primary rounded-pill" id="cores"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            RAM
-                            <div class="progress" style="width: 100px;">
-                                <div class="progress-bar" role="progressbar" style="width: 0;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="prog-heap"></div>
-                            </div>
-                            <span class="badge bg-primary rounded-pill" id="heap"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Flash
-                            <div class="progress" style="width: 100px;">
-                                <div class="progress-bar" role="progressbar" style="width: 0;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="prog-sketch"></div>
-                            </div>
-                            <span class="badge bg-primary rounded-pill" id="sketch"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            CAN-Bus Module
-                            <span class="badge bg-primary rounded-pill" id="can"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            CAN-Bus Errors
-                            <span class="badge bg-primary rounded-pill" id="canerrorcount"></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            MQTT Status
-                            <span class="badge bg-primary rounded-pill" id="mqtt"></span>
-                        </li>
-                    </ul>
-                </div>
-                <div class="row mt-5">
-                    <div class="d-grid gap-2 col-6 mx-auto">
-                        <div id="statusdetails"></div>
-                        <button class="btn btn-danger" onclick="rebootButton()">Reboot</button>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-            </div>
-        </div>
-    </div>
-    <script src="frontend/js/api.js"></script>
-    <script src="frontend/js/framework.js"></script>
-    <script src="frontend/js/bootstrap.bundle.min.js"></script>
-    <script type="text/javascript">
-        loadNavigation();
-        showStatus();
-
-        // Refresh Status every 5 seconds
-        window.setInterval(showStatus, 5000);
-
-            async function showStatus() {
-                /*
-                    {
-                        "cores": 2,
-                        "model": "ESP32-D0WDQ6",
-                        "revision": 1,
-                        "frequency": 240,
-                        "freeheap": 197884,
-                        "heap": 312732,
-                        "freesketch": 1536000,
-                        "sketchsize": 976032,
-                        "canstatus": true,
-                        "canerrorcount": 0,
-                        "mqtt": true
-                    }
-                */
-                const status = await getSystemStatus();
-                _("model").innerHTML = status["model"];
-                _("revision").innerHTML = status["revision"];
-                const occupiedHeap = status["heap"] - status["freeheap"];
-                const occupiedHeapPercent = (occupiedHeap / status["heap"]) * 100.0;
-                const freeHeapPercent = (status["freeheap"] / status["heap"]) * 100.0;
-                _("heap").innerHTML = `${humanReadableSize(occupiedHeap)} out of ${humanReadableSize(status["heap"])} used`;
-                _("prog-heap").style = "width: " + occupiedHeapPercent.toFixed(2) + "%;";
-                _("prog-heap").setAttribute('aria-valuenow', occupiedHeapPercent);
-                _("prog-heap").innerHTML = `${Math.round(occupiedHeapPercent)}%`;
-                _("cores").innerHTML = status["cores"];
-                const occupiedSketchPercent = (status["sketchsize"] / status["freesketch"]) * 100.0;
-                _("prog-sketch").style = "width: " + occupiedSketchPercent.toFixed(2) + "%;";
-                _("prog-sketch").setAttribute('aria-valuenow', occupiedSketchPercent);
-                _("prog-sketch").innerHTML = `${Math.round(occupiedSketchPercent)}%`;
-                _("sketch").innerHTML = `${humanReadableSize(status["sketchsize"])} out of ${humanReadableSize(status["freesketch"])} used`;
-                let canStatus = status["canstatus"];
-                _("can").innerHTML = CanErrorCodes[canStatus];
-                if(canStatus === 0) {
-                    _("can").classList.remove("bg-danger");
-                    _("can").classList.add("bg-success");
-                } else {
-                    _("can").classList.remove("bg-success");
-                    _("can").classList.add("bg-danger");
-                }
-                let canErrorCount = status["canerrorcount"];
-                _("canerrorcount").innerHTML = canErrorCount;
-                if(canErrorCount === 0) {
-                    _("canerrorcount").classList.remove("bg-danger");
-                    _("canerrorcount").classList.add("bg-success");
-                } else {
-                    _("canerrorcount").classList.remove("bg-success");
-                    _("canerrorcount").classList.add("bg-danger");
-                }
-                _("mqtt").innerHTML = status["mqtt"] ? "Connected" : "Disconnected";
-                if(status["mqtt"]) {
-                    _("mqtt").classList.remove("bg-danger");
-                    _("mqtt").classList.add("bg-success");
-                } else {
-                    _("mqtt").classList.remove("bg-success");
-                    _("mqtt").classList.add("bg-danger");
-                }
-            }
-    </script>
-</body>
-
-</html>
+<body class="dashboard-page">
+<div id="navigation-container"></div>
+<main class="container-fluid dashboard-shell px-lg-4 py-4">
+    <header class="d-flex flex-wrap justify-content-between align-items-center mt-3 mb-4 gap-3">
+        <div><h2 class="mb-1" data-i18n="dashboard.title">Heating Dashboard</h2><div id="dashboard-updated" class="text-muted small">—</div></div>
+        <div class="d-flex gap-2"><span id="runtime-status" class="badge bg-secondary dashboard-status-pill" data-i18n="common.loading">Loading...</span><a class="btn btn-outline-primary" href="/control"><i class="bi bi-sliders"></i> <span data-i18n="menu.control">Fallback Heating Control</span></a></div>
+    </header>
+    <section class="dashboard-hero-grid mb-4">
+        <div class="card dashboard-hero"><div class="card-body"><div class="dashboard-icon text-primary"><i class="bi bi-thermometer-half"></i></div><small class="text-muted" data-i18n="dashboard.outside">Outside Temperature</small><div id="outside" class="dashboard-reading">--</div><div class="dashboard-curve-values"><small><span data-i18n="dashboard_detail.base_value">Base value</span><strong id="outside-base">--</strong></small><small><span data-i18n="dashboard_detail.cutoff">Cutoff</span><strong id="outside-cutoff">--</strong></small></div></div></div>
+        <div class="card dashboard-hero"><div class="card-body"><div class="dashboard-icon text-danger"><i class="bi bi-thermometer-high"></i></div><small class="text-muted" data-i18n="dashboard.feed_current">Current Feed Temperature</small><div id="feed-current" class="dashboard-reading">--</div><small><span id="feed-target">--</span> <span data-i18n="dashboard.target">target</span></small></div></div>
+        <div class="card dashboard-hero"><div class="card-body"><div class="dashboard-icon"><i id="flame-icon" class="bi bi-fire text-muted"></i></div><small class="text-muted" data-i18n="dashboard.burner">Burner</small><div id="flame" class="dashboard-reading">--</div><small><span id="power">--</span> <span data-i18n="dashboard_detail.feed_temperature_utilization">feed temperature utilization</span></small></div></div>
+        <div class="card dashboard-hero"><div class="card-body"><div class="dashboard-icon text-info"><i id="pump-icon" class="bi bi-fan"></i></div><small class="text-muted" data-i18n="dashboard_detail.pump">Heating pump</small><div id="pump" class="dashboard-reading">--</div><small id="heating-active">--</small></div></div>
+    </section>
+    <section id="temperature-history-section" class="card dashboard-wide-card mb-4"><div class="card-body"><div class="mb-3"><h5 class="mb-1" data-i18n="dashboard.history">Temperature History</h5><small class="text-muted" data-i18n="dashboard.history_range">Last five minutes</small></div><div class="runtime-chart"><canvas id="temperature-chart"></canvas></div></div></section>
+    <section class="dashboard-section-grid mb-4">
+        <div id="heating-section" class="card" hidden><div class="card-header"><i class="bi bi-house-gear"></i> <span data-i18n="dashboard_detail.heating_runtime">Heating runtime</span></div><div id="heating-values" class="card-body metric-grid"></div></div>
+        <div id="hotwater-section" class="card" hidden><div class="card-header"><i class="bi bi-droplet-half"></i> <span data-i18n="dashboard_detail.hotwater_runtime">Domestic hot water</span></div><div id="hotwater-values" class="card-body metric-grid"></div></div>
+        <div id="mixed-section" class="card" hidden><div class="card-header"><i class="bi bi-shuffle"></i> <span data-i18n="dashboard_detail.mixed_runtime">Mixed circuit</span></div><div id="mixed-values" class="card-body metric-grid"></div></div>
+        <div id="auxiliary-section" class="card" hidden><div class="card-header"><i class="bi bi-thermometer-sun"></i> <span data-i18n="dashboard_detail.auxiliary">Auxiliary sensors</span></div><div class="card-body"><div id="auxiliary-values" class="metric-grid"></div><div id="auxiliary-chart-container" class="auxiliary-chart" hidden><canvas id="auxiliary-temperature-chart"></canvas></div></div></div>
+    </section>
+    <section class="card dashboard-settings mb-4"><div class="card-header"><i class="bi bi-sliders"></i> <span data-i18n="dashboard_detail.runtime_settings">Runtime control values and settings</span></div><div id="command-values" class="card-body metric-grid metric-grid-wide"></div></section>
+    <section class="mb-3"><h3 data-i18n="dashboard.system_status">System Status</h3></section>
+    <div class="row g-3 dashboard-system"><div class="col-lg-8"><ul class="list-group" id="status-list">
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard.model">Model</span><span id="model"></span></li>
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard_detail.uptime">Uptime</span><span id="uptime"></span></li>
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard_detail.can_profiles">CAN profiles</span><span id="can-profiles"></span></li>
+        <li class="list-group-item"><div class="d-flex justify-content-between mb-1"><span data-i18n="dashboard.ram">RAM</span><span id="heap"></span></div><div class="progress"><div class="progress-bar" id="prog-heap" role="progressbar"></div></div></li>
+        <li class="list-group-item"><div class="d-flex justify-content-between mb-1"><span data-i18n="dashboard.application_flash">Application Flash</span><span id="sketch"></span></div><div class="progress"><div class="progress-bar" id="prog-sketch" role="progressbar"></div></div></li>
+        <li class="list-group-item"><div class="d-flex justify-content-between mb-1"><span data-i18n="dashboard.filesystem">Filesystem</span><span id="filesystem"></span></div><div class="progress"><div class="progress-bar" id="prog-filesystem" role="progressbar"></div></div></li>
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard.can_module">CAN-Bus Module</span><span class="badge bg-secondary" id="can"></span></li>
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard.can_errors">CAN-Bus Errors</span><span class="badge bg-secondary" id="canerrorcount"></span></li>
+        <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard.mqtt_status">MQTT Status</span><span class="badge bg-secondary" id="mqtt"></span></li>
+    </ul></div><div class="col-lg-4 d-grid align-content-start"><div id="statusdetails"></div><button class="btn btn-danger" onclick="rebootButton()" data-i18n="common.reboot">Reboot</button></div></div>
+</main>
+<script src="frontend/js/i18n.js"></script><script src="frontend/js/api.js"></script><script src="frontend/js/framework.js"></script><script src="frontend/js/bootstrap.bundle.min.js"></script><script src="frontend/js/chart.umd.min.js"></script><script src="frontend/js/dashboard.js"></script>
+</body></html>

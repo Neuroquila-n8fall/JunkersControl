@@ -9,9 +9,9 @@
 //  Operation
 //——————————————————————————————————————————————————————————————————————————————
 
-// This flag enables the control of the heating. It will be automatically reset to FALSE if another controller sends messages
-//   It will be re-enabled if there are no messages from other controllers on the network for x seconds as defined by ControllerMessageTimeout
-bool OverrideControl = true;
+// Start read-only. Control is enabled only after a complete detection timeout
+// without room-controller traffic, preventing startup noise on an occupied bus.
+bool OverrideControl = false;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Variables
@@ -42,6 +42,25 @@ int dateTimeSendDelay = 30;
 volatile int CanSendErrorCount;
 
 volatile bool SetupMode = false;
+static unsigned long lastHeartbeatMillis = 0;
+
+static bool HeartbeatIsDue()
+{
+  const unsigned long interval = configuration.CanModuleConfig.HeartbeatIntervalSeconds * 1000UL;
+  return millis() - lastHeartbeatMillis >= interval;
+}
+
+static void SendConfiguredHeartbeat()
+{
+  if (configuration.CanModuleConfig.ReadOnly || !OverrideControl ||
+      !HeartbeatIsDue() || !SafeToSendMessage())
+    return;
+  CANMessage msg = PrepareMessage(configuration.CanModuleConfig.HeartbeatAddress, 0);
+  if (configuration.General.Debug)
+    Log.printf("CAN heartbeat: sending 0x%.3X DLC0\r\n", configuration.CanModuleConfig.HeartbeatAddress);
+  SendMessage(msg);
+  lastHeartbeatMillis = millis();
+}
 
 void setup()
 {
@@ -63,18 +82,47 @@ void setup()
     Serial.println("\e[1;33mLittleFS was formatted and is empty. Upload littlefs.bin before continuing.\e[0m");
   }
 
-  Serial.println("\e[1;36mPress the \"BOOT\" button within the next 5 seconds to enable Setup Mode!\e[0m");
+  String restoreError;
+  if (!RestoreConfigurationAfterFilesystemUpdate(restoreError))
+    Serial.printf("\e[1;31m%s\e[0m\r\n", restoreError.c_str());
+
+  Serial.println("\e[1;36mPress BOOT within 5 seconds for Setup Mode; hold it for 10 seconds to factory-reset configuration.\e[0m");
 
 #pragma region "Setup Mode"
 
-  unsigned long curmils = millis();
-  // Give the user the chance to push the "BOOT" button.
-  while (millis() - curmils <= 5000)
+  bool factoryResetRequested = false;
+  const unsigned long setupWindowStarted = millis();
+  // A short press selects Setup Mode. A deliberately long hold additionally
+  // clears both persistent NVS configuration and the LittleFS copy.
+  while (millis() - setupWindowStarted <= 5000)
   {
-    SetupMode = !digitalRead(GPIO_NUM_0);
-    if (SetupMode)
+    if (!digitalRead(GPIO_NUM_0))
     {
+      SetupMode = true;
+      const unsigned long buttonHeldSince = millis();
+      while (!digitalRead(GPIO_NUM_0) && millis() - buttonHeldSince < 10000)
+        delay(20);
+      factoryResetRequested = millis() - buttonHeldSince >= 10000;
       break;
+    }
+    delay(10);
+  }
+
+  if (factoryResetRequested)
+  {
+    String resetError;
+    if (!ClearPersistentConfigurationBackup(resetError))
+    {
+      Serial.printf("\e[1;31mFactory reset aborted: %s\e[0m\r\n", resetError.c_str());
+    }
+    else
+    {
+      LittleFS.remove("/configuration.json");
+      LittleFS.remove("/configuration.bak");
+      LittleFS.remove("/configuration.tmp");
+      LittleFS.remove("/configuration.restore");
+      SetConfigurationUploadPending(false);
+      Serial.println("\e[1;33mFactory reset complete. Persistent and LittleFS configuration were cleared.\e[0m");
     }
   }
 
@@ -122,6 +170,12 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
     return;
   }
 
+  if (configuration.CanModuleConfig.ReadOnly)
+  {
+    OverrideControl = false;
+    Serial.println("\e[1;33mCAN read-only mode is enabled. No bus messages will be transmitted.\e[0m");
+  }
+
   SetupFailSafe();
   if (!myTZ.setPosix(configuration.General.PosixTimezone))
     Serial.println("Invalid POSIX timezone rule. Fail-safe will use boiler time or its unknown-time policy.");
@@ -157,6 +211,7 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
   ota();
   TelnetServer.begin();
   initSensors();
+  controllerMessageTimer = millis();
   lastHeatingMessageTime = millis();
   lastSentMessageTime = millis();
 
@@ -224,9 +279,15 @@ void loop()
   processCan();
   // Apply the local safety profile before the next CAN command-chain step.
   UpdateFailSafe();
+  // A sustained manufacturer-defined 10 C feed request means heating off.
+  // This is a millis-based state machine and does not add a task or scheduler.
+  UpdateHeatingSetpointShutdown();
   // MQTT maintenance follows CAN work and is bounded by the configured socket
   // timeout, so network traffic cannot take priority over boiler traffic.
   client.loop();
+  // Coalesce stable MQTT/HA control changes before writing configuration. This
+  // stays in the main loop and avoids both flash churn and another task.
+  ProcessRuntimeControlPersistence();
   // Telnet Communication
   CheckForConnections();
   // Read Telnet commands
@@ -241,7 +302,8 @@ void loop()
   {
     // If we didn't spot a controller message on the network for x seconds we will take over control.
     // As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
-    if (currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
+    if (!configuration.CanModuleConfig.ReadOnly &&
+        currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
     {
       // Bail out if we already set this...
       if (!OverrideControl)
@@ -256,7 +318,13 @@ void loop()
   // Control Actions
   //——————————————————————————————————————————————————————————————————————————————
 
-  // TODO: Seek for a more elegant solution to send each message every 30 seconds. Right now it's 5 because we have 6 Steps and we want an interval of 30 seconds so 30/6 = 5 seconds delay.
+  // Keep all control activity in the main loop. The heartbeat is checked here
+  // rather than in a scheduler task and uses the same spacing guard as all
+  // other CAN traffic.
+  SendConfiguredHeartbeat();
+
+  // Enabled functional profiles
+  // determine which parts of the installation may be driven.
   runEverySeconds(5)
   {
     // We will send our data if there was silence on the bus for a specific time. This prevents sending uneccessary payload onto the bus or confusing the boiler if it's slow and brittle.
@@ -277,6 +345,8 @@ void loop()
       switch (currentStep)
       {
       case 0:
+        if (!configuration.CanModuleConfig.Profiles.Heating)
+          break;
         // Switch economy mode. This is always the opposite of the desired operational state
         msg = PrepareMessage(configuration.CanAddresses.Heating.Economy, 1);
         msg.data[0] = !commandedValues.Heating.Active;
@@ -289,11 +359,15 @@ void loop()
       // Temperature regulation mode
       //  1 = Weather guided | 0 = Room Temperature Guided
       case 1:
+        if (!configuration.CanModuleConfig.Profiles.Heating)
+          break;
         msg = PrepareMessage(configuration.CanAddresses.Heating.Mode, 1);
         msg.data[0] = 1;
         break;
 
       case 2:
+        if (!configuration.CanModuleConfig.Profiles.Heating)
+          break;
         SetFeedTemperature();
 
         if (configuration.General.Debug)
@@ -305,6 +379,8 @@ void loop()
 
       // DHW "Now"
       case 3:
+        if (!configuration.CanModuleConfig.Profiles.DomesticHotWater)
+          break;
         msg = PrepareMessage(configuration.CanAddresses.HotWater.Now, 1);
         msg.data[0] = 0x01;
         if (configuration.General.Debug)
@@ -315,21 +391,19 @@ void loop()
 
       // DHW Temperature Setpoint
       case 4:
+        if (!configuration.CanModuleConfig.Profiles.DomesticHotWater)
+          break;
         msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
-        msg.data[0] = 20;
+        msg.data[0] = static_cast<uint8_t>(commandedValues.HotWater.SetPoint * 2);
         if (configuration.General.Debug)
         {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %.2F\r\n", currentStep, ceraValues.Hotwater.SetPoint);
+          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, commandedValues.HotWater.SetPoint);
         }
         break;
 
       case 5:
-        // Request? Data
-        msg = PrepareMessage(0xF9, 0);
-        if (configuration.General.Debug)
-        {
-          Log.printf("DEBUG STEP CHAIN #%i: Sending KeepAlive\r\n", currentStep);
-        }
+        // Reserved step. The independently timed heartbeat above may use this
+        // gap without constraining its interval to a 30-second multiple.
         break;
 
       default:
@@ -407,13 +481,13 @@ void Reboot()
 
 void SendMessage(CANMessage msg)
 {
-  // Send message if not empty and override is true.
-  if (msg.id != 0 && OverrideControl)
+  // ReadOnly is a hard interlock and cannot be undone by the controller
+  // timeout logic. Address zero remains reserved as the empty-message marker.
+  if (msg.id != 0 && OverrideControl && !configuration.CanModuleConfig.ReadOnly)
   {
     if (configuration.General.Debug)
     {
       Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
-      WriteMessage(msg, false);
     }
     if (!can.tryToSend(msg))
     {
@@ -429,6 +503,7 @@ void SendMessage(CANMessage msg)
     }
     else
     {
+      WriteMessage(msg, false);
 
       if (CanErrorActivityHandle != NULL)
       {
@@ -453,6 +528,7 @@ void WriteMessage(CANMessage msg, bool received /* = true */)
   doc["id"] = msg.id;
   doc["len"] = msg.len;
   doc["rcv"] = received;
+  doc["ts"] = millis();
   JsonArray msgData = doc["data"].to<JsonArray>();
 
   for (int x = 0; x < msg.len; x++)
@@ -475,8 +551,10 @@ void WriteMessage(CANMessage msg, bool received /* = true */)
   }
   String json;
   serializeJson(doc, json);
-  eventSource->send(json.c_str(), "can");
-  Log.printf("[%s]\t\e[0m[%s]CAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), received ? "\e[1;36m◄\e[0m" : "\e[1;35m►\e[0m", msg.id, data.c_str());
+  if (eventSource)
+    eventSource->send(json.c_str(), "can");
+  if (configuration.General.Debug || configuration.General.Sniffing)
+    Log.printf("[%s]\t\e[0m[%s]CAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), received ? "\e[1;36m◄\e[0m" : "\e[1;35m►\e[0m", msg.id, data.c_str());
 }
 
 void SetDateTime()

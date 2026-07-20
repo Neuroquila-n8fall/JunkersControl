@@ -1,9 +1,13 @@
 {
-    "GasBurner": true,
-    "Pump": true,
+    "GasBurner": "true",
     "Error": 0,
-    "Season": true,
-    "Working": true,
-    "Boost": true,
-    "FastHeatup": true			
+    "FreeHeap": 183456,
+    "HeapSize": 327680,
+    "FilesystemUsed": 524288,
+    "FilesystemSize": 1441792,
+    "FlashSize": 4194304,
+    "ChipModel": "ESP32-D0WDQ6",
+    "ChipRevision": "1.00",
+    "CpuCores": 2,
+    "CpuFrequency": 240
 }

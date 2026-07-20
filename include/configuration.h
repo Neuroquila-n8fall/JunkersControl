@@ -17,6 +17,14 @@ extern bool WriteConfiguration();
 
 extern void SetConfigurationUploadPending(bool pending);
 
+extern bool BackupConfigurationForFilesystemUpdate(String &errorMessage);
+
+extern bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage);
+
+extern bool PersistConfigurationBackup(String &errorMessage);
+
+extern bool ClearPersistentConfigurationBackup(String &errorMessage);
+
 extern String IntToHex(int value);
 
 extern unsigned long convertHexString(const char *src);
@@ -78,6 +86,9 @@ struct Configuration
         char PosixTimezone[128] = "CET-1CEST,M3.5.0,M10.5.0/3"; // Offline-capable local time rules
 
         int BusMessageTimeout; // Message Timeout from other controllers on the bus, ex. 30
+        unsigned long SetpointOffDelaySeconds = 300; // Grace period before a 10 C feed request disables heating
+        double BasepointTemperature = -10.0F; // Normal-operation heating-curve basepoint restored at startup
+        double EndpointTemperature = 31.0F;   // Normal-operation heating-curve endpoint restored at startup
         bool Debug;            // Output debug messages, true|false
         bool Sniffing;         // Output every CAN message von the bus
     } General;
@@ -97,14 +108,31 @@ struct Configuration
         double MaximumFeedTemperature = 55.0F;
     } FailSafe;
 
+    // Last stable control state received through MQTT/Home Assistant. Live
+    // measurements and momentary actions are intentionally excluded.
+    struct RuntimeControls_
+    {
+        bool HeatingEnabled = true;
+        double FeedSetpoint = 40.0F;
+        double MinimumFeedTemperature = 10.0F;
+        double TargetAmbientTemperature = 21.5F;
+        double FeedAdaption = 0.0F;
+        bool ValveScaling = false;
+        int MaxValveOpening = 80;
+        bool DynamicAdaption = false;
+        bool OverrideSetpoint = false;
+        int BoostDuration = 300;
+        int HotWaterSetpoint = 40;
+    } RuntimeControls;
+
     struct HomeAssistant_
     {
-        String AutoDiscoveryPrefix;
+        String AutoDiscoveryPrefix = "homeassistant";
         bool Enabled = false;
-        int OffDelay;
-        String DeviceId;
+        int OffDelay = 0;
+        String DeviceId = "cerasmarter";
         String StateTopic;
-        String TempUnit;
+        String TempUnit = "°C";
     } HomeAssistant;
 
     struct LEDs_
@@ -118,6 +146,19 @@ struct Configuration
     struct CanModuleConfig_
     {
         int CAN_Quartz;
+        struct Profiles_
+        {
+            bool Heating = true;
+            bool MixedCircuit = false;
+            bool DomesticHotWater = true;
+        } Profiles;
+        // Hard safety interlock. Unlike automatic controller detection this
+        // can never time out and re-enable CAN writes.
+        bool ReadOnly = false;
+        uint16_t ControllerAddressMin = 0x250;
+        uint16_t ControllerAddressMax = 0x25F;
+        uint16_t HeartbeatAddress = 0x0F9;
+        unsigned long HeartbeatIntervalSeconds = 30;
     } CanModuleConfig;
 
     struct CanAddresses_

@@ -10,7 +10,9 @@
 namespace
 {
 bool failSafeActive = false;
-unsigned long lastValidHeatingCommand = 0;
+unsigned long mqttDisconnectedSince = 0;
+CommandedValues remoteValuesBeforeFailSafe;
+bool hasSavedRemoteValues = false;
 
 bool isInsideSchedule(int currentMinute, int startMinute, int stopMinute)
 {
@@ -60,44 +62,77 @@ void clearRemoteOverrides()
     commandedValues.Heating.DynamicAdaption = false;
     commandedValues.Heating.FeedAdaption = 0;
 }
+
+void enterFailSafe(const char *reason)
+{
+    if (!failSafeActive)
+    {
+        remoteValuesBeforeFailSafe = commandedValues;
+        hasSavedRemoteValues = true;
+    }
+
+    failSafeActive = true;
+    clearRemoteOverrides();
+    Log.println(reason);
+}
+
+void leaveFailSafe(const char *reason)
+{
+    if (!failSafeActive)
+        return;
+
+    if (hasSavedRemoteValues)
+        commandedValues = remoteValuesBeforeFailSafe;
+
+    hasSavedRemoteValues = false;
+    failSafeActive = false;
+    SetFeedTemperature();
+    Log.println(reason);
+}
 } // namespace
 
 void SetupFailSafe()
 {
-    lastValidHeatingCommand = millis();
+    mqttDisconnectedSince = millis();
     failSafeActive = configuration.FailSafe.Enabled;
     if (failSafeActive)
     {
+        remoteValuesBeforeFailSafe = commandedValues;
+        hasSavedRemoteValues = true;
         clearRemoteOverrides();
-        Log.println("Starting in fail-safe mode until a fresh heating command is received.");
+        Log.println("Starting in fail-safe mode until MQTT is connected.");
     }
 }
 
 void NotifyValidHeatingCommand()
 {
-    lastValidHeatingCommand = millis();
-    if (failSafeActive)
-    {
-        failSafeActive = false;
-        Log.println("Fresh heating command received. Leaving fail-safe mode.");
-    }
+    // Kept as the common command hook. Fail-safe ownership is intentionally
+    // based on MQTT connectivity, not on traffic frequency or command source.
 }
 
 void UpdateFailSafe()
 {
     if (!configuration.FailSafe.Enabled)
     {
-        failSafeActive = false;
+        leaveFailSafe("Fail-safe disabled. Restoring runtime control values.");
+        mqttDisconnectedSince = 0;
         return;
     }
 
-    const unsigned long timeoutMs = configuration.FailSafe.CommandTimeoutSeconds * 1000UL;
-    if (!failSafeActive && millis() - lastValidHeatingCommand >= timeoutMs)
+    if (client.connected())
     {
-        failSafeActive = true;
-        clearRemoteOverrides();
-        Log.println("Heating command lease expired. Entering fail-safe mode.");
+        mqttDisconnectedSince = 0;
+        leaveFailSafe("MQTT connected. Leaving fail-safe mode and restoring runtime control values.");
+        return;
     }
+
+    const unsigned long now = millis();
+    if (mqttDisconnectedSince == 0)
+        mqttDisconnectedSince = now;
+
+    const unsigned long timeoutMs = configuration.FailSafe.CommandTimeoutSeconds * 1000UL;
+    if (!failSafeActive && now - mqttDisconnectedSince >= timeoutMs)
+        enterFailSafe("MQTT offline timeout expired. Entering fail-safe mode.");
 
     if (!failSafeActive)
         return;

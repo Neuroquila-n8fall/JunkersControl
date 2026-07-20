@@ -21,6 +21,8 @@ struct CeraValues
     double FeedCurrent = 0.00F;
     //-- Feed Temperature Setpoint
     double FeedSetpoint = 40.00F;
+    //-- Whether a feed setpoint has actually been observed on CAN
+    bool HasReceivedFeedSetpoint = false;
     //-- Minimum Feed Temperature as reported by the boiler
     double FeedMinimum = 10.0F;
     //-- Max. possible water temperature -or- target temperature when running in heating Buffer mode
@@ -55,6 +57,8 @@ struct CeraValues
   {
     //-- Setpoint (Target Temperature) for DHW
     double SetPoint = 40.0F;
+    //-- Whether a DHW setpoint has actually been observed on CAN
+    bool HasReceivedSetPoint = false;
     //-- The currently reported temperature of the DHW circuit
     double TemperatureCurrent = 0.00F;
     //-- Whether this installation utilizes a buffer(or battery)
@@ -63,6 +67,8 @@ struct CeraValues
     bool Now = false;
     //-- Continous Flow Setpoint
     double ContinousFlowSetpoint = 0.00F;
+    //-- Whether a continuous-flow setpoint has actually been observed on CAN
+    bool HasReceivedContinousFlowSetpoint = false;
     //-- Maximum Temperature
     double MaximumTemperature =0.00F;
   } Hotwater;
@@ -121,5 +127,7 @@ extern CeraValues ceraValues;
 
 extern double CalculateFeedTemperature();
 extern int ConvertFeedTemperature(double temperature);
+extern bool EnforceHeatingSetpointShutdown(double effectiveSetpoint);
+extern void UpdateHeatingSetpointShutdown();
 
 #endif

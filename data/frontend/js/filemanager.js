@@ -28,8 +28,8 @@ function listFiles(path) {
                     if (!isDir) {
                         table += `<tr><td>${fileName}</td>`;
                         table += `<td>${humanReadableSize(size)}</td>`;
-                        table += `<td><button class="btn btn-primary btn-sm" onclick="downloadDeleteButton('${prop}${fileName}', 'download')">Download</button>`;
-                        table += `<td><button class="ml-2 btn btn-danger btn-sm" onclick="deleteFile('${prop}${fileName}')">Delete</button></tr>`;
+                        table += `<td><button class="btn btn-primary btn-sm" onclick="downloadDeleteButton('${prop}${fileName}', 'download')">${translate("Download")}</button>`;
+                        table += `<td><button class="ml-2 btn btn-danger btn-sm" onclick="deleteFile('${prop}${fileName}')">${translate("Delete")}</button></tr>`;
                     } else {
                         table += `<tr><td><div class="badge rounded-pill bg-secondary me-3">dir</div><a href="#" onclick="listFiles('${prop}${fileName}/')">${fileName}</a></td>`;
                         table += `<td/><td/><td/></tr>`;
@@ -76,7 +76,7 @@ function deleteFile(path) {
 }
 
 function downloadDeleteButton(filename, action) {
-    const urltocall = "/filemanager/file?name=" + filename + "&action=" + action;
+    const urltocall = "/filemanager/file?name=" + encodeURIComponent(filename) + "&action=" + encodeURIComponent(action);
     let xmlhttp = new XMLHttpRequest();
     if (action === "delete") {
         xmlhttp.open("GET", urltocall, false);
@@ -96,7 +96,12 @@ function downloadDeleteButton(filename, action) {
     }
     if (action === "download") {
         _("status").innerHTML = "";
-        window.open(urltocall, "_blank");
+        const link = document.createElement("a");
+        link.href = urltocall;
+        link.download = filename.split("/").pop() || "download";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
     }
 }
 
@@ -157,7 +162,7 @@ function renameFile(originalFile, newName) {
 }
 
 function progressHandler(event) {
-    _("loaded_n_total").innerHTML = "Uploaded " + humanReadableSize(event.loaded);
+    _("loaded_n_total").innerHTML = translate("Uploaded") + " " + humanReadableSize(event.loaded);
     const percent = (event.loaded / event.total) * 100;
     const roundedPercent = Math.round(percent);
     _("progressBar").style = "width: " + roundedPercent + "%;";
@@ -221,7 +226,7 @@ async function reloadConfiguration() {
         if (!response.ok) {
             throw new Error(result.msg || "Configuration validation failed.");
         }
-        _("statusdetails").innerHTML = `${result.msg} The device will be unavailable briefly.`;
+        _("statusdetails").innerHTML = `${result.msg} ${translate("The device will be unavailable briefly.")}`;
     } catch (error) {
         _("statusdetails").innerHTML = `<div class="alert alert-danger" role="alert">${error.message}</div>`;
         button.disabled = false;

@@ -8,6 +8,7 @@
     <title>CERASMARTER Auxiliary Sensors Configuration</title>
     <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
     <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
 </head>
 
 <body>
@@ -81,6 +82,7 @@
             </div>
         </div>
     </div>
+    <script src="frontend/js/i18n.js"></script>
     <script src="frontend/js/framework.js"></script>
     <script src="frontend/js/api.js"></script>
     <script src="frontend/js/firmware.js"></script>
@@ -293,12 +295,13 @@
             // Prevent the form from submitting.
             event.preventDefault();
             event.disabled = true;
+            syncSensors();
+            const isValid = validateSensors();
+
             _("form-fieldset").disabled = true;
             _("config-saving").hidden = false;
             _("save-config-label").innerHTML = "Saving Configuration...";
             _("save-config").disabled = true;
-            syncSensors();
-            const isValid = validateSensors();
             console.log(sensors);
             if (isValid) {
                 const json = JSON.stringify(sensors);            

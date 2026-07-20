@@ -8,6 +8,7 @@
     <title>Manage Files</title>
     <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
     <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
 </head>
 
 <body>
@@ -77,12 +78,16 @@
                         </div>                                        
                     </form>
                 </div>
+                <div class="card border-warning text-start mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Reload Configuration</h5>
+                        <p class="card-text">Use this after manually uploading or replacing /configuration.json. The file is validated before the controller restarts.</p>
+                        <div id="statusdetails"></div>
+                        <button class="btn btn-warning" id="reload-config" onclick="reloadConfiguration()">Reload Configuration</button>
+                    </div>
+                </div>
                 <div class="row mt-5">
                     <div class="d-grid gap-2 col-6 mx-auto">
-                        <div id="statusdetails"></div>
-                        <button class="btn btn-warning" id="reload-config" onclick="reloadConfiguration()">
-                            Reload Configuration
-                        </button>
                         <button class="btn btn-danger" onclick="rebootButton()">Reboot</button>
                     </div>
                 </div>
@@ -91,6 +96,7 @@
             </div>
         </div>
     </div>
+    <script src="frontend/js/i18n.js"></script>
     <script src="frontend/js/framework.js"></script>
     <script src="frontend/js/filemanager.js"></script>
     <script src="frontend/js/bootstrap.bundle.min.js"></script>

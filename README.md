@@ -1,55 +1,19 @@
-# JunkersControl
+# Cerasmarter
 [![CI](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml/badge.svg)](https://github.com/Neuroquila-n8fall/JunkersControl/actions/workflows/build-master.yml)
-## NOTE: Documentation is mostly accurate right now.
-**Feel free to open an issue if something is unclear.**
-## Table of contents
-- [JunkersControl](#junkerscontrol)
-  - [NOTE: Documentation is mostly accurate right now.](#note-documentation-is-mostly-accurate-right-now)
-  - [Table of contents](#table-of-contents)
-  - [Community](#community)
-  - [Purpose and Aim](#purpose-and-aim)
-    - [Cerasmart-er](#cerasmart-er)
-  - [Contribution](#contribution)
-  - [Intended Audience](#intended-audience)
-    - [Disclaimer:](#disclaimer)
-  - [A word of warning](#a-word-of-warning)
-    - [But why? We are talking about a data line!](#but-why-we-are-talking-about-a-data-line)
-  - [Prerequisites](#prerequisites)
-  - [Installation (Quick Start)](#installation-quick-start)
-  - [Features](#features)
-    - [MQTT](#mqtt)
-      - [Where?](#where)
-      - [How?](#how)
-      - [Example Parameter JSON for setting Heating Parameters:](#example-parameter-json-for-setting-heating-parameters)
-      - [Examples & Detailed Explanation](#examples--detailed-explanation)
-    - [Heating Parameters](#heating-parameters)
-    - [Night/Economy Mode](#nighteconomy-mode)
-      - [Option #1 (MQTT):](#option-1-mqtt)
-      - [Option #2 (Amend Code):](#option-2-amend-code)
-    - [Switch Off/On](#switch-offon)
-    - [Boost](#boost)
-    - [Fast Heatup](#fast-heatup)
-    - [Fallback and Failsafe](#fallback-and-failsafe)
-    - [Automatic Controller Detection](#automatic-controller-detection)
-    - [External Temperature Sensors](#external-temperature-sensors)
-      - [Where?](#where-1)
-    - [Dynamic Adaption](#dynamic-adaption)
-    - [Calculate yourself](#calculate-yourself)
-    - [Valve-based control](#valve-based-control)
-  - [Updating](#updating)
-  - [Telnet Console](#telnet-console)
-  - [Home Assistant Integration](#home-assistant-integration)
-  - [Hints](#hints)
-  - [Getting Started](#getting-started)
-    - [Configuration](#configuration)
-  - [Dedicated PCB](#dedicated-pcb)
-  - [Todo](#todo)
-  - [Special Thanks](#special-thanks)
 
-![Alt_Text](/assets/example_ha_dashboard.jpg)
+## Documentation
+
+- [Installation and feature overview](README.md#installation-quick-start)
+- [Configuration reference](assets/Configuration.md)
+- [Web, SSE, and MQTT API reference](assets/API.md)
+- [CAN Analyzer guide](assets/CANAnalyzer.md)
+- [MQTT command examples](assets/Examples/MQTT_Message_Exchange/Receive/README.md)
+- [MQTT state examples](assets/Examples/MQTT_Message_Exchange/Send/README.md)
+
+Documentation tracks the current development firmware. Please open an issue when controller-specific behavior differs from the documented BM1 installation profiles.
 
 ## Community
-You can reach out to us on [Discord](https://discord.gg/9Wrndbqu7t) where we can discuss and help eachother.
+You can reach out on [Discord](https://discord.gg/9Wrndbqu7t) to discuss the project and get help from the community.
 
 ## Purpose and Aim
 This project is designed around the idea of having a SCADA-like setup where your command & control server (MQTT-Broker) sends commands and receives the status of the heating.
@@ -58,7 +22,7 @@ Since the rise of modern and affordable "Smart Radiator Thermostats" we are able
 ### Cerasmart-er
 The Junkers/Bosch "Heatronic" controller of the "Cerasmart" type of boilers (yes they used that term back in pre-2000!) is by itself smart enough to keep your home warm without wasting too much energy, if properly equipped and configured, of course. You won't receive any benefits from this project if you are messing around with the parameters without knowing the concepts of a central heating system. Also if your heating isn't "tuned" to your home it will waste money nonetheless.
 **This also means you can't tell the boiler to perform unreasonable actions because the controller inside the boiler unit is in charge of controlling the actual temperatures within a safe, predefined range that has been set either by the manufacturer or the technician that maintains your heating.**
-We are, hoewever, able to suggest certain temperatures or switch the boiler on and off
+We are, however, able to suggest certain temperatures or switch the boiler on and off.
 
 With this project we can at least account for seasonal changes in temperature, humidity and the temperature as we feel it so we can adjust the power demand to what we actually need.
 
@@ -94,7 +58,7 @@ If your are missing a cable to plug in your self-made controller, don't install 
 ## Prerequisites
 Now that we have sorted out the serious bits, lets check if we got everything together to pull this off...
 
-1) A compatible Bosch-Junkers central gas heating system with Bosch Heatronic controller and BM1 or BM2 Bus Module equipped.
+1) A compatible Bosch-Junkers central gas heating system with Bosch Heatronic controller and a BM1 Bus Module. BM2 installations are intentionally outside this project's scope.
 2) Access to the data line that exits the bus module. Most of the time you will find a "room thermostat" like TA250 or TA270 which in fact is the control unit for you, the consumer. **It won't work with 1-2-4 style room thermostats like the TR200**
 Again, when in doubt, ask a technician.
 3) Awareness to short circuits and bus failures due to wrong wiring
@@ -107,24 +71,34 @@ Again, when in doubt, ask a technician.
 10) Optional: DS18B20 Sensors
 
 ## Installation (Quick Start)
-Either clone the repository and build/upload yourself using Platformio and your IDE of choice or download the binaries and use esptool as follows:
-Example for Windows environments:
+Either clone the repository and build/upload it with PlatformIO, or download the release binaries. For a new board, a board that still contains factory firmware, or a board with an unknown partition table, flash the complete image at address `0x0`:
+
 ```shell
-esptool.exe --after no_reset --chip esp32 --baud 921600 --port <Serial port of your device> write_flash --verify 0x10000 firmware.bin
-esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash 0x307000 littlefs.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x0 cerasmarter-complete.bin
 ```
 
-The important part is the addresses `0x10000` for the firmware and `0x307000`for the filesystem.
+The complete image contains the bootloader, Cerasmarter partition table, OTA metadata, firmware, and LittleFS filesystem. Flashing only `firmware.bin` at `0x10000` does **not** install the required partition table and will not boot on a board carrying an incompatible factory layout.
+
+After the complete image has provisioned the board once, the component images can be used for updates while retaining the other flash regions:
+
+```shell
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x10000 firmware.bin
+esptool.exe --after hard_reset --chip esp32 --baud 921600 --port <serial port of your device> write_flash --verify 0x307000 littlefs.bin
+```
+
+These component offsets are valid only with the matching `partitions_custom.csv` layout. The complete image is intended for first installation or deliberate full recovery; reflashing it also replaces the configuration stored in both NVS and LittleFS.
 
 Release filesystem images contain the credential-free configuration template as `/configuration.json`; they never contain a developer's device-specific configuration. Its empty WiFi credentials make a new controller start the `CERASMARTER` access point for provisioning through the web UI.
 
 If everything went well you should see the following output on the console:
 ```log
-Press the "BOOT" button within the next 5 seconds to enable Setup Mode!
+Press BOOT within 5 seconds for Setup Mode; hold it for 10 seconds to factory-reset configuration.
 Setup Mode not enabled. You can enable it at every time by pressing the "BOOT" button once.
 Invalid WiFi configuration. Launching AP mode.
 WiFi AP launched. Find me @ 192.168.4.1
 ```
+
+A short BOOT-button press during the startup window enters Setup Mode without changing configuration. Holding BOOT continuously for 10 seconds performs a deliberate factory reset: it clears the persistent NVS mirror and all LittleFS configuration copies, then starts the provisioning access point. The frontend and other filesystem assets are retained.
 
 Startup reports filesystem problems separately:
 
@@ -136,6 +110,24 @@ Startup reports filesystem problems separately:
 Now you can connect to the AP ("CERASMARTER" network by default) and modify/import your configuration. A sample configuration is located [here](assets/Templates/Configurations/configuration.json). After uploading `/configuration.json` in the file manager, use **Reload Configuration** to validate and activate it without a power cycle.
 
 If MDNS is working properly on your end, you will be able to open the web UI using http://cerasmarter/
+
+### Web interface preferences
+
+The navigation bar provides English and German language selection and a sun/moon light/dark appearance toggle. Both preferences are stored in the current browser and apply to every web-interface page. On first use, the browser language selects German when appropriate, and the operating-system color preference selects the initial appearance.
+
+Translations are maintained as one JSON resource per locale in `data/frontend/i18n/` (`en.json`, `de.json`). Keys are grouped by their UI area, for example `menu.home`, `dashboard.system_status`, `mqtt.prefix`, and `filemanager.reload`. Markup can opt into automatic translation with `data-i18n="area.key"`; translated attributes use `data-i18n-placeholder`, `data-i18n-title`, or `data-i18n-aria-label`. JavaScript uses `translate("area.key", values)`. English is the fallback locale, and new locales only require a new resource plus an entry in `UiLocales`.
+
+The CAN Message Analyzer under **Utilities** receives live bus events independently of verbose console sniffing. It groups traffic by ID, displays configured value names, frame counts, DLCs, mean intervals, last payloads, byte deltas, and common candidate interpretations. Captures can be paused, filtered, limited on screen, and exported as JSON or CSV for comparison. Unknown IDs remain clearly identified. See the [CAN Message Analyzer guide](assets/CANAnalyzer.md) for a safe capture workflow, field descriptions, interpretation guidance, and troubleshooting.
+
+![Cerasmarter web dashboard](/assets/webui-dashboard-dark.png)
+
+_Production-controller capture. The displayed `Burner power` label was renamed to `Feed temperature utilization` in the current development UI because it represents the feed-temperature range, not thermal burner output._
+
+The home page is a live heating dashboard organized into heating, mixed-circuit, domestic-hot-water, auxiliary-sensor, runtime-control, and system categories. It presents every value returned by `GET /api/runtime`, uses equipment-appropriate state icons, and plots a five-minute temperature history with the locally bundled Chart.js 4.5.1 library. No CDN or internet access is required. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These web fallback commands take effect immediately but are not persisted; stable settings received through MQTT or Home Assistant are stored in `RuntimeControls` and restored after reboot.
+
+![Fallback heating controls](/assets/webui-fallback-control-dark.png)
+
+The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers. See the [API reference](assets/API.md) for request schemas, ranges, persistence behavior, the CAN event stream, and security limitations.
 
 ## Features
 
@@ -158,20 +150,15 @@ The `MQTT` section has everything and this is where you define the topics:
         "User": "mqtt",
         "Password": "mqtt",
         "Topics": {
-            // Topic for receiving temperatures and status
             "HeatingValues": "cerasmarter/heating/values",
-            // Send values here to steer the heating circuit and functions
             "HeatingParameters": "cerasmarter/heating/parameters",
-            // Topic for receiving temperatures and status
             "WaterValues": "cerasmarter/water/values",
-            // Send values here to steer the hot water circuit and functions
             "WaterParameters": "cerasmarter/water/parameters",
-            // Topic for receiving temperatures from auxiliary sensors
             "AuxiliaryValues": "cerasmarter/auxiliary/values",
-            // Topic for receiving status information
             "Status": "cerasmarter/status",
-            // Send values here to receive values on demand
-            "StatusRequest": "cerasmarter/status/get"
+            "StatusRequest": "cerasmarter/status/get",
+            "Boost": "cerasmarter/boost/set",
+            "FastHeatup": "cerasmarter/fastheatup/set"
         }
     },
 ```
@@ -179,10 +166,8 @@ The `MQTT` section has everything and this is where you define the topics:
 #### Example Parameter JSON for setting Heating Parameters:
 ```json
 {
-  //Enable the heating mode
   "Enabled": false,
-  //Setpoint for Feed Temperature
-  "FeedSetpoint": 0,
+  "FeedSetpoint": 10,
   "FeedBaseSetpoint": -10,
   "FeedCutOff": 22,
   "FeedMinimum": 10,
@@ -221,23 +206,22 @@ See `FeedBaseSetpoint` for base point, `FeedCutOff` for end point or "cut off" t
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters)
 
 ### Night/Economy Mode
-There are two ways to switch the economy mode.
-#### Option #1 (MQTT):
- Set `Enabled` to `false` or `0` using the Parameters JSON file which you send to the Heating Parameters Topic defined in `/configuration.json`.
+Set `Enabled` to `false` using the JSON document sent to the configured Heating Parameters topic, the Home Assistant **Heating Enabled** switch, or **Utilities > Fallback Heating Control**.
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
 ```json
 "Enabled": true,
 ```
 
-#### Option #2 (Amend Code):
- Set `commandedValues.Heating.Active` to `false` or `true` depending on if you want to switch economy on or off.
-
 ### Switch Off/On
 
 See [Night/Economy Mode](#nighteconomy-mode)
 
-Hint: The manufacturer recommends to not turn the heating off by the power switch but instead set it into economy mode with 10° feed temperature (lowest setting) to prevent getting the pump or valves stuck. If set to economy the heating will move the pump(s) and valve(s) every 24h if they haven't been moved within that range.
+The manufacturer-defined 10 °C (50 °F) effective feed setpoint represents an off request. Every calculated result below that minimum is normalized to exactly 10 °C before shutdown evaluation, CAN conversion, or transmission. Cerasmarter then switches the heating operation flag off if the effective setpoint remains at 10 °C for `General.SetpointOffDelaySeconds`. The default grace period is 300 seconds, avoiding short demand changes that could repeatedly cycle the igniter, valves, or pump.
+
+This guard is part of the controller core rather than the Home Assistant integration. It applies equally to MQTT, Home Assistant, WebUI, and locally calculated setpoints. Once active, repeated `Enabled: true` commands cannot override the off state while the effective feed request remains at 10 °C. A higher effective setpoint clears the guard; clients that explicitly manage `Enabled` should send it as `true` with the new demand.
+
+Temperatures remain Celsius internally. Home Assistant performs the equivalent Fahrenheit display conversion when the installation uses imperial units.
 
 ### Boost
 Boost function sets the feed temperature to the maximum reported value (`ceraValues.Heating.FeedMaximum`) for a selected period of time (default: 300 seconds). This is especially useful when you own electronic or "smart home" thermostats in general which in most cases offer such a boost function. the problem with this "boost" is that although the valve opens up for a few minutes, the heating won't actually deliver the required temperature. A common misunderstanding is that opening the valve to the highest setting will heat more. It will instead only *allow* for a much higher room temperature as the water flow through the system is almost unchanged.
@@ -263,7 +247,9 @@ Fast Heatup function compares a temperature (`commandedValues.Heating.AmbientTem
 
 ### Fallback and Failsafe
 
-The controller starts in local fail-safe mode after every boot and leaves it only after a recognized heating command arrives. That command refreshes the `CommandTimeoutSeconds` lease; broker reconnection alone does not leave fail-safe mode.
+The controller starts in local fail-safe mode after every boot and leaves it as soon as MQTT connects. No periodic command heartbeat is required, and the controller does not assume that Node-RED or any other particular automation system is present.
+
+For configuration-file compatibility, the setting remains named `CommandTimeoutSeconds`. It now defines how long MQTT may remain continuously disconnected before fail-safe mode starts. When that grace period expires, the controller saves the current runtime controls and applies the local fail-safe profile. Reconnecting to MQTT leaves fail-safe mode and restores those saved controls; command frequency does not affect activation.
 
 ```json
 "FailSafe": {
@@ -288,7 +274,7 @@ WiFi, MQTT, and NTP recovery are cooperative and bounded; they do not own or sus
 
 ### Automatic Controller Detection
 
-Other controllers on the network will send their messages which always start at ID `0x250`. As soon as such a message is detected, the `Override` flag will turn to `false` and our controller will stop sending control messages. If there is no controller message on the network for 30 seconds (defined by `BusMessageTimeOut` within `/configuration.json`) it will resume control and the `Override` flag returns to true.
+The controller starts in read-only mode and watches CAN IDs `0x250` through `0x25F` for another room controller. As soon as such a message is detected, the `Override` flag remains `false` and Cerasmarter does not send control messages. Only after a complete interval with no controller traffic (30 seconds by default, configured by `BusMessageTimeout` in `/configuration.json`) does it assume control and set `Override` to `true`.
 
 Example:
 ```json
@@ -388,8 +374,8 @@ The standard "Arduino OTA" procedure is included which means you can upload the 
 You can also use the web UI (See: Firmware Update on the menu bar) to upload the `firmware.bin` and `littlefs.bin` files to update the firmware and filesystem image.
 
 - A firmware-only update preserves the existing LittleFS configuration.
-- Before uploading `littlefs.bin`, download `/configuration.json` from the file manager as a backup. Replacing the filesystem erases the active configuration and installs the credential-free template.
-- After a filesystem update, upload the backup as `/configuration.json` and click **Reload Configuration**. A successful reload activates WiFi, MQTT, CAN, auxiliary-sensor, and LED settings without requiring a power cycle. Without a backup, connect to the `CERASMARTER` setup access point and configure the template values through the web UI.
+- Every successfully loaded or saved device configuration is mirrored to the separate NVS partition. After a WebUI, PlatformIO, esptool, or programmer-based LittleFS replacement, startup recognizes the credential-free provisioning template and restores the last valid device configuration before normal loading. WebUI filesystem updates still refresh and validate the backup before writing the image.
+- A deliberately uploaded valid `/configuration.json` remains authoritative and replaces the persistent mirror after it loads. Keep a downloaded backup for manual disaster recovery. To intentionally start over, hold BOOT for 10 seconds during startup; erasing the NVS partition or the whole flash also produces a genuine factory reset.
 - Configuration saves from the web UI are written atomically and verified before they replace the previous file. If validation or writing fails, the previous configuration remains available as a backup.
 
 ## Telnet Console
@@ -397,11 +383,34 @@ You can also use the web UI (See: Firmware Update on the menu bar) to upload the
 Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
 
 ## Home Assistant Integration
-This project was originally specifically designed to be run alongside Home Assistant and efforts have been taken to make the setup as hassle-free as possible but the so-called autodiscovery is still in the works. In the meantime you may find the necessary scripts, values and other stuff inside the [Home Assistant Folder](Home%20Assistant)
+
+Cerasmarter uses current MQTT **device discovery**. No Home Assistant YAML files or separate discovery templates are required.
+
+Set `HomeAssistant.Enabled` to `true`, configure the same discovery prefix used by Home Assistant (normally `homeassistant`), and give every controller a unique `DeviceId`. After connecting to MQTT, the controller publishes one retained device-discovery document to:
+
+```text
+<AutoDiscoveryPrefix>/device/<DeviceId>/config
+```
+
+Home Assistant groups the heating, hot-water, status, and auxiliary-temperature entities under one device. The integration provides temperature and status sensors, binary operating-state sensors, dynamically generated auxiliary-sensor entities, and a read-only sensor for the remaining boost time reported by the controller logic.
+
+Heating controls cover the complete runtime command contract used by the default `cerasmarter/heating/parameters` topic: heating enablement, requested feed setpoint and direct-setpoint override, heating-curve basepoint/cutoff/minimum, manual and dynamic adaptation, room-reference/target/auxiliary temperatures, valve-scaling enablement/current/max opening, boost duration, boost, and fast heatup. Home Assistant uses individual command topics below `cerasmarter/<DeviceId>/Heating/`, while legacy clients can continue publishing the existing combined JSON document. Both paths use the same validation and immediately publish the accepted state back to Home Assistant.
+
+Memory, filesystem and flash capacity, chip model and revision, CPU core count, CPU frequency, and auxiliary-sensor connectivity are exposed as diagnostic entities. Home Assistant keeps these on the device's diagnostic card instead of treating them as normal heating controls or measurements.
+
+Discovery assigns purpose-specific Material Design icons to every entity. The **Flame Lit** binary sensor intentionally has no Home Assistant device class: it therefore reports plain **On/Off** while using a flame icon whose active color follows the burner state. MQTT discovery supports one static icon per entity, so using different custom glyphs for its on and off states would require a separate Home Assistant template entity.
+
+Runtime state and command topics use `cerasmarter/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
+
+![Home Assistant device created through MQTT discovery](/assets/home-assistant-autodiscovery-device.png)
+
+Keep `DeviceId` stable after discovery. If it or the discovery prefix is changed through the web interface, the controller removes its previous retained discovery record and reconnects with the new identity. An old record only needs manual removal if the broker was unavailable during the change.
+
+See the [configuration guide](assets/Configuration.md#home-assistant) for all settings and the [API reference](assets/API.md#mqtt-api) for topic behavior.
 
 ## Hints
-- If you just wanna read then usually you have nothing to modify. The program will see other controllers on the bus and will go into "read-only" mode by itself. If you're not wanting to take any risks, you have to set the variable `OverrideControl` in [main.cpp](src/main.cpp) to `false`. This way nothing will be sent on the bus udner any circumstances but you can read everything.
-- For debug purposes the `configuration.General.Debug` variable controls wether you want to see verbose output of the underlying routines like feed temperature calculation and step chain progress.
+- Automatic takeover is suppressed while messages are observed in the configurable controller-address range. For capture-only installations, enable `CAN.ReadOnly` in the web interface or configuration file; this hard interlock cannot time out and re-enable transmission.
+- For debug purposes the `configuration.General.Debug` variable controls whether you see verbose output from routines such as feed-temperature calculation and step-chain progress.
 - Keep in mind that if you are intending to migrate this to an arduino you have to watch out for the OTA feature and `float` (`%f`) format parameters within `sprintf` calls.
 - When OTA is triggered, all connections will be terminated except the one used for OTA because otherwise the update will fail. The MC will keep working.
 - The OTA feature is confirmed working with Arduino IDE and Platform.io but for the latter you have to adapt the settings inside `platformio.ini` to your preference.
@@ -416,7 +425,9 @@ This project was originally specifically designed to be run alongside Home Assis
 
 Do not place a real `configuration.json` in the repository's `data` directory when preparing releases. The filesystem build always copies the credential-free file from `assets/Templates/Configurations/configuration.json`; a device-specific file could contain WiFi and MQTT credentials.
 
-For local USB provisioning only, set `JUNKERSCONTROL_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The GitHub release workflow never sets this override and verifies that release images use the credential-free template.
+For local USB provisioning only, set `CERASMARTER_CONFIG_FILE` to an external configuration file while running the `buildfs`/`uploadfs` targets. This stages that file in the generated image without adding it to the repository. The pipeline stamps it with `"ProvisioningTemplate": false`, making the bundled configuration authoritative over an older NVS mirror on first boot; it then becomes the new persistent backup. The GitHub release workflow never sets this override and verifies that release images use the credential-free template stamped `true`.
+
+This distinction also covers unusual provisioning edge cases: a custom filesystem configuration may intentionally have empty Wi-Fi credentials, but the explicit `false` marker still prevents it from being replaced. If constructing a LittleFS image outside the supplied pipeline, set the root-level marker yourself. Be aware that custom images contain the selected configuration in recoverable form—including Wi-Fi or MQTT secrets—and must not be published as release artifacts.
 
 ### Configuration
 
@@ -452,4 +463,5 @@ WIP
 - Nick O'Leary and contributors of the PubSubClient library: https://github.com/knolleary/pubsubclient
 - Rop Gonggrijp and contributors of the ezTime library: https://github.com/ropg/ezTime
 - The maintainers of the ArduinoJSON library: https://arduinojson.org/
-- The maintainers of the Async ESP Webserver and AsyncTCP library: https://github.com/me-no-dev/ESPAsyncWebServer
+- The maintainers of the ESP32Async ESPAsyncWebServer and AsyncTCP libraries: https://github.com/ESP32Async/ESPAsyncWebServer
+- The Chart.js contributors. Chart.js 4.5.1 is bundled locally under the MIT license for dashboard history charts: https://www.chartjs.org/

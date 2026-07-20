@@ -1,4 +1,6 @@
 #include <configuration.h>
+#include <Preferences.h>
+#include <mqtt.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Configuration File
@@ -11,6 +13,209 @@ const char *backupConfigFileName = (char *)"/configuration.bak";
 Configuration configuration;
 
 static bool configurationUploadPending = false;
+static const char *filesystemBackupNamespace = "cerafsbackup";
+static const char *filesystemBackupKey = "config";
+static const size_t maximumBackupSize = 16384;
+
+static bool validateConfigurationDocument(JsonDocument &doc, String &errorMessage)
+{
+    const char *requiredSections[] = {"Wifi", "MQTT", "Features", "Time", "General", "HomeAssistant", "CAN", "AuxiliarySensors", "LEDs"};
+    for (const char *section : requiredSections)
+    {
+        if (!doc[section].is<JsonObject>())
+        {
+            errorMessage = "Configuration section is missing or invalid: " + String(section);
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool isProvisioningTemplate(JsonDocument &doc)
+{
+    const String ssid = doc["Wifi"]["SSID"] | "";
+    JsonVariant marker = doc["ProvisioningTemplate"];
+    if (!marker.isNull())
+    {
+        // A custom filesystem build is explicitly stamped false. A true marker
+        // still requires empty Wi-Fi credentials so a customized/uploaded copy
+        // of the template is not mistaken for a release provisioning image.
+        return marker.as<bool>() && ssid.isEmpty();
+    }
+
+    // Filesystem images produced before the explicit marker was introduced
+    // used this credential-free combination.
+    const String mqttServer = doc["MQTT"]["Server"] | "";
+    const String mqttUser = doc["MQTT"]["User"] | "";
+    return ssid.isEmpty() && mqttServer == "1.2.3.4" && mqttUser == "mqtt";
+}
+
+bool BackupConfigurationForFilesystemUpdate(String &errorMessage)
+{
+    File file = LittleFS.open(configFileName, FILE_READ);
+    if (!file)
+    {
+        errorMessage = "The active configuration could not be opened; filesystem update cancelled.";
+        return false;
+    }
+    const size_t size = file.size();
+    if (size == 0 || size > maximumBackupSize)
+    {
+        file.close();
+        errorMessage = "The active configuration has an unsupported size; filesystem update cancelled.";
+        return false;
+    }
+    std::unique_ptr<uint8_t[]> data(new (std::nothrow) uint8_t[size]);
+    if (!data || file.read(data.get(), size) != size)
+    {
+        file.close();
+        errorMessage = "The active configuration could not be read; filesystem update cancelled.";
+        return false;
+    }
+    file.close();
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, data.get(), size);
+    if (jsonError || !validateConfigurationDocument(doc, errorMessage))
+    {
+        if (jsonError)
+            errorMessage = "The active configuration is invalid JSON; filesystem update cancelled.";
+        return false;
+    }
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+    {
+        errorMessage = "NVS backup storage could not be opened; filesystem update cancelled.";
+        return false;
+    }
+    const size_t existingSize = preferences.getBytesLength(filesystemBackupKey);
+    if (existingSize == size)
+    {
+        std::unique_ptr<uint8_t[]> existingData(new (std::nothrow) uint8_t[size]);
+        if (existingData && preferences.getBytes(filesystemBackupKey, existingData.get(), size) == size &&
+            memcmp(existingData.get(), data.get(), size) == 0)
+        {
+            preferences.end();
+            return true;
+        }
+    }
+    const size_t written = preferences.putBytes(filesystemBackupKey, data.get(), size);
+    preferences.end();
+    if (written != size)
+    {
+        errorMessage = "The configuration could not be backed up to NVS; filesystem update cancelled.";
+        return false;
+    }
+    return true;
+}
+
+bool PersistConfigurationBackup(String &errorMessage)
+{
+    return BackupConfigurationForFilesystemUpdate(errorMessage);
+}
+
+bool ClearPersistentConfigurationBackup(String &errorMessage)
+{
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+    {
+        errorMessage = "NVS backup storage could not be opened.";
+        return false;
+    }
+    const bool cleared = preferences.clear();
+    preferences.end();
+    if (!cleared)
+    {
+        errorMessage = "The persistent configuration backup could not be cleared.";
+        return false;
+    }
+    return true;
+}
+
+bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage)
+{
+    Preferences preferences;
+    if (!preferences.begin(filesystemBackupNamespace, false))
+        return true;
+    const size_t size = preferences.getBytesLength(filesystemBackupKey);
+    if (size == 0)
+    {
+        preferences.end();
+        return true;
+    }
+    if (size > maximumBackupSize)
+    {
+        preferences.remove(filesystemBackupKey);
+        preferences.end();
+        errorMessage = "Discarded an oversized configuration backup from NVS.";
+        return false;
+    }
+    std::unique_ptr<uint8_t[]> data(new (std::nothrow) uint8_t[size]);
+    if (!data || preferences.getBytes(filesystemBackupKey, data.get(), size) != size)
+    {
+        preferences.end();
+        errorMessage = "The configuration backup could not be read from NVS.";
+        return false;
+    }
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, data.get(), size);
+    if (jsonError || !validateConfigurationDocument(doc, errorMessage))
+    {
+        preferences.remove(filesystemBackupKey);
+        preferences.end();
+        if (jsonError)
+            errorMessage = "Discarded an invalid configuration backup from NVS.";
+        return false;
+    }
+
+    // A deliberately uploaded, valid device configuration is authoritative.
+    // Restore only over a release provisioning template, a missing file, or an
+    // invalid file left by an interrupted/raw filesystem replacement.
+    File currentFile = LittleFS.open(configFileName, FILE_READ);
+    if (currentFile)
+    {
+        JsonDocument currentDoc;
+        String currentValidationError;
+        const DeserializationError currentJsonError = deserializeJson(currentDoc, currentFile);
+        currentFile.close();
+        if (!currentJsonError && validateConfigurationDocument(currentDoc, currentValidationError) &&
+            !isProvisioningTemplate(currentDoc))
+        {
+            preferences.end();
+            return true;
+        }
+    }
+    const char *restoreFileName = "/configuration.restore";
+    File restored = LittleFS.open(restoreFileName, FILE_WRITE, true);
+    if (!restored || restored.write(data.get(), size) != size)
+    {
+        restored.close();
+        LittleFS.remove(restoreFileName);
+        preferences.end();
+        errorMessage = "The preserved configuration could not be restored to LittleFS.";
+        return false;
+    }
+    restored.flush();
+    restored.close();
+    LittleFS.remove(backupConfigFileName);
+    if (LittleFS.exists(configFileName) && !LittleFS.rename(configFileName, backupConfigFileName))
+    {
+        LittleFS.remove(restoreFileName);
+        preferences.end();
+        errorMessage = "The filesystem template could not be replaced by the preserved configuration.";
+        return false;
+    }
+    if (!LittleFS.rename(restoreFileName, configFileName))
+    {
+        LittleFS.rename(backupConfigFileName, configFileName);
+        preferences.end();
+        errorMessage = "The preserved configuration could not be committed.";
+        return false;
+    }
+    LittleFS.remove(backupConfigFileName);
+    preferences.end();
+    Log.println("Restored the persistent configuration backup after the filesystem was replaced.");
+    return true;
+}
 
 void SetConfigurationUploadPending(bool pending)
 {
@@ -105,8 +310,59 @@ bool ReadConfiguration()
 
     JsonObject GeneralSettings = doc["General"];
     configuration.General.BusMessageTimeout = GeneralSettings["BusMessageTimeout"];
+    configuration.General.SetpointOffDelaySeconds = GeneralSettings["SetpointOffDelaySeconds"] | configuration.General.SetpointOffDelaySeconds;
+    configuration.General.BasepointTemperature = GeneralSettings["BasepointTemperature"] | configuration.General.BasepointTemperature;
+    configuration.General.EndpointTemperature = GeneralSettings["EndpointTemperature"] | configuration.General.EndpointTemperature;
     configuration.General.Debug = GeneralSettings["Debug"];
     configuration.General.Sniffing = GeneralSettings["Sniffing"];
+    if (configuration.General.SetpointOffDelaySeconds < 10 || configuration.General.SetpointOffDelaySeconds > 86400)
+        configuration.General.SetpointOffDelaySeconds = 300;
+    if (!isfinite(configuration.General.BasepointTemperature) ||
+        configuration.General.BasepointTemperature < -50 || configuration.General.BasepointTemperature > 50)
+        configuration.General.BasepointTemperature = -10;
+    if (!isfinite(configuration.General.EndpointTemperature) ||
+        configuration.General.EndpointTemperature < -50 || configuration.General.EndpointTemperature > 50)
+        configuration.General.EndpointTemperature = 31;
+
+    JsonObject RuntimeControls = doc["RuntimeControls"];
+    if (!RuntimeControls.isNull())
+    {
+        configuration.RuntimeControls.HeatingEnabled = RuntimeControls["HeatingEnabled"] | configuration.RuntimeControls.HeatingEnabled;
+        configuration.RuntimeControls.FeedSetpoint = RuntimeControls["FeedSetpoint"] | configuration.RuntimeControls.FeedSetpoint;
+        configuration.RuntimeControls.MinimumFeedTemperature = RuntimeControls["MinimumFeedTemperature"] | configuration.RuntimeControls.MinimumFeedTemperature;
+        configuration.RuntimeControls.TargetAmbientTemperature = RuntimeControls["TargetAmbientTemperature"] | configuration.RuntimeControls.TargetAmbientTemperature;
+        configuration.RuntimeControls.FeedAdaption = RuntimeControls["FeedAdaption"] | configuration.RuntimeControls.FeedAdaption;
+        configuration.RuntimeControls.ValveScaling = RuntimeControls["ValveScaling"] | configuration.RuntimeControls.ValveScaling;
+        configuration.RuntimeControls.MaxValveOpening = RuntimeControls["MaxValveOpening"] | configuration.RuntimeControls.MaxValveOpening;
+        configuration.RuntimeControls.DynamicAdaption = RuntimeControls["DynamicAdaption"] | configuration.RuntimeControls.DynamicAdaption;
+        configuration.RuntimeControls.OverrideSetpoint = RuntimeControls["OverrideSetpoint"] | configuration.RuntimeControls.OverrideSetpoint;
+        configuration.RuntimeControls.BoostDuration = RuntimeControls["BoostDuration"] | configuration.RuntimeControls.BoostDuration;
+        configuration.RuntimeControls.HotWaterSetpoint = RuntimeControls["HotWaterSetpoint"] | configuration.RuntimeControls.HotWaterSetpoint;
+    }
+    configuration.RuntimeControls.FeedSetpoint = constrain(configuration.RuntimeControls.FeedSetpoint, 0.0, 100.0);
+    configuration.RuntimeControls.MinimumFeedTemperature = constrain(configuration.RuntimeControls.MinimumFeedTemperature, 0.0, 100.0);
+    configuration.RuntimeControls.TargetAmbientTemperature = constrain(configuration.RuntimeControls.TargetAmbientTemperature, 5.0, 35.0);
+    configuration.RuntimeControls.FeedAdaption = constrain(configuration.RuntimeControls.FeedAdaption, -30.0, 30.0);
+    configuration.RuntimeControls.MaxValveOpening = constrain(configuration.RuntimeControls.MaxValveOpening, 1, 100);
+    configuration.RuntimeControls.BoostDuration = constrain(configuration.RuntimeControls.BoostDuration, 0, 86400);
+    configuration.RuntimeControls.HotWaterSetpoint = constrain(configuration.RuntimeControls.HotWaterSetpoint, 0, 100);
+
+    // Restore stable external controls. Live inputs and momentary actions start
+    // from safe defaults and are never resurrected after a reboot.
+    commandedValues.Heating.Active = configuration.RuntimeControls.HeatingEnabled;
+    commandedValues.Heating.FeedSetpoint = configuration.RuntimeControls.FeedSetpoint;
+    commandedValues.Heating.BasepointTemperature = configuration.General.BasepointTemperature;
+    commandedValues.Heating.EndpointTemperature = configuration.General.EndpointTemperature;
+    commandedValues.Heating.MinimumFeedTemperature = configuration.RuntimeControls.MinimumFeedTemperature;
+    commandedValues.Heating.TargetAmbientTemperature = configuration.RuntimeControls.TargetAmbientTemperature;
+    commandedValues.Heating.FeedAdaption = configuration.RuntimeControls.FeedAdaption;
+    commandedValues.Heating.ValveScaling = configuration.RuntimeControls.ValveScaling;
+    commandedValues.Heating.MaxValveOpening = configuration.RuntimeControls.MaxValveOpening;
+    commandedValues.Heating.DynamicAdaption = configuration.RuntimeControls.DynamicAdaption;
+    commandedValues.Heating.OverrideSetpoint = configuration.RuntimeControls.OverrideSetpoint;
+    commandedValues.Heating.BoostDuration = configuration.RuntimeControls.BoostDuration;
+    commandedValues.Heating.BoostTimeCountdown = 0;
+    commandedValues.HotWater.SetPoint = configuration.RuntimeControls.HotWaterSetpoint;
 
     JsonObject FailSafeSettings = doc["FailSafe"];
     if (!FailSafeSettings.isNull())
@@ -141,12 +397,30 @@ bool ReadConfiguration()
         configuration.FailSafe.MaximumFeedTemperature = 55;
 
     JsonObject HomeAssistantSettings = doc["HomeAssistant"];
-    configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"];
-    configuration.HomeAssistant.DeviceId = HomeAssistantSettings["DeviceId"].as<String>();
-    configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"];
-    configuration.HomeAssistant.AutoDiscoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
-    configuration.HomeAssistant.StateTopic = configuration.HomeAssistant.AutoDiscoveryPrefix + "/" + configuration.HomeAssistant.DeviceId + "/";
-    configuration.HomeAssistant.TempUnit = HomeAssistantSettings["TempUnit"].as<String>();
+    configuration.HomeAssistant.Enabled = HomeAssistantSettings["Enabled"] | false;
+    configuration.HomeAssistant.OffDelay = HomeAssistantSettings["OffDelay"] | 0;
+
+    String deviceId = HomeAssistantSettings["DeviceId"].as<String>();
+    if (deviceId.isEmpty())
+        deviceId = configuration.Wifi.Hostname;
+    if (deviceId.isEmpty())
+        deviceId = "cerasmarter";
+    deviceId.trim();
+    deviceId.replace(" ", "_");
+    deviceId.replace("/", "_");
+    configuration.HomeAssistant.DeviceId = deviceId;
+
+    String discoveryPrefix = HomeAssistantSettings["AutoDiscoveryPrefix"].as<String>();
+    discoveryPrefix.trim();
+    while (discoveryPrefix.endsWith("/"))
+        discoveryPrefix.remove(discoveryPrefix.length() - 1);
+    if (discoveryPrefix.isEmpty())
+        discoveryPrefix = "homeassistant";
+    configuration.HomeAssistant.AutoDiscoveryPrefix = discoveryPrefix;
+
+    String temperatureUnit = HomeAssistantSettings["TempUnit"].as<String>();
+    configuration.HomeAssistant.TempUnit = temperatureUnit.isEmpty() ? "°C" : temperatureUnit;
+    configuration.HomeAssistant.StateTopic = "cerasmarter/" + configuration.HomeAssistant.DeviceId + "/";
 
     JsonObject Leds = doc["LEDs"];
     if (Leds["Wifi"].is<int>())
@@ -160,6 +434,30 @@ bool ReadConfiguration()
 
     JsonObject CAN = doc["CAN"];
     configuration.CanModuleConfig.CAN_Quartz = CAN["Quartz"];
+    JsonObject CAN_Profiles = CAN["Profiles"];
+    configuration.CanModuleConfig.Profiles.Heating = CAN_Profiles["Heating"] | true;
+    configuration.CanModuleConfig.Profiles.MixedCircuit = CAN_Profiles["MixedCircuit"] | false;
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = CAN_Profiles["DomesticHotWater"] | true;
+    configuration.CanModuleConfig.ReadOnly = CAN["ReadOnly"] | false;
+
+    JsonObject CAN_ControllerDetection = CAN["ControllerDetection"];
+    configuration.CanModuleConfig.ControllerAddressMin = convertHexString(CAN_ControllerDetection["MinimumAddress"] | "0x250");
+    configuration.CanModuleConfig.ControllerAddressMax = convertHexString(CAN_ControllerDetection["MaximumAddress"] | "0x25F");
+    if (configuration.CanModuleConfig.ControllerAddressMin > 0x7FF ||
+        configuration.CanModuleConfig.ControllerAddressMax > 0x7FF ||
+        configuration.CanModuleConfig.ControllerAddressMin > configuration.CanModuleConfig.ControllerAddressMax)
+    {
+        configuration.CanModuleConfig.ControllerAddressMin = 0x250;
+        configuration.CanModuleConfig.ControllerAddressMax = 0x25F;
+    }
+
+    JsonObject CAN_Heartbeat = CAN["Heartbeat"];
+    configuration.CanModuleConfig.HeartbeatAddress = convertHexString(CAN_Heartbeat["Address"] | "0x0F9");
+    configuration.CanModuleConfig.HeartbeatIntervalSeconds = CAN_Heartbeat["IntervalSeconds"] | 30;
+    if (configuration.CanModuleConfig.HeartbeatAddress > 0x7FF)
+        configuration.CanModuleConfig.HeartbeatAddress = 0x0F9;
+    if (configuration.CanModuleConfig.HeartbeatIntervalSeconds < 5 || configuration.CanModuleConfig.HeartbeatIntervalSeconds > 3600)
+        configuration.CanModuleConfig.HeartbeatIntervalSeconds = 30;
 
     JsonObject CAN_Addresses = CAN["Addresses"];
 
@@ -248,6 +546,9 @@ bool ReadConfiguration()
         }
     }
     file.close();
+    String backupError;
+    if (!PersistConfigurationBackup(backupError))
+        Log.println("Warning: configuration loaded, but its persistent backup could not be refreshed: " + backupError);
     return true;
 }
 
@@ -296,8 +597,24 @@ bool WriteConfiguration()
 
     JsonObject General = doc["General"].to<JsonObject>();
     General["BusMessageTimeout"] = configuration.General.BusMessageTimeout;
+    General["SetpointOffDelaySeconds"] = configuration.General.SetpointOffDelaySeconds;
+    General["BasepointTemperature"] = configuration.General.BasepointTemperature;
+    General["EndpointTemperature"] = configuration.General.EndpointTemperature;
     General["Debug"] = configuration.General.Debug;
     General["Sniffing"] = configuration.General.Sniffing;
+
+    JsonObject RuntimeControls = doc["RuntimeControls"].to<JsonObject>();
+    RuntimeControls["HeatingEnabled"] = configuration.RuntimeControls.HeatingEnabled;
+    RuntimeControls["FeedSetpoint"] = configuration.RuntimeControls.FeedSetpoint;
+    RuntimeControls["MinimumFeedTemperature"] = configuration.RuntimeControls.MinimumFeedTemperature;
+    RuntimeControls["TargetAmbientTemperature"] = configuration.RuntimeControls.TargetAmbientTemperature;
+    RuntimeControls["FeedAdaption"] = configuration.RuntimeControls.FeedAdaption;
+    RuntimeControls["ValveScaling"] = configuration.RuntimeControls.ValveScaling;
+    RuntimeControls["MaxValveOpening"] = configuration.RuntimeControls.MaxValveOpening;
+    RuntimeControls["DynamicAdaption"] = configuration.RuntimeControls.DynamicAdaption;
+    RuntimeControls["OverrideSetpoint"] = configuration.RuntimeControls.OverrideSetpoint;
+    RuntimeControls["BoostDuration"] = configuration.RuntimeControls.BoostDuration;
+    RuntimeControls["HotWaterSetpoint"] = configuration.RuntimeControls.HotWaterSetpoint;
 
     JsonObject FailSafe = doc["FailSafe"].to<JsonObject>();
     FailSafe["Enabled"] = configuration.FailSafe.Enabled;
@@ -321,6 +638,14 @@ bool WriteConfiguration()
 
     JsonObject CAN = doc["CAN"].to<JsonObject>();
     CAN["Quartz"] = configuration.CanModuleConfig.CAN_Quartz;
+    CAN["Profiles"]["Heating"] = configuration.CanModuleConfig.Profiles.Heating;
+    CAN["Profiles"]["MixedCircuit"] = configuration.CanModuleConfig.Profiles.MixedCircuit;
+    CAN["Profiles"]["DomesticHotWater"] = configuration.CanModuleConfig.Profiles.DomesticHotWater;
+    CAN["ReadOnly"] = configuration.CanModuleConfig.ReadOnly;
+    CAN["ControllerDetection"]["MinimumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMin);
+    CAN["ControllerDetection"]["MaximumAddress"] = IntToHex(configuration.CanModuleConfig.ControllerAddressMax);
+    CAN["Heartbeat"]["Address"] = IntToHex(configuration.CanModuleConfig.HeartbeatAddress);
+    CAN["Heartbeat"]["IntervalSeconds"] = configuration.CanModuleConfig.HeartbeatIntervalSeconds;
 
     JsonObject CAN_Addresses = CAN["Addresses"].to<JsonObject>();
 
@@ -434,5 +759,8 @@ bool WriteConfiguration()
     }
 
     LittleFS.remove(backupConfigFileName);
+    String backupError;
+    if (!PersistConfigurationBackup(backupError))
+        Log.println("Warning: configuration saved, but its persistent backup could not be refreshed: " + backupError);
     return true;
 }

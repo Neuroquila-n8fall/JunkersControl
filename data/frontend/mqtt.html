@@ -8,6 +8,7 @@
     <title>CERASMARTER MQTT Configuration</title>
     <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
     <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
 </head>
 
 <body>
@@ -28,32 +29,32 @@
                 </div>
                 <div class="row">
                     <form id="mqtt-form">
-                        <div class="text-start">
+                        <div class="text-start mqtt-config-form">
                             <div class="mb-3 row">
-                                <label class="col-sm-2 col-form-label" for="mqtt-server">Server</label>
-                                <div class="col-sm-10">
+                                <label class="col-sm-4 col-form-label" for="mqtt-server">Server</label>
+                                <div class="col-sm-8">
                                     <input id="mqtt-server" name="mqtt-server"
                                         placeholder="The IP address of your MQTT broker" type="text"
                                         class="form-control" autocomplete="mqtt-server" required>
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label class="col-sm-2 col-form-label" for="mqtt-port">Port</label>
-                                <div class="col-sm-10">
+                                <label class="col-sm-4 col-form-label" for="mqtt-port">Port</label>
+                                <div class="col-sm-8">
                                     <input id="mqtt-port" name="mqtt-port" placeholder="Default: 1883" type="number"
                                         class="form-control" autocomplete="mqtt-port" value="1883" required>
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="mqtt-user" class="col-sm-2 col-form-label">User</label>
-                                <div class="col-sm-10">
+                                <label for="mqtt-user" class="col-sm-4 col-form-label">User</label>
+                                <div class="col-sm-8">
                                     <input id="mqtt-user" name="mqtt-user" type="text" class="form-control"
                                         autocomplete="mqtt-user">
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="mqtt-password" class="col-sm-2 col-form-label">Password</label>
-                                <div class="col-sm-10">
+                                <label for="mqtt-password" class="col-sm-4 col-form-label">Password</label>
+                                <div class="col-sm-8">
                                     <input id="mqtt-password" name="mqtt-password" type="password" class="form-control"
                                         autocomplete="mqtt-password">
                                 </div>
@@ -62,11 +63,70 @@
                                 <span id="mqtt-status"></span>
                             </div>
                             <div class="mb-3 row justify-content-end">
-                                <div class="col-sm-10">
+                                <div class="col-sm-8">
                                     <button name="submit" type="submit" class="btn btn-primary" id="save-config">
                                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
                                             id="config-saving" hidden></span>
                                         <span id="save-config-label">Save MQTT Config</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="row mt-4">
+                    <h4>Home Assistant Device Discovery</h4>
+                </div>
+                <div class="row">
+                    <form id="home-assistant-form">
+                        <div class="text-start mqtt-config-form">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ha-enabled"
+                                    name="enabled">
+                                <label class="form-check-label" for="ha-enabled">Enable Home Assistant MQTT device discovery</label>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="discovery-prefix">Discovery Prefix</label>
+                                <div class="col-sm-8">
+                                    <input id="discovery-prefix" name="discovery-prefix" type="text"
+                                        class="form-control" value="homeassistant" required>
+                                    <span class="form-text text-muted">Must match the MQTT discovery prefix configured in Home Assistant.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="device-id">Device ID</label>
+                                <div class="col-sm-8">
+                                    <input id="device-id" name="device-id" type="text" class="form-control"
+                                        placeholder="cerasmarter_1" required>
+                                    <span class="form-text text-muted">Use a unique value for every controller on the MQTT broker. Changing it replaces the controller's discovered device.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="temperature-unit">Temperature Unit</label>
+                                <div class="col-sm-8">
+                                    <input id="temperature-unit" name="temperature-unit" type="text"
+                                        class="form-control" value="°C" required>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="off-delay">Binary Sensor Off Delay</label>
+                                <div class="col-sm-8">
+                                    <input id="off-delay" name="off-delay" type="number" min="0" step="1"
+                                        class="form-control" value="0" required>
+                                    <span class="form-text text-muted">Seconds before an active binary sensor resets; use 0 to disable.</span>
+                                </div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-4 col-form-label" for="state-topic">Runtime Topic</label>
+                                <div class="col-sm-8">
+                                    <input id="state-topic" name="state-topic" type="text" class="form-control" readonly>
+                                </div>
+                            </div>
+                            <div class="container"><span id="home-assistant-status"></span></div>
+                            <div class="mb-3 row justify-content-end">
+                                <div class="col-sm-8">
+                                    <button name="submit" type="submit" class="btn btn-primary" id="save-home-assistant">
+                                        Save Home Assistant Config
                                     </button>
                                 </div>
                             </div>
@@ -78,10 +138,10 @@
                 </div>
                 <div class="row">
                     <form id="mqtt-topics-form">
-                        <div class="text-start">
+                        <div class="text-start mqtt-config-form">
                             <div class="mb-3 row">
-                                <label for="status" class="col-sm-2 col-form-label">Status</label>
-                                <div class="col-sm-10">
+                                <label for="status" class="col-sm-4 col-form-label">Status</label>
+                                <div class="col-sm-8">
                                     <input id="status" name="status" placeholder="cerasmarter/status" type="text"
                                         class="form-control" required aria-describedby="statusHelpBlock">
                                     <span id="statusHelpBlock" class="form-text text-muted">This topic is used for
@@ -89,8 +149,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="statusrequest" class="col-sm-2 col-form-label">Request Status</label>
-                                <div class="col-sm-10">
+                                <label for="statusrequest" class="col-sm-4 col-form-label">Request Status</label>
+                                <div class="col-sm-8">
                                     <input id="statusrequest" name="statusrequest" placeholder="cerasmarter/status/get"
                                         type="text" class="form-control" aria-describedby="statusrequestHelpBlock"
                                         required>
@@ -99,9 +159,9 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="heatingparameters" class="col-sm-2 col-form-label">Heating
+                                <label for="heatingparameters" class="col-sm-4 col-form-label">Heating
                                     Parameters</label>
-                                <div class="col-sm-10">
+                                <div class="col-sm-8">
                                     <input id="heatingparameters" name="heatingparameters"
                                         placeholder="cerasmarter/heating/parameters" type="text" class="form-control"
                                         required aria-describedby="heatingparametersHelpBlock">
@@ -110,8 +170,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="heatingvalues" class="col-sm-2 col-form-label">Heating Values</label>
-                                <div class="col-sm-10">
+                                <label for="heatingvalues" class="col-sm-4 col-form-label">Heating Values</label>
+                                <div class="col-sm-8">
                                     <input id="heatingvalues" name="heatingvalues"
                                         placeholder="cerasmarter/heating/values" type="text" class="form-control"
                                         aria-describedby="heatingvaluesHelpBlock" required>
@@ -120,8 +180,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="waterparameters" class="col-sm-2 col-form-label">Water Parameters</label>
-                                <div class="col-sm-10">
+                                <label for="waterparameters" class="col-sm-4 col-form-label">Water Parameters</label>
+                                <div class="col-sm-8">
                                     <input id="waterparameters" name="waterparameters"
                                         placeholder="cerasmarter/water/parameters" type="text" class="form-control"
                                         aria-describedby="waterparametersHelpBlock" required>
@@ -130,8 +190,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="watervalues" class="col-sm-2 col-form-label">Water Values</label>
-                                <div class="col-sm-10">
+                                <label for="watervalues" class="col-sm-4 col-form-label">Water Values</label>
+                                <div class="col-sm-8">
                                     <input id="watervalues" name="watervalues" placeholder="cerasmarter/water/values"
                                         type="text" class="form-control" aria-describedby="watervaluesHelpBlock"
                                         required>
@@ -140,9 +200,9 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="auxvalues" class="col-sm-2 col-form-label">Auxiliary Temperature
+                                <label for="auxvalues" class="col-sm-4 col-form-label">Auxiliary Temperature
                                     Sensors</label>
-                                <div class="col-sm-10">
+                                <div class="col-sm-8">
                                     <input id="auxvalues" name="auxvalues" placeholder="cerasmarter/auxiliary/values"
                                         type="text" class="form-control" aria-describedby="auxvaluesHelpBlock" required>
                                     <span id="auxvaluesHelpBlock" class="form-text text-muted">Topic where temperature
@@ -150,8 +210,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="boost" class="col-sm-2 col-form-label">Boost</label>
-                                <div class="col-sm-10">
+                                <label for="boost" class="col-sm-4 col-form-label">Boost</label>
+                                <div class="col-sm-8">
                                     <input id="boost" name="boost" placeholder="cerasmarter/boost/set" type="text"
                                         class="form-control" aria-describedby="boostHelpBlock" required>
                                     <span id="boostHelpBlock" class="form-text text-muted">Topic to activate the boost
@@ -159,8 +219,8 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label for="fastheatup" class="col-sm-2 col-form-label">Fast Heatup</label>
-                                <div class="col-sm-10">
+                                <label for="fastheatup" class="col-sm-4 col-form-label">Fast Heatup</label>
+                                <div class="col-sm-8">
                                     <input id="fastheatup" name="fastheatup" placeholder="cerasmarter/fastheatup/set"
                                         type="text" class="form-control" aria-describedby="fastheatupHelpBlock"
                                         required>
@@ -173,7 +233,7 @@
                                 <span id="mqtt-topics-status"></span>
                             </div>
                             <div class="mb-3 row justify-content-end">
-                                <div class="col-sm-10">
+                                <div class="col-sm-8">
                                     <button name="submit" type="submit" class="btn btn-primary" id="save-topics">
                                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
                                             id="topics-saving" hidden></span>
@@ -187,6 +247,7 @@
             </div>
         </div>
     </div>
+    <script src="frontend/js/i18n.js"></script>
     <script src="frontend/js/framework.js"></script>
     <script src="frontend/js/api.js"></script>
     <script src="frontend/js/bootstrap.bundle.min.js"></script>
@@ -194,9 +255,11 @@
         loadNavigation();
         loadMqttConfig();
         loadMqttTopicsConfig();
+        loadHomeAssistantConfig();
 
         _("mqtt-form").addEventListener('submit', sendMqttConfig);
         _("mqtt-topics-form").addEventListener('submit', sendMqttTopicsConfig);
+        _("home-assistant-form").addEventListener('submit', sendHomeAssistantConfig);
 
         async function loadMqttConfig() {
             const form = document.forms["mqtt-form"];
@@ -216,6 +279,41 @@
                 form.elements[entry].value = config[entry];
             }
             form.disabled = false;
+        }
+
+        async function loadHomeAssistantConfig() {
+            const form = document.forms["home-assistant-form"];
+            form.disabled = true;
+            const config = await getConfigJson("/api/config/homeassistant");
+            _("ha-enabled").checked = config.enabled;
+            for (const field of ["discovery-prefix", "device-id", "temperature-unit", "off-delay", "state-topic"])
+                form.elements[field].value = config[field];
+            form.disabled = false;
+        }
+
+        async function sendHomeAssistantConfig(event) {
+            event.preventDefault();
+            const button = _("save-home-assistant");
+            button.disabled = true;
+
+            const payload = Object.fromEntries(new FormData(event.target).entries());
+            payload.enabled = _("ha-enabled").checked;
+            delete payload["state-topic"];
+
+            const response = await fetch('/api/config/homeassistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json().catch(() => ({}));
+            const level = response.ok ? "success" : "danger";
+            _("home-assistant-status").innerHTML = `<div class="alert alert-${level} alert-dismissible fade show" role="alert">
+                <strong>${response.ok ? "Config Saved" : "Error"}</strong><br>${result.msg || response.statusText}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`;
+
+            if (response.ok)
+                await loadHomeAssistantConfig();
+            button.disabled = false;
         }
     </script>
 </body>

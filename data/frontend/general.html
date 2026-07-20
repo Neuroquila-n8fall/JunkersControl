@@ -8,6 +8,7 @@
     <title>CERASMARTER Configuration</title>
     <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
     <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
 </head>
 
 <body>
@@ -69,14 +70,32 @@
                                 </div>
                             </div>
                             <hr>
+                            <h4 data-i18n="general.normal_defaults">Normal-operation defaults</h4>
+                            <p class="form-text text-muted" data-i18n="general_help.normal_defaults">Initial heating-curve values restored after every startup. MQTT, Home Assistant, or fallback controls may override them during runtime.</p>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="normal-basepoint" data-i18n="general.normal_curve_base">Normal heating-curve basepoint</label>
+                                <div class="col-sm-7"><input id="normal-basepoint" name="normal-basepoint" type="number" min="-50" max="50" step="0.5" class="form-control" required></div>
+                            </div>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="normal-endpoint" data-i18n="general.normal_curve_endpoint">Normal heating-curve endpoint</label>
+                                <div class="col-sm-7"><input id="normal-endpoint" name="normal-endpoint" type="number" min="-50" max="50" step="0.5" class="form-control" required></div>
+                            </div>
+                            <hr>
+                            <h4>Low-setpoint shutdown</h4>
+                            <p class="form-text text-muted">A sustained effective feed setpoint of 10 °C (50 °F) is the manufacturer's off request. Heating is disabled after this grace period even if an external client continues to send Enabled.</p>
+                            <div class="mb-3 row">
+                                <label class="col-sm-5 col-form-label" for="setpoint-off-delay">Low-setpoint off delay (seconds)</label>
+                                <div class="col-sm-7"><input id="setpoint-off-delay" name="setpoint-off-delay" type="number" min="10" max="86400" class="form-control" required></div>
+                            </div>
+                            <hr>
                             <h4>Offline Fail-safe</h4>
-                            <p class="form-text text-muted">Used when no valid heating command has been received within the timeout. A fresh command is required to leave fail-safe mode.</p>
+                            <p class="form-text text-muted">Used only when MQTT remains disconnected beyond the configured grace period. Command frequency does not affect fail-safe mode.</p>
                             <div class="mb-3 form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch" id="failsafe-enabled" name="failsafe-enabled">
                                 <label class="form-check-label" for="failsafe-enabled">Enable offline fail-safe</label>
                             </div>
                             <div class="mb-3 row">
-                                <label class="col-sm-5 col-form-label" for="failsafe-timeout">Command timeout (seconds)</label>
+                                <label class="col-sm-5 col-form-label" for="failsafe-timeout">MQTT offline timeout (seconds)</label>
                                 <div class="col-sm-7"><input id="failsafe-timeout" name="failsafe-timeout" type="number" min="10" max="86400" class="form-control" required></div>
                             </div>
                             <div class="mb-3 row">
@@ -139,6 +158,7 @@
         </div>
     </div>
     <script src="frontend/js/api.js"></script>
+    <script src="frontend/js/i18n.js"></script>
     <script src="frontend/js/framework.js"></script>
     <script src="frontend/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript">
