@@ -12,3 +12,4 @@ data/configuration.json
 /cmake-*/
 CMakeLists.txt
 CMakeListsPrivate.txt
+/graphify-out
