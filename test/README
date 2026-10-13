@@ -1,11 +1,115 @@
+# Temperature input/output verification
 
-This directory is intended for PlatformIO Unit Testing and project tests.
+The tests and simulator execute the same C++ temperature calculation as production
+firmware. Its 26 scenarios check weather-cap boundaries, winter valve authority,
+coefficient/sign behavior, room permission, mode precedence, malformed inputs,
+physical maximum/half-step limits and fail-safe behavior. Negative valve-mode
+forecast adjustments require a fresh, explicit all-rooms-satisfied permission.
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
+Use one Python environment for build and serial tools:
 
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/page/plus/unit-testing.html
+```sh
+python -m pip install platformio==6.1.19 esptool==4.11.0 pyserial
+```
+
+Python 3.11 is the verified CI/local setup. With multiple PlatformIO installations,
+`python -m platformio` selects the tools belonging to that interpreter.
+
+## Temperature calculation tests (ESP32 / COM3)
+
+Run the isolated Unity tests on the USB-connected ESP32:
+
+```sh
+python -m platformio test -e temperature_test --upload-port COM3
+```
+
+The `temperature_test` environment compiles `src/feed_temperature.cpp` and the
+Unity tests only. It does not build or initialize the controller, CAN, WiFi,
+MQTT, or web server.
+
+## Forecast lifecycle tests (ESP32 / COM3)
+
+```sh
+python -m platformio test -e forecast_test --upload-port COM3
+```
+
+The 9 cases compile the real `src/forecast.cpp` and `src/feed_temperature.cpp`.
+`test/forecast_support/context.h` replaces only application CAN/network bindings;
+the forecast state machine, ESP32 clock, critical sections and calculation remain
+real. Assertions check disabled application, live coefficient changes, permission
+transitions without a changed correction, expiry, receipt-time lifetime, invalid
+sample rejection, and rejection of older queued samples against newer pending
+or active samples—even with identical millisecond timestamps.
+
+Run PlatformIO commands sequentially: changes to project configuration can
+autoclean other environments, and concurrent processes can delete each other's
+build artifacts. These tests replace the application on COM3, not production.
+
+## Queued runtime-control tests (ESP32 / COM3)
+
+```sh
+python -m platformio test -e runtime_control_test --upload-port COM3
+```
+
+This environment compiles the real `src/mqtt.cpp`, `src/forecast.cpp` and
+`src/feed_temperature.cpp` implementations and uses the production command,
+configuration and heating data types. It disables MQTT transmission and supplies
+only passive application bindings; it does not connect to WiFi/MQTT or initialize
+the boiler/CAN controller. The behavior tests cover whole-document validation,
+preservation/replacement of queued control and forecast input, recognized versus
+unknown fields, accepted boolean forms, numeric bounds, and the resulting
+ordinary feed-temperature calculation.
+
+## Interactive temperature simulator
+
+Build and upload the serial JSON simulator to the test ESP32:
+
+```sh
+python -m platformio run -e temperature_simulator -t upload --upload-port COM3
+python scripts/temperature_console.py --all
+```
+
+Use `python scripts/temperature_console.py --interactive` to send one JSON
+object per input line, or pass one request with `--json`, for example:
+
+```sh
+python scripts/temperature_console.py --json '{"ValveScaling":true,"DynamicAdaption":true,"OutsideTemperature":11.59,"ValveOpening":32}'
+```
+
+Fields use the `FeedTemperatureInputs` member names. Omitted fields use the
+same defaults as the calculation API. Each request returns a JSON object with
+`Setpoint` and `DisableFastHeatup`; malformed JSON, unsupported fields, and
+fields with the wrong JSON type return an `error` object. The simulator has no
+heater I/O or production network setup.
+
+The simulator accepts at most 511 input bytes per line. It reconstructs the
+input defaults for each request; one scenario cannot leak its settings into the
+next. The `HoldMinimumTemperature` input represents the intentional no-clock
+fail-safe hold; ordinary invalid/equal curve endpoints still fail off.
+
+Raw forecast scenarios additionally accept `ForecastEnabled`,
+`ForecastCoefficient`, `ForecastTemperatureChange` and `ForecastRoomsSatisfied`.
+Raw change requires explicit enablement and is converted by the shared
+`DeriveForecastCorrection` function. A direct `ForecastCorrection` remains a
+calculation input for existing scenarios; explicit `ForecastEnabled: false`
+also gates that simulator input.
+
+For example, `--scenario hybrid_winter_30` requests 57 °C at −10 °C and 30% demand
+with the 60% cap. `forecast_cooling` requests 59 °C for a −4 °C trend at coefficient
+0.5; `forecast_warming_deficit` stays at 57 °C, whereas
+`forecast_warming_satisfied` requests 55 °C. `forecast_disabled` stays at 57 °C.
+
+The test firmware delays test startup briefly so the host monitor can attach
+after the upload resets the ESP32. The simulator remains available immediately
+through its separate serial request protocol.
+
+Both upload commands replace the application on the test ESP32. Close serial
+monitors before uploading; reconnect USB if Windows reports a semaphore timeout.
+The simulator can remain loaded for subsequent `--json` or interactive sessions.
+
+These tests do not prove physical CAN delivery, radiator response or winter
+calibration. HTTP route behavior, validation and persistence require an isolated
+controller: CAN read-only, all CAN profiles off, HA discovery disabled, and
+unique MQTT topics. Never substitute a fabricated boiler maximum to make an
+unconnected test board heat. The [optional HA producer](../assets/Examples/HomeAssistant/README.md)
+can be verified with native template evaluation before it is enabled.

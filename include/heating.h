@@ -17,6 +17,8 @@ struct CeraValues
   {
     //-- Max. Feed Temperature
     double FeedMaximum = 75.00F;
+    //-- Whether the physical boiler maximum has actually been observed on CAN
+    bool HasReceivedFeedMaximum = false;
     //-- Current Feed Temperature
     double FeedCurrent = 0.00F;
     //-- Feed Temperature Setpoint

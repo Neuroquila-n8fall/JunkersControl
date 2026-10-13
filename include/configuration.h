@@ -117,6 +117,9 @@ struct Configuration
         double MinimumFeedTemperature = 10.0F;
         double TargetAmbientTemperature = 21.5F;
         double FeedAdaption = 0.0F;
+        double WeatherSupportMaximum = 60.0;
+        bool ForecastEnabled = false;
+        double ForecastCoefficient = 0.5;
         bool ValveScaling = false;
         int MaxValveOpening = 80;
         bool DynamicAdaption = false;

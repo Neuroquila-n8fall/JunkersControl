@@ -51,9 +51,9 @@ static void completeWifiRoamScan()
     if (WiFi.SSID(i) != configuration.Wifi.SSID)
       continue;
 
-    uint8_t candidateBssid[6];
-    if (WiFi.BSSID(i, candidateBssid) == nullptr ||
-        memcmp(candidateBssid, wifiRoamSourceBssid, sizeof(candidateBssid)) == 0)
+    const uint8_t *candidateBssid = WiFi.BSSID(i);
+    if (candidateBssid == nullptr ||
+        memcmp(candidateBssid, wifiRoamSourceBssid, sizeof(bestBssid)) == 0)
       continue;
 
     const int32_t candidateRssi = WiFi.RSSI(i);
@@ -124,9 +124,10 @@ static void updateWifiRoaming()
       (lastWifiRoamAttempt != 0 && now - lastWifiRoamAttempt < wifiRoamCooldown))
     return;
 
-  uint8_t *currentBssid = WiFi.BSSID(wifiRoamSourceBssid);
+  const uint8_t *currentBssid = WiFi.BSSID();
   if (currentBssid == nullptr)
     return;
+  memcpy(wifiRoamSourceBssid, currentBssid, sizeof(wifiRoamSourceBssid));
 
   wifiRoamSourceRssi = currentRssi;
   lastWifiRoamAttempt = now;

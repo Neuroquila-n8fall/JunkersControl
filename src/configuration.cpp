@@ -325,6 +325,21 @@ bool ReadConfiguration()
         configuration.General.EndpointTemperature = 31;
 
     JsonObject RuntimeControls = doc["RuntimeControls"];
+    double weatherSupportMaximum = 60.0;
+    bool weatherSupportPresent = false;
+    if (!ParseWeatherSupportMaximum(RuntimeControls, weatherSupportMaximum, weatherSupportPresent))
+        weatherSupportMaximum = 60.0;
+    configuration.RuntimeControls.WeatherSupportMaximum = weatherSupportMaximum;
+    bool forecastEnabled = false, forecastEnabledPresent = false, forecastCoefficientPresent = false;
+    double forecastCoefficient = 0.5;
+    if (!ParseForecastSettings(RuntimeControls, forecastEnabled, forecastEnabledPresent,
+                               forecastCoefficient, forecastCoefficientPresent))
+    {
+        forecastEnabled = false;
+        forecastCoefficient = 0.5;
+    }
+    configuration.RuntimeControls.ForecastEnabled = forecastEnabled;
+    configuration.RuntimeControls.ForecastCoefficient = forecastCoefficient;
     if (!RuntimeControls.isNull())
     {
         configuration.RuntimeControls.HeatingEnabled = RuntimeControls["HeatingEnabled"] | configuration.RuntimeControls.HeatingEnabled;
@@ -356,6 +371,8 @@ bool ReadConfiguration()
     commandedValues.Heating.MinimumFeedTemperature = configuration.RuntimeControls.MinimumFeedTemperature;
     commandedValues.Heating.TargetAmbientTemperature = configuration.RuntimeControls.TargetAmbientTemperature;
     commandedValues.Heating.FeedAdaption = configuration.RuntimeControls.FeedAdaption;
+    SetWeatherSupportMaximum(configuration.RuntimeControls.WeatherSupportMaximum);
+    SetForecastSettings(configuration.RuntimeControls.ForecastEnabled, configuration.RuntimeControls.ForecastCoefficient);
     commandedValues.Heating.ValveScaling = configuration.RuntimeControls.ValveScaling;
     commandedValues.Heating.MaxValveOpening = configuration.RuntimeControls.MaxValveOpening;
     commandedValues.Heating.DynamicAdaption = configuration.RuntimeControls.DynamicAdaption;
@@ -609,6 +626,9 @@ bool WriteConfiguration()
     RuntimeControls["MinimumFeedTemperature"] = configuration.RuntimeControls.MinimumFeedTemperature;
     RuntimeControls["TargetAmbientTemperature"] = configuration.RuntimeControls.TargetAmbientTemperature;
     RuntimeControls["FeedAdaption"] = configuration.RuntimeControls.FeedAdaption;
+    RuntimeControls["WeatherSupportMaximum"] = configuration.RuntimeControls.WeatherSupportMaximum;
+    RuntimeControls["ForecastEnabled"] = configuration.RuntimeControls.ForecastEnabled;
+    RuntimeControls["ForecastCoefficient"] = configuration.RuntimeControls.ForecastCoefficient;
     RuntimeControls["ValveScaling"] = configuration.RuntimeControls.ValveScaling;
     RuntimeControls["MaxValveOpening"] = configuration.RuntimeControls.MaxValveOpening;
     RuntimeControls["DynamicAdaption"] = configuration.RuntimeControls.DynamicAdaption;
