@@ -3,11 +3,24 @@ const auxiliarySamples = [];
 const auxiliaryColors = ["#0dcaf0","#fd7e14","#20c997","#d63384","#ffc107","#6f42c1","#198754","#adb5bd"];
 let temperatureChart;
 let auxiliaryChart;
+let weatherForecastValues;
 loadNavigation();
 i18nReady.then(() => { createTemperatureChart(); createAuxiliaryChart(); refreshDashboard(); setInterval(refreshDashboard, 5000); });
+document.addEventListener("ui-language-changed", () => {
+    if (weatherForecastValues) renderWeatherForecast(weatherForecastValues);
+});
 
 const metricDefinitions = {
     heating: [["dashboard_detail.active","Active","bool"],["dashboard_detail.pump","Pump","bool"],["dashboard_detail.season","Season","season"],["dashboard_detail.economy","Economy","bool"],["dashboard_detail.feed_temperature_utilization","Power","percent"],["dashboard.feed_current","FeedCurrent","temperature"],["dashboard.feed_setpoint","FeedSetpoint","temperature"],["dashboard_detail.calculated_feed","CalculatedFeedSetpoint","temperature"],["dashboard_detail.feed_max","FeedMaximum","temperature"],["dashboard_detail.buffer_current","BufferCurrent","temperature"],["dashboard_detail.buffer_max","BufferMaximum","temperature"]],
+    weatherForecast: [
+        ["control.weather_maximum","WeatherSupportMaximum","percent"],
+        ["dashboard_weather.enabled","ForecastEnabled","bool"],
+        ["control.forecast_coefficient","ForecastCoefficient","coefficient"],
+        ["dashboard_weather.correction","ForecastCorrection","temperature"],
+        ["dashboard_weather.remaining","ForecastRemainingSeconds","seconds"],
+        ["dashboard_weather.rooms_satisfied","ForecastRoomsSatisfied","permission"],
+        ["dashboard_weather.temperature_change","ForecastTemperatureChange","temperature"]
+    ],
     hotwater: [["dashboard_detail.current","Current","temperature"],["dashboard_detail.setpoint","Setpoint","temperature"],["dashboard_detail.maximum","Maximum","temperature"],["dashboard_detail.continuous_setpoint","ContinuousFlowSetpoint","temperature"],["dashboard_detail.now","Now","bool"],["dashboard_detail.buffer","Buffer","bool"]],
     mixed: [["dashboard_detail.pump","Pump","bool"],["dashboard_detail.economy","Economy","bool"],["dashboard.feed_current","FeedCurrent","temperature"],["dashboard.feed_setpoint","FeedSetpoint","temperature"]],
     command: [["dashboard_detail.enabled","Enabled","bool"],["dashboard_detail.requested_feed","FeedSetpoint","temperature"],["dashboard_detail.curve_base","FeedBaseSetpoint","temperature"],["dashboard_detail.curve_cutoff","FeedCutOff","temperature"],["dashboard_detail.feed_min","FeedMinimum","temperature"],["dashboard_detail.aux_temperature","AuxiliaryTemperature","temperature"],["dashboard_detail.ambient","AmbientTemperature","temperature"],["dashboard_detail.target_ambient","TargetAmbientTemperature","temperature"],["dashboard_detail.adaption","Adaption","number"],["dashboard_detail.valve_scaling","ValveScaling","bool"],["dashboard_detail.valve_max","ValveScalingMaxOpening","percent"],["dashboard_detail.valve_opening","ValveScalingOpening","percent"],["dashboard_detail.dynamic_adaption","DynamicAdaption","bool"],["dashboard_detail.override_setpoint","OverrideSetpoint","bool"],["dashboard_detail.boost_duration","OnDemandBoostDuration","duration"],["dashboard_detail.boost","Boost","bool"],["dashboard_detail.boost_remaining","BoostTimeLeft","duration"],["dashboard_detail.fast_heatup","FastHeatup","bool"],["dashboard_detail.hotwater_setpoint","HotWaterSetpoint","temperature"]]
@@ -15,12 +28,17 @@ const metricDefinitions = {
 
 function temperature(value) { return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)} °C` : "—"; }
 function formatValue(value, type) {
-    if (type === "temperature") return temperature(value);
-    if (type === "bool") return translate(value ? "common.on" : "common.off");
-    if (type === "percent") return `${Number(value || 0).toFixed(0)}%`;
-    if (type === "duration") return formatDuration(Number(value || 0));
+    if (value === undefined || value === null) return "—";
+    if (type === "bool") return typeof value === "boolean" ? translate(value ? "common.on" : "common.off") : "—";
+    if (type === "permission") return typeof value === "boolean" ? translate(value ? "dashboard_weather.yes" : "dashboard_weather.no") : "—";
     if (type === "season") return translate(value ? "dashboard_detail.winter" : "dashboard_detail.summer");
-    return Number.isFinite(Number(value)) ? Number(value).toFixed(1) : String(value ?? "—");
+    if (!Number.isFinite(value)) return "—";
+    if (type === "temperature") return temperature(value);
+    if (type === "percent") return `${value.toFixed(0)}%`;
+    if (type === "duration") return formatDuration(value);
+    if (type === "seconds") return `${Math.max(0, Math.floor(value))} ${translate("dashboard_weather.seconds_unit")}`;
+    if (type === "coefficient") return `${value.toLocaleString(getUiLanguage(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${translate("control.forecast_coefficient_unit")}`;
+    return value.toFixed(1);
 }
 function formatDuration(seconds) { const total=Math.max(0,Math.floor(seconds)); const days=Math.floor(total/86400),hours=Math.floor(total%86400/3600),minutes=Math.floor(total%3600/60),secs=total%60; return `${days?`${days}d `:""}${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`; }
 function setBadge(id, ok, good, bad) { const el=_(id); el.textContent=translate(ok?good:bad); el.className=`badge ${ok?"bg-success":"bg-danger"}`; }
@@ -30,18 +48,70 @@ function setSectionVisibility(id,visible) { _(id).hidden=!visible; }
 async function refreshDashboard() {
     try {
         const [runtime,status]=await Promise.all([fetch("/api/runtime").then(response=>response.json()),getSystemStatus()]);
-        const burnerPower=calculateBurnerPower(runtime.Heating),heatingDisplay={...runtime.Heating,Power:burnerPower};
+        const burnerPower=calculateBurnerPower(runtime.Heating),heatingDisplay={
+            ...runtime.Heating,
+            Power:burnerPower,
+            WeatherSupportMaximum:runtime.Command?.WeatherSupportMaximum,
+            ForecastEnabled:runtime.Command?.ForecastEnabled,
+            ForecastCoefficient:runtime.Command?.ForecastCoefficient
+        };
         _("outside").textContent=temperature(runtime.General.OutsideTemperature); _("outside-base").textContent=temperature(runtime.Command.FeedBaseSetpoint); _("outside-cutoff").textContent=temperature(runtime.Command.FeedCutOff); _("feed-current").textContent=temperature(runtime.Heating.FeedCurrent); _("feed-target").textContent=temperature(runtime.Heating.CalculatedFeedSetpoint);
         _("flame").textContent=translate(runtime.General.FlameLit?"common.on":"common.off"); _("flame-icon").className=`bi bi-fire ${runtime.General.FlameLit?"text-danger":"text-muted"}`; _("power").textContent=formatValue(burnerPower,"percent");
         _("pump").textContent=translate(runtime.Heating.Pump?"common.on":"common.off"); _("pump-icon").className=`bi bi-fan ${runtime.Heating.Pump?"text-info dashboard-spin":"text-muted"}`; _("heating-active").textContent=`${translate("dashboard_detail.active")}: ${translate(runtime.Heating.Active?"common.on":"common.off")}`;
         const healthy=runtime.System.Wifi&&runtime.System.CanErrors===0; _("runtime-status").textContent=translate(runtime.System.FailSafe?"dashboard.failsafe":(healthy?"dashboard.live":"dashboard.degraded")); _("runtime-status").className=`badge dashboard-status-pill ${runtime.System.FailSafe?"bg-warning text-dark":(healthy?"bg-success":"bg-danger")}`; _("dashboard-updated").textContent=`${translate("dashboard_detail.updated")}: ${new Date().toLocaleTimeString()}`;
         setSectionVisibility("heating-section",runtime.System.CanProfiles.Heating); setSectionVisibility("hotwater-section",runtime.System.CanProfiles.DomesticHotWater); setSectionVisibility("mixed-section",runtime.System.CanProfiles.MixedCircuit); setSectionVisibility("auxiliary-section",runtime.Auxiliary?.length>0); setSectionVisibility("temperature-history-section",runtime.System.CanProfiles.Heating||runtime.System.CanProfiles.DomesticHotWater);
         renderMetrics("heating-values",heatingDisplay,metricDefinitions.heating); renderMetrics("hotwater-values",runtime.HotWater,metricDefinitions.hotwater); renderMetrics("mixed-values",runtime.MixedCircuit,metricDefinitions.mixed); renderMetrics("command-values",runtime.Command,metricDefinitions.command); renderAuxiliary(runtime.Auxiliary); updateTemperatureChart(runtime); updateAuxiliaryChart(runtime.Auxiliary);
+        renderWeatherForecast(heatingDisplay);
         _("model").textContent=`${status.model} r${status.revision} · ${status.cores} cores`; _("uptime").textContent=formatDuration(runtime.System.Uptime); _("can-profiles").textContent=[runtime.System.CanProfiles.Heating&&translate("can_setup.profile_heating"),runtime.System.CanProfiles.MixedCircuit&&translate("can_setup.profile_mixed"),runtime.System.CanProfiles.DomesticHotWater&&translate("can_setup.profile_hotwater")].filter(Boolean).join(" · ")+(runtime.System.CanReadOnly?` · ${translate("can_setup.read_only")}`:"");
+        _("firmware-version").textContent=typeof status.version==="string" && status.version.trim() ? status.version : "—";
         setUsageBar("heap","prog-heap",status.heap-status.freeheap,status.heap); setUsageBar("sketch","prog-sketch",status.sketchsize,status.sketchsize+status.freesketch); setUsageBar("filesystem","prog-filesystem",status.filesystemused,status.filesystemsize); setBadge("can",status.canstatus===0,"common.connected",CanErrorCodes[status.canstatus]||"common.error"); setBadge("canerrorcount",status.canerrorcount===0,"0",String(status.canerrorcount)); setBadge("mqtt",status.mqtt,"common.connected","common.disconnected");
-    } catch(error) { console.error(error); _("runtime-status").textContent=translate("common.unavailable"); _("runtime-status").className="badge dashboard-status-pill bg-danger"; }
+    } catch(error) {
+        console.error(error);
+        _("runtime-status").textContent=translate("common.unavailable");
+        _("runtime-status").className="badge dashboard-status-pill bg-danger";
+        renderWeatherForecast({});
+    }
 }
-function renderMetrics(containerId,values,definitions,disabled=false) { _(containerId).innerHTML=disabled?`<div class="text-muted">${translate("dashboard_detail.profile_disabled")}</div>`:definitions.map(([label,property,type])=>`<div class="metric"><span>${translate(label)}</span><strong>${formatValue(values?.[property],type)}</strong></div>`).join(""); }
+function renderMetrics(containerId,values,definitions,disabled=false) {
+    const metrics=document.createDocumentFragment();
+    if (disabled) {
+        const message=document.createElement("div");
+        message.className="text-muted";
+        message.dataset.i18n="dashboard_detail.profile_disabled";
+        message.textContent=translate(message.dataset.i18n);
+        metrics.append(message);
+    } else {
+        definitions.forEach(([label,property,type]) => {
+            const metric=document.createElement("div"),name=document.createElement("span"),value=document.createElement("strong");
+            metric.className="metric";
+            name.dataset.i18n=label;
+            name.textContent=translate(label);
+            value.textContent=formatValue(values?.[property],type);
+            metric.append(name,value);
+            metrics.append(metric);
+        });
+    }
+    _(containerId).replaceChildren(metrics);
+}
+function renderWeatherForecast(values) {
+    weatherForecastValues=values;
+    const freshSample=Number.isFinite(values.ForecastRemainingSeconds) && values.ForecastRemainingSeconds>0;
+    const displayValues=freshSample ? values : {
+        ...values,
+        ForecastCorrection:undefined,
+        ForecastRoomsSatisfied:undefined,
+        ForecastTemperatureChange:undefined
+    };
+    renderMetrics("weather-forecast-values",displayValues,metricDefinitions.weatherForecast);
+    let status="common.unavailable";
+    if (values.ForecastEnabled === false) status="dashboard_weather.disabled";
+    else if (values.ForecastEnabled === true && Number.isFinite(values.ForecastRemainingSeconds)) {
+        status=values.ForecastRemainingSeconds>0 ? "dashboard_weather.fresh_sample" : "dashboard_weather.no_fresh_sample";
+    }
+    const summary=_("weather-forecast-status");
+    summary.dataset.i18n=status;
+    summary.textContent=translate(status);
+}
 function renderAuxiliary(sensors) { _("auxiliary-values").innerHTML=sensors?.length?sensors.map((sensor,index)=>`<div class="metric"><span><i class="auxiliary-color" style="background:${auxiliaryColors[index%auxiliaryColors.length]}"></i>${escapeDashboard(sensor.Label)}</span><strong class="${sensor.Reachable?"":"text-muted"}">${sensor.Reachable?temperature(sensor.Temperature):translate("common.unavailable")}</strong></div>`).join(""):`<div class="text-muted">${translate("dashboard_detail.no_auxiliary")}</div>`; if(!sensors?.length)_("auxiliary-chart-container").hidden=true; }
 function escapeDashboard(value) { const element=document.createElement("span"); element.textContent=value; return element.innerHTML; }
 function createTemperatureChart() { temperatureChart=new Chart(_("temperature-chart"),{type:"line",data:{labels:[],datasets:[{label:translate("dashboard.feed_current"),data:[],borderColor:"#dc3545",backgroundColor:"#dc3545",tension:.25,pointRadius:0},{label:translate("dashboard_detail.calculated_feed"),data:[],borderColor:"#0d6efd",backgroundColor:"#0d6efd",tension:.25,pointRadius:0},{label:translate("dashboard.outside"),data:[],borderColor:"#198754",backgroundColor:"#198754",tension:.25,pointRadius:0},{label:translate("dashboard.hot_water"),data:[],borderColor:"#6f42c1",backgroundColor:"#6f42c1",tension:.25,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},scales:{x:{ticks:{maxTicksLimit:8}},y:{title:{display:true,text:"°C"}}},plugins:{legend:{position:"bottom",labels:{filter:(item,data)=>!data.datasets[item.datasetIndex].profileDisabled}}}}}); }
