@@ -163,6 +163,8 @@ For configuration-file compatibility, `CommandTimeoutSeconds` retains its existi
 
 The schedule uses boiler-reported time first, then locally synchronized time. With no valid clock it applies `HeatWhenTimeUnknown`: `true` holds the minimum feed temperature, while `false` disables heating.
 
+`StartHour`/`StartMinute` and `StopHour`/`StopMinute` govern this offline profile only. While MQTT is connected, the firmware leaves fail-safe mode and normal external controls own scheduling; it does not enforce an additional online stop at the fail-safe stop time. An external installation may intentionally permit demand outside its normal window, as in the [Home Assistant policy example](Examples/HomeAssistant/README.md#installed-system-scheduling-and-shutdown).
+
 ![Normal-operation and offline fail-safe settings](webui-general-failsafe-dark.png)
 
 ### General Settings
@@ -200,7 +202,11 @@ The program will stop issuing control messages immediately after another control
         "SetpointOffDelaySeconds": 300,
 ```
 
-The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating off. Calculated values below 10 °C are clamped to exactly 10 °C before CAN conversion and transmission. If that request remains continuously active for this many seconds, Cerasmarter disables the heating operation flag. The controller-side latch applies to every command transport and prevents repeated `Enabled: true` messages from defeating the shutdown. An effective setpoint above 10 °C clears the latch; a client that explicitly manages `Enabled` should send `Enabled: true` with the higher demand. Values from 10 through 86400 seconds are accepted.
+The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating off. Calculated values below 10 °C are clamped to exactly 10 °C before CAN conversion and transmission. Explicit `Enabled: false`, or zero supplied demand in valve mode, lowers the effective request to 10 °C immediately; it does not wait for this timer. If the effective request remains continuously at or below 10.01 °C for the configured period, Cerasmarter disables its commanded heating operation flag. The controller-side latch applies to every command transport and prevents repeated `Enabled: true` messages at low demand from defeating the shutdown. A genuinely higher effective setpoint clears the timer/latch; a client that explicitly manages `Enabled` should send `Enabled: true` with the higher demand. Values from 10 through 86400 seconds are accepted.
+
+The default above is 300 seconds. The [12–13 October 2026 installation example](Examples/HomeAssistant/README.md#installed-system-scheduling-and-shutdown) used 30 seconds; this is an installation setting, not a new default. Neither value specifies physical pump afterrun. Commanded enablement, the effective request, received `HeatingOperation`, burner flame and pump state are distinct observations and need not change together.
+
+Effective heating requests are also capped at the physical maximum received from the boiler. There is no separately invented installation maximum. The firmware waits for that CAN observation before calculating a heating request, and rounds limits downward when necessary to keep half-degree wire values within the ceiling. Existing active fail-safe limits remain additional, configured limits and cannot raise an off request or defeat the boiler maximum.
 
 ### Runtime Controls
 
@@ -216,6 +222,9 @@ The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating o
         "ValveScaling": false,
         "MaxValveOpening": 80,
         "DynamicAdaption": false,
+        "WeatherSupportMaximum": 60.0,
+        "ForecastEnabled": false,
+        "ForecastCoefficient": 0.5,
         "OverrideSetpoint": false,
         "BoostDuration": 300,
         "HotWaterSetpoint": 40
@@ -224,9 +233,13 @@ The manufacturer-defined 10 °C (50 °F) effective feed setpoint means heating o
 
 The firmware updates this block automatically after stable values are accepted through the combined MQTT parameter topics or Home Assistant command entities. Writes are delayed and coalesced for three seconds so a burst of related commands produces one atomic configuration update instead of unnecessary flash wear. Repeating an unchanged value does not write again.
 
-Live measurements and momentary actions are deliberately not persisted: `AuxiliaryTemperature`, `AmbientTemperature`, `ValveScalingOpening`, active boost state, and fast heat-up state must be supplied again by their source. Normal-operation heating-curve `FeedBaseSetpoint` and `FeedCutOff` are stored as `General.BasepointTemperature` and `General.EndpointTemperature` because they also define the startup defaults.
+Live measurements and momentary actions are deliberately not persisted: `AuxiliaryTemperature`, `AmbientTemperature`, `ValveScalingOpening`, active boost state, fast heat-up state, and forecast samples/lifetime/room permission must be supplied again by their source. Normal-operation heating-curve `FeedBaseSetpoint` and `FeedCutOff` are stored as `General.BasepointTemperature` and `General.EndpointTemperature` because they also define the startup defaults.
 
-The fallback web page and `POST /api/control` are emergency runtime controls and do not alter `RuntimeControls`. Use MQTT or Home Assistant when the accepted state should return after reboot. See the [API reference](API.md#post-apicontrol) for command ranges.
+The fallback web page uses `POST /api/control/queued`; it and the existing `POST /api/control` are temporary runtime controls and do not alter `RuntimeControls`. Use MQTT or Home Assistant when settings should return after reboot. See the [API reference](API.md#post-apicontrolqueued) for command ranges and queued-versus-applied semantics.
+
+`WeatherSupportMaximum` is a 0–100% cap on the outside fraction in dynamic valve mode, not a multiplier and not an override of the physical boiler maximum. Missing/invalid stored values default to 60%. The cold weather contribution becomes flat at this cap; actual valve demand can still raise output toward the boiler maximum. 100% restores the full hybrid curve, 0% removes its weather-weighted baseline/adaptation contribution. Static valve/weather-only/boost/override/fail-safe paths are unaffected. With the −10/+21 °C endpoints and 60%, the weather contribution saturates around +2.4 °C.
+
+`ForecastEnabled` defaults to false; `ForecastCoefficient` accepts finite 0–1 °C feed per °C expected outside change and defaults to 0.5. Invalid stored values use these safe defaults; command input is rejected instead. The external provider trend is converted into a bounded ±2 °C correction. Negative valve-mode corrections additionally require fresh same-sample permission that all relevant rooms are satisfied. Reboot drops every forecast sample and its permission, not these stable settings. See [Optional three-hour weather forecast](../README.md#optional-three-hour-weather-forecast).
 
 ###### Debug
 

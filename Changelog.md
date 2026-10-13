@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- Removed location-bearing entity IDs, private schedules, building details and recorded installation traces from the Home Assistant forecast guide. Shared documentation now uses generic setup guidance; private automation YAML/JSON examples remain intentionally excluded.
+
+## 0.95.0 (Beta) — 2026-10-13
+
+- Corrected valve-mode dynamic adaptation to support cold weather. Dynamic valve control now interpolates from an outside-temperature baseline to the boiler maximum, including with zero manual adaptation; disabled heating and zero valve demand retain the 10 °C off request.
+- Added `WeatherSupportMaximum` (0–100%, default 60%) to cap the dynamic-valve weather fraction while retaining demand authority in cold weather. The setting is exposed in the localized web controls and MQTT/Home Assistant and persists for stable MQTT changes.
+- Extracted the real temperature calculation into a hardware-independent input/output module, retained fractional precision, and bounded every effective heating feed request by the observed physical boiler maximum, including half-degree rounding and active fail-safe ceilings.
+- Added optional forecast enable/coefficient controls (default off / 0.5 °C feed per °C outside change), bounded ±2 °C trend correction, receipt-time expiry and same-sample room permission for valve-mode reductions. Documented an explicitly enabled external Home Assistant producer using three future hourly temperatures from one provider; no portable automation JSON is bundled. Samples remain volatile, and reductions are refused when relevant rooms have deficits, active heating or insufficient reporting freshness.
+- Documented the accepted installation-specific Home Assistant season-lock and window-or-demand policy: the stop time is not an absolute shutdown when demand remains. Distinguished immediate off requests, low-setpoint latching, pump afterrun and the separate offline fail-safe without changing that external policy.
+- Added 26 isolated ESP32 temperature scenarios, 9 tests executing the real forecast lifecycle and 7 real queued-control regression tests with passive peripheral bindings, plus reproducible serial weather/forecast presets. Coverage includes coefficient changes, disablement, room-permission transitions, expiry, cross-queue submission ordering, whole-document rejection and preservation of pending valid controls.
+- Added `/api/control/queued` for main-loop-owned temporary controls: `202` accepts one fully validated pending document, with newer submissions replacing rather than merging it. Any malformed recognized field rejects the entire queued document without replacing pending controls or forecasts. Ordinary legacy `/api/control` keeps its `200` runtime response and `400` when no control is accepted; newly introduced stable fields use the queued route. Setup mode returns `503`, and an ordinal cross-queue guard prevents older queued HTTP forecast samples from overwriting newer MQTT inputs even at equal timestamps. Stable MQTT/Home Assistant settings retain coalesced persistence; HTTP runtime controls remain temporary.
+- Added a localized read-only weather/forecast monitor to the heating dashboard, with precise coefficient units, fresh-sample validity and reduction permission. Missing or expired samples display unavailable values; telemetry is distinguished from an applied correction. Runtime refresh failures clear stale monitor values, and shared dashboard metric rows are rendered with `textContent` rather than HTML.
+- Exposed the running firmware's normalized build version through `GET /api/info` and added a localized firmware-version row beside the MCU model at the end of the website. Missing version metadata remains unavailable rather than displaying a website-derived or hard-coded version.
+- Returned to the pinned official PlatformIO ESP32 platform 7.1.3 / Arduino 2.0.17, retained bounded TCP connection attempts with portable APIs, enabled C++17, and adapted complete first-install image packaging to its boot/application artifacts.
+- Cleared the example MQTT credentials from the provisioning template; release Wi-Fi and MQTT credential fields are empty.
+
+Release filesystem images remain credential-free, with forecast assistance disabled. The default release pipeline packages application, LittleFS and complete first-install images; complete images use partition-derived offsets, capacity/overlap checks and erased-byte padding. These changes do not broaden the supported hardware or certify winter comfort or gas savings.
+
+[Release notes and upgrade guidance](assets/Releases/0.95.0.md) · [Full comparison with v0.94.0](https://github.com/Neuroquila-n8fall/JunkersControl/compare/v0.94.0...0.95.0)
+
+
 ## v0.94.0
 
 - Reworked the documentation around the current web UI, configuration persistence, MQTT/Home Assistant state, and CAN profiles. Added a consolidated HTTP/SSE/MQTT API reference with security and persistence notes, refreshed MQTT payload examples, and added current production-controller and Home Assistant discovery screenshots.

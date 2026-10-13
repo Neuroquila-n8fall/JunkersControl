@@ -14,5 +14,8 @@
     "ValveScalingMaxOpening": 100,
     "ValveScalingOpening": 75,
     "DynamicAdaption": true,
+    "WeatherSupportMaximum": 60,
+    "ForecastEnabled": false,
+    "ForecastCoefficient": 0.5,
     "OverrideSetpoint": false
 }

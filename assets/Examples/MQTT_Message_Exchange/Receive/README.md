@@ -54,7 +54,7 @@ override is enabled.
     "FeedBaseSetpoint": -10,
 ```
 
-The heating will yield 100% of it's heating power (feed temperature) when outside temperature is at or below this setting.
+At or below this outside-temperature basepoint, the outside curve reaches the physical maximum feed temperature reported by the boiler. This is a temperature request, not a measurement of burner power.
 
 ###### Cutoff Temperature (Weather Guided)
 
@@ -62,7 +62,7 @@ The heating will yield 100% of it's heating power (feed temperature) when outsid
     "FeedCutOff": 22,
 ```
 
-The heating will stop operation when the outside temperature has reached this value.
+At this outside temperature the outside curve reaches its minimum. In dynamic valve mode, an actual valve demand can still raise the request above that baseline; zero valve demand remains off.
 
 ###### Anti-Freeze
 
@@ -70,7 +70,7 @@ The heating will stop operation when the outside temperature has reached this va
     "FeedMinimum": 10,
 ```
 
-This is a more or less static value determined by your heating system. If the feed temperature goes below this point, the heating will resume operation to prevent pipes from freezing. Internally calculated values below the manufacturer-defined 10 °C off value are clamped to exactly 10 °C.
+The manufacturer-defined 10 °C feed request means heating off; it is not proof of guaranteed frost protection. Every effective heating feed request is bounded by that floor and the physical maximum reported by the boiler.
 
 
 ###### Auxiliary Temperature
@@ -111,7 +111,7 @@ Enable or disable the [Fastheatup Feature](../../../../README.md#fast-heatup)
     "Adaption": 0,
 ```
 
-The feed calculations are off? Just set a value here and it will adjust the final setpoint accordingly.
+The manual temperature correction depends on the selected mode. In dynamic valve mode it raises the outside baseline proportionally toward the cold basepoint and fades to zero at the warm cutoff. Static valve mode retains the fixed correction in its interpolation base.
 
 ###### Valve Based Control Settings
 
@@ -137,11 +137,29 @@ Enables or disables the [Dynamic Adaption Feature](../../../../README.md#dynamic
     "OverrideSetpoint": false
 ```
 
-Ignore and Override any internal calculations and set the feed to the temperature set by [Feed Setpoint](#feed-setpoint)
+Use the requested [Feed Setpoint](#feed-setpoint) instead of the automatic curve. Physical boiler limits and disabled/zero-valve off precedence still apply.
 
 This is considered the completely manual method where you do your own calculations and just steer the temperature to your likings.
 
-Be aware, though, that you can only "suggest" temperatures to the heating. It will throttle itself to prevent any harm and malfunction on its own. It actively prevents setting unrealistic values that might break the boundaries of its internal parameters. So for example if you set the feed to 100°C but your system is only able to deliver 90°C, it will set 90°C. If the dial is set to allow 75°C, it will only go as far as 75°C.
+###### Forecast Correction
+
+The combined heating-parameter topic also accepts a transient forecast pair:
+
+```json
+{
+    "ForecastCorrection": 1.5,
+    "ForecastValidForSeconds": 3600
+}
+```
+
+Correction must be a finite number between -2 and 2 °C. Lifetime must be an integer
+from 1 to 14400 seconds; it defaults to 3600 when omitted. Lifetime without a
+correction is invalid. The main loop applies the newest queued sample, removes it
+at expiry, and does not persist it. Send zero to clear it. Publish these commands
+without MQTT retain so an old correction is not refreshed by broker replay.
+See [Forecast API](../../../API.md#get-apiforecast-and-post-apiforecast) for HTTP
+ingestion, telemetry and the external weather-producer contract.
+
 
 ## Persistence
 
