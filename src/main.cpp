@@ -4,6 +4,7 @@
 // Main Header
 #include <main.h>
 #include <failsafe.h>
+#include <forecast.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Operation
@@ -248,6 +249,7 @@ void loop()
   {
     // But we like to be still able to update files via OTA ofc
     ArduinoOTA.handle();
+    ProcessForecastCorrection();
     return;
   }
 
@@ -285,6 +287,8 @@ void loop()
   // MQTT maintenance follows CAN work and is bounded by the configured socket
   // timeout, so network traffic cannot take priority over boiler traffic.
   client.loop();
+  ProcessPendingRuntimeControls();
+  ProcessForecastCorrection();
   // Coalesce stable MQTT/HA control changes before writing configuration. This
   // stays in the main loop and avoids both flash churn and another task.
   ProcessRuntimeControlPersistence();

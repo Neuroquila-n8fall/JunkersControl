@@ -281,6 +281,14 @@ void addCoreComponents(JsonObject components)
     addNumber(components, "heating_manual_adaptation", "Manual Adaptation", "Heating", "Adaption",
               "{{ value_json.Heating.Adaption | float(default=0) }}", -30, 30, 0.5, temperatureUnit,
               "box", "mdi:tune-variant");
+    addNumber(components, "heating_weather_support_maximum", "Maximum Weather Support", "Heating", "WeatherSupportMaximum",
+              "{{ value_json.Heating.WeatherSupportMaximum | float(default=60) }}", 0, 100, 1, "%",
+              "slider", "mdi:weather-partly-cloudy");
+    addNumber(components, "heating_forecast_coefficient", "Forecast Coefficient", "Heating", "ForecastCoefficient",
+              "{{ value_json.Heating.ForecastCoefficient | float(default=0.5) }}", 0, 1, 0.05, "°C/°C",
+              "slider", "mdi:weather-partly-cloudy");
+    addSwitch(components, "heating_forecast_enabled", "Forecast Enabled", "Heating", "ForecastEnabled",
+              "{{ 'true' if value_json.Heating.ForecastEnabled else 'false' }}", "mdi:weather-partly-cloudy");
     addNumber(components, "heating_auxiliary_temperature", "Auxiliary Outside Temperature", "Heating", "AuxiliaryTemperature",
               "{{ value_json.Heating.AuxiliaryTemperature | float(default=0) }}", -50, 100, 0.1, temperatureUnit,
               "box", "mdi:sun-thermometer");
@@ -357,7 +365,7 @@ bool parseBoolean(const String &payload, bool &value)
 bool isHeatingBooleanKey(const String &key)
 {
     return key == "Enabled" || key == "ValveScaling" || key == "DynamicAdaption" ||
-           key == "OverrideSetpoint" || key == "Boost" || key == "FastHeatup";
+           key == "OverrideSetpoint" || key == "Boost" || key == "FastHeatup" || key == "ForecastEnabled";
 }
 
 bool isHeatingNumberKey(const String &key)
@@ -366,7 +374,7 @@ bool isHeatingNumberKey(const String &key)
            key == "FeedMinimum" || key == "AuxiliaryTemperature" || key == "AmbientTemperature" ||
            key == "TargetAmbientTemperature" || key == "Adaption" ||
            key == "ValveScalingMaxOpening" || key == "ValveScalingOpening" ||
-           key == "OnDemandBoostDuration";
+           key == "OnDemandBoostDuration" || key == "WeatherSupportMaximum" || key == "ForecastCoefficient";
 }
 
 bool handleHomeAssistantCommand(const String &relativeTopic, const String &payload)
@@ -433,8 +441,10 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
     else
         return false;
 
-    ApplyHeatingCommand(command.as<JsonVariantConst>(), true);
-    Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
+    if (ApplyHeatingCommand(command.as<JsonVariantConst>(), true))
+        Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
+    else
+        Log.printf("Ignoring invalid HA control payload on %s\r\n", relativeTopic.c_str());
     return true;
 }
 } // namespace

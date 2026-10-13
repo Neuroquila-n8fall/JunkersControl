@@ -12,6 +12,8 @@
 
 Documentation tracks the current development firmware. Please open an issue when controller-specific behavior differs from the documented BM1 installation profiles.
 
+**Beta release: `0.95.0` (2026-10-13).** Adds bounded dynamic-valve weather support, optional forecast assistance and updated ESP32 packaging. Forecast assistance is disabled by default. Read the [English release notes](assets/Releases/0.95.0.md) for installation assets, configuration backups, trusted-LAN requirements and verification limits before upgrading.
+
 ## Community
 You can reach out on [Discord](https://discord.gg/9Wrndbqu7t) to discuss the project and get help from the community.
 
@@ -123,7 +125,9 @@ The CAN Message Analyzer under **Utilities** receives live bus events independen
 
 _Production-controller capture. The displayed `Burner power` label was renamed to `Feed temperature utilization` in the current development UI because it represents the feed-temperature range, not thermal burner output._
 
-The home page is a live heating dashboard organized into heating, mixed-circuit, domestic-hot-water, auxiliary-sensor, runtime-control, and system categories. It presents every value returned by `GET /api/runtime`, uses equipment-appropriate state icons, and plots a five-minute temperature history with the locally bundled Chart.js 4.5.1 library. No CDN or internet access is required. **Utilities > Fallback Heating Control** exposes every runtime command accepted through MQTT, including heating-curve, room-reference, boost, fast-heatup, valve-scaling, and hot-water controls. These web fallback commands take effect immediately but are not persisted; stable settings received through MQTT or Home Assistant are stored in `RuntimeControls` and restored after reboot.
+The home page is a live heating dashboard organized into heating, mixed-circuit, domestic-hot-water, auxiliary-sensor, runtime-control, and system categories. It presents the main operational values from `GET /api/runtime`, uses equipment-appropriate state icons, and plots a five-minute temperature history with the locally bundled Chart.js 4.5.1 library. No CDN or internet access is required. The heating card includes a localized weather/forecast monitor: maximum weather fraction, forecast enablement, a two-decimal coefficient, available correction, sample lifetime, reduction permission and raw forecast trend. Sample-dependent values display a dash when no fresh sample exists; available correction is not confirmation that it changes the transmitted request. **Utilities > Fallback Heating Control** exposes heating-curve, room-reference, boost, fast-heatup, valve-scaling, weather/forecast settings and hot-water controls. These web fallback commands are queued for the main loop through `POST /api/control/queued` and are not persisted; stable settings received through MQTT or Home Assistant are stored in `RuntimeControls` and restored after reboot. Forecast samples arrive separately through the HTTP/MQTT interfaces.
+
+At the end of the home page, **System Status** displays the running firmware version beside the MCU model. Its value comes from `GET /api/info`, not the website build; an absent version field is shown as `—`.
 
 ![Fallback heating controls](/assets/webui-fallback-control-dark.png)
 
@@ -303,22 +307,15 @@ See [Auxiliary Sensors](assets/Configuration.md#auxiliary-sensors)
 
 ### Dynamic Adaption
 
-Simply put: my heating system is way too powerful and the radiators are not capable of getting rid of the energy fast enough. I figured if I lower the temperature by the difference between return and desired room temperature I can get away with a more dynamic model:
+With valve scaling enabled, dynamic adaptation selects the outside-temperature baseline described in [Valve-based control](#valve-based-control). Outside temperature therefore supports heat delivery even when `Adaption` is zero. A positive manual adaptation raises that baseline more in cold weather and fades toward the warm cutoff; its direction is no longer reversed.
 
-Adaption = Desired target room temperature - feed temperature (+ Manual Adaption)
+Without valve scaling, dynamic adaptation retains the existing correction `TargetAmbientTemperature - FeedReturnTemperatureReference + Adaption`. This is a return-reference correction, not a measurement of radiator output or building heat loss. Fast heatup temporarily uses its own temperature approach instead.
 
-This means that the setpoint of the feed will be lowered by the difference. You don't have to pump in that much energy when 90% of it returns to the heat exchanger which by itself will always try to steer the feed temperature to the average setpoint.
-
-This kind of adaption is, of course, very simple and rough. As soon as this mode is active, the `Adaption` value will alter the value accordingly so in my instance I put in additional 5° `Adaption` so if the temperature would be lowered to around 35° feed, it will be actually set to 40°.
-
-[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
-```json
-  "Adaption": 0
-```
+Every resulting heating feed request is bounded by the physical maximum reported by the boiler. No software command can raise that limit. Before the maximum has been observed on CAN, the calculated request remains at the 10 °C off value.
 
 ### Calculate yourself
 
-You can do your own calculations and just tell the control to set the temperature accordingly by setting `1|0` or `true|false` via parameters topic to enable or disable this feature and set the desired `FeedSetpoint`
+You can calculate a requested `FeedSetpoint` externally and enable `OverrideSetpoint`. The effective request is still bounded by the manufacturer-defined 10 °C off value and the physical maximum reported by the boiler; override does not bypass those limits.
 
 [See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
 ```json
@@ -330,42 +327,79 @@ You can do your own calculations and just tell the control to set the temperatur
 
 ### Valve-based control
 
-This feature will calculate the desired feed temperature based on the valve opening that is received, mapped using the minimum a valve can be closed (0%) and the maximum (80% for Homematic eTRV-2, set by `ValveScalingMaxOpening`) to the `FeedMinimum` plus `Adaption` and `FeedMaximum` (reported on the topic defined at `HeatingValues` within the [configuration template](assets/Templates/Configurations/configuration.json)).
-This is the most demand focused function yet because if you always report the most open valve in the circuit, you end up with a very responsive system that will react on demand immediately.
-This also means that, for example, in the morning when the heat cycle starts, the most open valve will most likely report it is running at the maximum available opening thus raising the feed setpoint to max. As the rooms get warmer and warmer it will eventually throttle and another valve may be higher. This is a self regulating system which will deactivate the influence of outside temperatures. If you want to have the temperature influenced by outside temperature, switch on `DynamicAdaption` which will then add a value mapped between `FeedBaseSetpoint` and `FeedCutoff`. Next set `Adaption` according to your needs.
+`ValveScalingOpening` is the supplied demand, normalized by `ValveScalingMaxOpening` and bounded to 0–100%. The firmware does not aggregate individual room valves: the producer must preserve sustained genuine room demand rather than assume that a weighted average or an unfiltered maximum always represents it.
 
-Example for dynamic adaption together with valve scaling:
-- Outside Temperature is 5°
-- Basepoint is -15°
-- Endpoint is 31°
-- Feed Adaption is 20
-- Valve Opening: 50%
-- Max Feed: 75°
+With `DynamicAdaption` disabled, static interpolation remains between `FeedMinimum + Adaption` and the boiler's reported `FeedMaximum`, followed by the output bounds.
 
+With both valve scaling and dynamic adaptation enabled, the outside curve supplies the interpolation baseline:
 
-Map Function: `(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min`
+```text
+r = clamp((FeedCutOff - outside) / (FeedCutOff - FeedBaseSetpoint), 0, 1)
+rw = min(r, WeatherSupportMaximum / 100)
+D = clamp(ValveScalingOpening / ValveScalingMaxOpening, 0, 1)
+weatherBase = clamp(FeedMinimum + (FeedMaximum - FeedMinimum) * rw
+                    + Adaption * rw, 10, FeedMaximum)
+feed = weatherBase + (FeedMaximum - weatherBase) * D
+```
 
-Adaption Calculation: (Outside - Basepoint) * (Feed Adaption - 0) / (Endpoint - Basepoint) + 0
+This supplies an outside-dependent baseline even with zero manual adaptation and allows valve demand to raise it toward the boiler maximum. `WeatherSupportMaximum` limits the weather fraction; it does not multiply the entire curve or change the physical boiler limit. The default is 60%, 100% restores the full hybrid curve, and 0% removes its weather-weighted baseline/adaptation contribution. The setting affects dynamic valve control only; static valve control, weather-only control, override, boost and fail-safe hold retain their own behavior. Missing or malformed stored settings use 60%; control commands reject invalid settings.
 
-Example: `(5 - -15) * (20 - 0) / (31 - -15) + 0 = 8.7`
+At the default 60%, weather support becomes flat below approximately +2.4 °C with the −10/+21 °C curve endpoints. Valve demand remains effective below that point. This deliberately exchanges further weather-driven increases for demand-driven increases; 60% is an initial setting, not a verified winter calibration. No heating enablement or zero valve demand yields the 10 °C off request, including during boost/override in valve mode. Missing/invalid required weather inputs or an invalid curve produce off rather than an invented heating temperature.
 
-Feed Calculation: (Valve Opening - Min-Valve Opening) * (Max Feed - (Min-Feed + Adapt. Calc.)) / (Max. Valve - Min. Valve) + (Min. Feed + Adapt. Calc.)
+Calculations retain floating-point precision until nearest-half-degree rounding. The representable output ceiling is rounded down where necessary so it cannot exceed the boiler maximum. For minimum 10 °C, maximum 75 °C, basepoint −10 °C, cutoff 21 °C, adaptation zero and demand 32%:
 
-Example: `(50 - 0) * (75 - (10 + 8.7)) / (80 - 0) + (10 + 8.7) = 53.89`
+| Outside temperature | Effective hybrid feed request |
+| --- | ---: |
+| 11.59 °C | 44.0 °C |
+| 11.5 °C | 44.5 °C |
+| 0 °C | 57.5 °C |
+| −10 °C | 57.5 °C |
 
-[See Example JSON](#example-parameter-json-for-setting-heating-parameters) and look out for:
+These are calculation examples, not a calibration guarantee for every building. The configured `Features.UseAuxiliaryOutsideTempReference` determines whether the outside input comes from CAN or the externally supplied temperature.
+
 ```json
 {
-[...]
-  //Enable valve scaling
   "ValveScaling": true,
-  //The maximum value of a valve
+  "DynamicAdaption": true,
   "ValveScalingMaxOpening": 100,
-  //The current valve opening
-  "ValveScalingOpening": 75,
-[...]
+  "WeatherSupportMaximum": 60,
+  "ValveScalingOpening": 32,
+  "Adaption": 0
 }
 ```
+
+#### Heating off and external schedules
+
+In valve mode, `Enabled: false` or zero supplied valve demand lowers the effective request to 10 °C immediately, before override, boost or forecast assistance. The separate [low-setpoint off delay](assets/Configuration.md#low-setpoint-off-delay) latches the controller's heating operation off after a sustained low request; it is not a delay before lowering the request or a boiler pump-afterrun timer.
+
+External scheduling remains the producer's responsibility during normal MQTT-connected operation. In the documented Home Assistant installation, the accepted policy is **not an absolute 23:30 stop**: a season lock takes priority, otherwise the 05:30–23:30 window **or** continuing valve demand permits the desired-operation helper to stay on. That helper is not the device's `Enabled` state. Demand hysteresis can stop the device before every physical valve closes, and room week plans do not switch all valves instantaneously.
+
+Read device enablement, effective feed request, burner flame and heating-pump state separately; a reported `HeatingOperation` value alone does not prove that the burner or pump is running. See the [installed-system policy and observed shutdown example](assets/Examples/HomeAssistant/README.md#installed-system-scheduling-and-shutdown) for the helper/device distinction. The firmware's [offline fail-safe schedule](assets/Configuration.md#offline-fail-safe) is a separate fallback, not an additional online hard stop.
+
+### Optional three-hour weather forecast
+
+`ForecastEnabled` defaults to `false`. `ForecastCoefficient` defaults to `0.5` and accepts 0–1 °C feed per °C predicted outside-temperature change. These are separate from the maximum weather fraction. Stable MQTT/Home Assistant changes persist; web runtime controls remain temporary.
+
+The producer averages the three upcoming hourly temperatures and subtracts the **same provider's current temperature**, avoiding a permanent bias between the weather station and the boiler's outside sensor:
+
+```text
+temperatureChange = mean(next three hourly provider temperatures) - providerCurrent
+correction = clamp(-ForecastCoefficient * temperatureChange, -2, 2)
+```
+
+Cooling supplies positive support; warming supplies negative correction. Static and dynamic valve modes permit reductions only when the same fresh sample explicitly confirms `ForecastRoomsSatisfied: true` for **all relevant rooms**. A weighted valve average cannot provide that permission. Unknown room states, missing measurements, deficits or insufficient freshness must deny it. Weather-only control retains both correction signs. Disabled heating, zero valve demand, override, boost and fail-safe hold ignore forecast assistance; the observed physical boiler maximum still bounds every output.
+
+Samples arrive through [`POST /api/forecast`](assets/API.md#get-apiforecast-and-post-apiforecast) or MQTT, expire locally from receipt time, and are never restored after reboot. Already-computed `Correction` remains supported without applying the coefficient twice. Available forecast telemetry is not proof that a heating mode applies it.
+
+The optional [Home Assistant producer](assets/Examples/HomeAssistant/README.md) retrieves hourly forecasts outside the ESP32 control loop, renews non-retained samples and revokes reduction permission on room changes. It is installed disabled; enable it only after deploying compatible firmware and checking its weather/room/topic selection.
+
+Forecast samples cannot directly enable heating or bypass the off/zero-demand guards. Their effect on feed temperature can nevertheless influence subsequent room temperatures and valve demand; this does not establish that they have no indirect effect on shutdown timing.
+
+### Temperature tests and simulation
+
+The real temperature calculation is shared with isolated Unity tests and a serial JSON simulator. They run on the test ESP32 without CAN, WiFi, MQTT or heater I/O. See [`test/README`](test/README) for the COM3 commands and custom input/output scenarios.
+
+Builds use the pinned official `platformio/espressif32@7.1.3` platform (Arduino 2.0.17) with C++17. Keep PlatformIO and its uploader dependencies in the same Python environment; use `python -m platformio` when several Python/PlatformIO installations coexist.
 
 ## Updating
 

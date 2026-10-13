@@ -150,6 +150,8 @@ html[data-theme="dark"] .btn-close {
 .metric { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem .15rem; border-bottom: 1px solid var(--bs-border-color); }
 .metric span { color: var(--bs-secondary-color); }
 .metric strong { text-align: right; }
+.dashboard-weather .metric > * { min-width: 0; overflow-wrap: anywhere; }
+.dashboard-weather .metric > span { hyphens: auto; }
 @keyframes dashboard-spin { to { transform: rotate(360deg); } }
 .dashboard-spin { display: inline-block; animation: dashboard-spin 1.4s linear infinite; }
 .control-form .card { height: 100%; }

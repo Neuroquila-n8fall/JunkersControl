@@ -8,8 +8,8 @@
     "MQTT": {
         "Server": "1.2.3.4",
         "Port": 1883,
-        "User": "mqtt",
-        "Password": "mqtt",
+        "User": "",
+        "Password": "",
         "Topics": {
             "HeatingValues": "cerasmarter/heating/values",
             "HeatingParameters": "cerasmarter/heating/parameters",
@@ -46,6 +46,9 @@
         "MinimumFeedTemperature": 10.0,
         "TargetAmbientTemperature": 21.5,
         "FeedAdaption": 0.0,
+        "WeatherSupportMaximum": 60.0,
+        "ForecastEnabled": false,
+        "ForecastCoefficient": 0.5,
         "ValveScaling": false,
         "MaxValveOpening": 80,
         "DynamicAdaption": false,

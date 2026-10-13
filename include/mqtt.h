@@ -5,6 +5,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <wifi_config.h>
+#include <forecast.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MQTT Client (uses Wifi Client)
@@ -31,6 +32,8 @@ struct CommandedValues
         double TargetAmbientTemperature = 21.5F;
         // Feed Temperature Adaption Value. Increases or decreases the target feed temperature
         double FeedAdaption = 0.00F;
+        // Maximum weather fraction used by dynamic valve control, in percent.
+        double WeatherSupportMaximum = 60.0;
         // Minimum ("Anti Freeze") Temperature.
         double MinimumFeedTemperature = 10.0F;
         // Whether the heating should be off or not
@@ -95,7 +98,17 @@ extern void PublishAuxiliaryTemperatures();
 extern void ShowActivityLed();
 extern String boolToString(bool src);
 extern void PublishLog(const char *msg, const char *func, LogLevel level);
-extern bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState = false);
+extern bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState = false,
+                                uint32_t forecastReceivedAtMillis = millis(), uint32_t forecastSubmission = 0);
+extern bool ParseForecastCommand(JsonVariantConst json, const char *correctionKey, const char *ttlKey,
+                                 const char *changeKey, const char *roomsKey, ForecastInput &input, bool &present);
+extern bool ParseForecastSettings(JsonVariantConst json, bool &enabled, bool &enabledPresent,
+                                  double &coefficient, bool &coefficientPresent);
+extern bool ParseWeatherSupportMaximum(JsonVariantConst json, double &maximum, bool &present);
+extern double GetWeatherSupportMaximum();
+extern void SetWeatherSupportMaximum(double maximum);
+extern bool SubmitRuntimeControlCommand(JsonVariantConst json);
+extern void ProcessPendingRuntimeControls();
 extern bool ApplyHotWaterCommand(JsonVariantConst json, bool persistStableState = false);
 extern void ProcessRuntimeControlPersistence();
 extern void ApplyBoostCommand(bool enabled);

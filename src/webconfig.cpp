@@ -2,6 +2,7 @@
 #include <failsafe.h>
 #include <heating.h>
 #include <mqtt.h>
+#include <forecast.h>
 
 AsyncWebServer *server;
 AsyncEventSource *eventSource;
@@ -45,6 +46,7 @@ static void populateRuntimeJson(JsonDocument &doc)
 
     JsonObject heating = doc["Heating"].to<JsonObject>();
     heating["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+    heating["HasFeedMaximum"] = ceraValues.Heating.HasReceivedFeedMaximum;
     heating["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
     heating["FeedSetpoint"] = ceraValues.Heating.FeedSetpoint;
     heating["CalculatedFeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
@@ -55,6 +57,14 @@ static void populateRuntimeJson(JsonDocument &doc)
     heating["Economy"] = ceraValues.Heating.Economy;
     heating["BufferMaximum"] = ceraValues.Heating.BufferWaterTemperatureMaximum;
     heating["BufferCurrent"] = ceraValues.Heating.BufferWaterTemperatureCurrent;
+    const ForecastState forecast = GetForecastState();
+    heating["ForecastCorrection"] = forecast.Correction;
+    heating["ForecastRemainingSeconds"] = forecast.RemainingSeconds;
+    heating["ForecastEnabled"] = forecast.Enabled;
+    heating["ForecastCoefficient"] = forecast.Coefficient;
+    heating["ForecastRoomsSatisfied"] = forecast.RoomsSatisfied;
+    if (forecast.HasTemperatureChange)
+        heating["ForecastTemperatureChange"] = forecast.TemperatureChange;
 
     JsonObject water = doc["HotWater"].to<JsonObject>();
     water["Current"] = ceraValues.Hotwater.TemperatureCurrent;
@@ -89,6 +99,10 @@ static void populateRuntimeJson(JsonDocument &doc)
     command["AmbientTemperature"] = commandedValues.Heating.AmbientTemperature;
     command["TargetAmbientTemperature"] = commandedValues.Heating.TargetAmbientTemperature;
     command["Adaption"] = commandedValues.Heating.FeedAdaption;
+    command["WeatherSupportMaximum"] = GetWeatherSupportMaximum();
+    const ForecastState forecastControls = GetForecastState();
+    command["ForecastEnabled"] = forecastControls.Enabled;
+    command["ForecastCoefficient"] = forecastControls.Coefficient;
     command["ValveScaling"] = commandedValues.Heating.ValveScaling;
     command["ValveScalingMaxOpening"] = commandedValues.Heating.MaxValveOpening;
     command["ValveScalingOpening"] = commandedValues.Heating.ValveOpening;
@@ -333,42 +347,113 @@ void configureGeneralApiEndpoints()
                    sendJson(doc, request);
                });
 
-    auto *controlHandler = new AsyncCallbackJsonWebHandler(
+    server->on("/api/forecast", HTTP_GET, [](AsyncWebServerRequest *request)
+               {
+                   const ForecastState forecast = GetForecastState();
+                   JsonDocument doc;
+                   doc["Correction"] = forecast.Correction;
+                   doc["RemainingSeconds"] = forecast.RemainingSeconds;
+                   doc["Enabled"] = forecast.Enabled;
+                   doc["Coefficient"] = forecast.Coefficient;
+                   doc["RoomsSatisfied"] = forecast.RoomsSatisfied;
+                   if (forecast.HasTemperatureChange)
+                       doc["TemperatureChange"] = forecast.TemperatureChange;
+                   sendJson(doc, request);
+               });
+
+    auto *forecastHandler = new AsyncCallbackJsonWebHandler(
+        "/api/forecast", [](AsyncWebServerRequest *request, JsonVariant &json)
+        {
+            ForecastInput input;
+            bool present = false;
+            if (!json.is<JsonObject>() ||
+                !ParseForecastCommand(json.as<JsonVariantConst>(), "Correction", "ValidForSeconds",
+                                      "TemperatureChange", "RoomsSatisfied", input, present) || !present ||
+                !SubmitForecast(input))
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"Provide either Correction (-2..2) or TemperatureChange (-50..50), optional boolean RoomsSatisfied and integer ValidForSeconds (1..14400)."})");
+                return;
+            }
+            request->send(202, "application/json", R"({"status":202,"state":"queued","msg":"Forecast queued for main-loop processing; newest submission replaces pending input."})");
+        });
+    forecastHandler->setMethod(HTTP_POST);
+    server->addHandler(forecastHandler);
+
+    auto *immediateControlHandler = new AsyncCallbackJsonWebHandler(
         "/api/control", [](AsyncWebServerRequest *request, JsonVariant &json)
         {
+            if (SetupMode)
+            {
+                request->send(503, "application/json", R"({"status":503,"msg":"Runtime controls are unavailable in setup mode."})");
+                return;
+            }
             if (!json.is<JsonObject>())
             {
                 request->send(400, "application/json", R"({"status":400,"msg":"Expected a JSON object."})");
                 return;
             }
-            bool changed = ApplyHeatingCommand(json.as<JsonVariantConst>());
-            if (!json["HotWaterSetpoint"].isNull())
+            if (!json["WeatherSupportMaximum"].isUnbound() ||
+                !json["ForecastEnabled"].isUnbound() || !json["ForecastCoefficient"].isUnbound())
             {
-                JsonDocument waterDoc;
-                waterDoc["Setpoint"] = json["HotWaterSetpoint"];
-                changed = ApplyHotWaterCommand(waterDoc.as<JsonVariantConst>()) || changed;
-            }
-            if (!json["Boost"].isNull())
-            {
-                ApplyBoostCommand(json["Boost"].as<bool>());
-                changed = true;
-            }
-            if (!json["FastHeatup"].isNull())
-            {
-                ApplyFastHeatupCommand(json["FastHeatup"].as<bool>());
-                changed = true;
-            }
-            if (!changed)
-            {
-                request->send(400, "application/json", R"({"status":400,"msg":"No recognized control value was supplied."})");
+                request->send(400, "application/json", R"({"status":400,"msg":"Use /api/control/queued for weather and forecast settings; no controls applied."})");
                 return;
             }
-            JsonDocument response;
-            populateRuntimeJson(response);
-            sendJson(response, request);
+            ForecastInput forecast;
+            bool forecastPresent = false;
+            if (!ParseForecastCommand(json.as<JsonVariantConst>(), "ForecastCorrection", "ForecastValidForSeconds",
+                                      "ForecastTemperatureChange", "ForecastRoomsSatisfied", forecast, forecastPresent))
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"Invalid forecast input; no controls applied."})");
+                return;
+            }
+            bool accepted = ApplyHeatingCommand(json.as<JsonVariantConst>(), false);
+            if (!json["HotWaterSetpoint"].isUnbound())
+            {
+                JsonDocument water;
+                water["Setpoint"] = json["HotWaterSetpoint"];
+                accepted |= ApplyHotWaterCommand(water.as<JsonVariantConst>(), false);
+            }
+            if (!forecastPresent && !accepted)
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"No recognized control fields."})");
+                return;
+            }
+            if (forecastPresent)
+                request->send(202, "application/json", R"({"status":202,"state":"queued","msg":"Forecast queued."})");
+            else
+            {
+                JsonDocument runtime;
+                populateRuntimeJson(runtime);
+                sendJson(runtime, request);
+            }
+        });
+    immediateControlHandler->setMethod(HTTP_POST);
+
+    auto *controlHandler = new AsyncCallbackJsonWebHandler(
+        "/api/control/queued", [](AsyncWebServerRequest *request, JsonVariant &json)
+        {
+            if (SetupMode)
+            {
+                request->send(503, "application/json", R"({"status":503,"msg":"Runtime controls are unavailable in setup mode."})");
+                return;
+            }
+            if (!json.is<JsonObject>())
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"Expected a JSON object."})");
+                return;
+            }
+            if (!SubmitRuntimeControlCommand(json.as<JsonVariantConst>()))
+            {
+                request->send(400, "application/json", R"({"status":400,"msg":"Invalid forecast/settings or WeatherSupportMaximum, no recognized control, or control payload too large; no controls applied."})");
+                return;
+            }
+            request->send(202, "application/json", R"({"status":202,"state":"queued","msg":"Temporary controls queued for main-loop processing; newest submission replaces pending controls."})");
         });
     controlHandler->setMethod(HTTP_POST);
     server->addHandler(controlHandler);
+    // AsyncCallbackJsonWebHandler matches URI prefixes: register the more
+    // specific queued route before the existing immediate-control route.
+    server->addHandler(immediateControlHandler);
 }
 
 #pragma region "General Config"
@@ -1648,6 +1733,11 @@ void onLedConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
 void getSystemStatus(AsyncWebServerRequest *request)
 {
     JsonDocument doc;
+    static constexpr char version[] = JC_STRINGIFY(VERSION);
+    static constexpr size_t versionOffset = version[0] == '"' ? 1 : 0;
+    doc["version"] = JsonString(version + versionOffset,
+                                sizeof(version) - 1 - 2 * versionOffset,
+                                versionOffset == 0);
     doc["cores"] = ESP.getChipCores();
     doc["model"] = ESP.getChipModel();
     doc["revision"] = ESP.getChipRevision();

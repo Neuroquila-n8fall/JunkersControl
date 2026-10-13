@@ -12,7 +12,7 @@ Do not expose the controller directly to the internet. If remote access is requi
 
 - JSON requests use `Content-Type: application/json`.
 - Configuration and control property names are case-sensitive.
-- `200 OK` indicates a successful read or save, `202 Accepted` indicates that a configuration reload and reboot were scheduled, `400 Bad Request` indicates invalid input, and `404 Not Found` indicates a missing path. Filesystem or update failures can return `409` or `500`.
+- `200 OK` indicates a successful read or save; `202 Accepted` indicates queued forecast processing or a scheduled configuration reload/reboot. `400 Bad Request` indicates invalid input, and `404 Not Found` indicates a missing path. Filesystem or update failures can return `409` or `500`.
 - `POST /api/control` changes the running command state but does not persist it. Stable MQTT and Home Assistant commands are persisted as described in [Configuration](Configuration.md#runtime-controls).
 - Temperatures are represented internally in degrees Celsius. Home Assistant converts displayed values according to `HomeAssistant.TempUnit`, normally `°C` or `°F`.
 
@@ -46,9 +46,12 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
   },
   "Heating": {
     "FeedMaximum": 75,
+    "HasFeedMaximum": true,
     "FeedCurrent": 32.5,
     "FeedSetpoint": 35,
     "CalculatedFeedSetpoint": 35,
+    "ForecastCorrection": 0,
+    "ForecastRemainingSeconds": 0,
     "Pump": true,
     "Active": true,
     "Power": 43.3,
@@ -88,6 +91,9 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
     "ValveScalingMaxOpening": 100,
     "ValveScalingOpening": 0,
     "DynamicAdaption": false,
+    "WeatherSupportMaximum": 60,
+    "ForecastEnabled": false,
+    "ForecastCoefficient": 0.5,
     "OverrideSetpoint": false,
     "OnDemandBoostDuration": 600,
     "Boost": false,
@@ -100,9 +106,11 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
 
 Consumers should check the enabled installation profiles in `System.CanProfiles` before displaying mixed-circuit or domestic-hot-water sections and should not interpret an unchanged value as proof that a fresh CAN frame was received.
 
+`Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
+
 ### `POST /api/control`
 
-Applies a partial runtime command document and returns the same complete document as `GET /api/runtime`. Omitted fields are unchanged.
+The existing endpoint preserves immediate ordinary controls and returns the complete runtime document with HTTP `200`, including valid repeat submissions. An empty document, unknown-only document or other request with neither an accepted ordinary control nor a forecast returns `400`. With a valid forecast sample it returns `202`: ordinary controls are applied immediately, while the forecast is handed to the main loop. The new stable settings `WeatherSupportMaximum`, `ForecastEnabled` and `ForecastCoefficient` are rejected on this route before any mutation; use `/api/control/queued` for them. Setup mode returns `503` rather than accepting controls without a consumer.
 
 ```shell
 curl -X POST http://cerasmarter.local/api/control \
@@ -110,12 +118,24 @@ curl -X POST http://cerasmarter.local/api/control \
   -d '{"Enabled":true,"FeedBaseSetpoint":-10,"FeedCutOff":21}'
 ```
 
+### `POST /api/control/queued`
+
+The web control page uses this main-loop-owned endpoint. It queues a partial command and returns `202` with `state: "queued"`; acceptance is not confirmation of application or persistence. Omitted fields remain unchanged when applied. Every present recognized field must have an accepted type and value: any malformed recognized field rejects the entire document before replacing pending controls or reserving a forecast submission. One bounded pending slot holds at most 1023 normalized JSON bytes; newer pending controls replace the previous submission rather than merging it. Read runtime state afterward to confirm settings. Invalid/oversized normalized controls and empty or unknown-only documents return `400`; setup mode returns `503`. Unknown fields mixed with valid recognized fields are ignored. Forecast receipt order is preserved across this queue, the direct forecast endpoint and MQTT, even when a newer sample has already been consumed.
+
+```shell
+curl -X POST http://cerasmarter.local/api/control/queued \
+  -H "Content-Type: application/json" \
+  -d '{"WeatherSupportMaximum":60,"ForecastEnabled":true,"ForecastCoefficient":0.5}'
+```
+
+Both runtime-control endpoints are temporary. The following table describes the queued endpoint; ordinary properties and forecast samples also retain their existing `/api/control` behavior:
+
 Accepted properties and ranges:
 
 | Property | Type | Range or meaning |
 | --- | --- | --- |
 | `Enabled` | boolean | Enable heating demand |
-| `FeedSetpoint` | number | 0–100 °C; effective output is clamped to the boiler-safe minimum |
+| `FeedSetpoint` | number | 0–100 °C; effective heating output is bounded by 10 °C and the observed boiler maximum |
 | `FeedBaseSetpoint`, `FeedCutOff` | number | -50–50 °C |
 | `FeedMinimum` | number | 0–100 °C |
 | `AuxiliaryTemperature`, `AmbientTemperature` | number | -50–100 °C |
@@ -124,17 +144,48 @@ Accepted properties and ranges:
 | `ValveScaling`, `DynamicAdaption`, `OverrideSetpoint` | boolean | Control mode flags |
 | `ValveScalingMaxOpening` | number | 1–100% |
 | `ValveScalingOpening` | number | 0–100% live valve demand |
+| `WeatherSupportMaximum` | number | 0–100%; dynamic-valve weather fraction cap, default 60 |
+| `ForecastEnabled` | boolean | Optional forecast application, default false |
+| `ForecastCoefficient` | number | 0–1 °C feed / °C expected outside change, default 0.5 |
 | `OnDemandBoostDuration` | number | 0–86400 seconds |
 | `Boost`, `FastHeatup` | boolean | Momentary operating modes |
 | `HotWaterSetpoint` | number | 0–100 °C |
+| `ForecastCorrection` | number | -2–2 °C, transient forecast adjustment |
+| `ForecastTemperatureChange` | number | -50–50 °C; future provider mean minus current provider temperature; alternative to `ForecastCorrection` |
+| `ForecastRoomsSatisfied` | boolean | All relevant rooms have no temperature deficit; same-sample permission for valve-mode reductions, default false |
+| `ForecastValidForSeconds` | integer | 1–14400 seconds; optional with correction, default 3600 |
 
 A sustained effective 10 °C feed request activates the manufacturer-compatible heating-off guard after the configured grace period. Web API commands are intentionally transient; use MQTT or Home Assistant for stable values that should survive a reboot.
+
+Forecast samples contain either correction or temperature change, never both. Lifetime or room permission without a sample, malformed types, non-finite/out-of-range values, and invalid weather/forecast settings are rejected before any control is applied. The latest queued forecast replaces the earlier pending sample. HTTP queueing preserves the original receipt timestamp. MQTT accepts the same sample fields on the combined heating-parameter topic without persisting them; stable weather/forecast settings retain the normal coalesced persistence behavior.
+
+### `GET /api/forecast` and `POST /api/forecast`
+
+The dedicated POST accepts either `Correction` (-2–2 °C, already computed) or `TemperatureChange` (-50–50 °C, future provider mean minus the same provider's current temperature), optional `RoomsSatisfied` (boolean, default false), and optional integer `ValidForSeconds` (1–14400, default 3600). It returns `202` with `state: "queued"`; malformed/conflicting input returns `400`. Lifetime starts at receipt, not main-loop application. Zero removes the temperature correction; a valid zero-valued sample still retains its freshness/lifetime.
+
+```shell
+curl -X POST http://cerasmarter.local/api/forecast \
+  -H "Content-Type: application/json" \
+  -d '{"TemperatureChange":-4,"RoomsSatisfied":false,"ValidForSeconds":900}'
+```
+
+GET returns one coherent available-state snapshot, for example:
+
+```json
+{"Enabled":true,"Coefficient":0.5,"Correction":2,"RemainingSeconds":900,"RoomsSatisfied":false,"TemperatureChange":-4}
+```
+
+`Correction` is available data, not proof of application: disabled forecast support or an excluded heating mode does not use it. Only fresh raw samples include `TemperatureChange`. Expiry/reboot clears the sample, correction, lifetime and room permission. Changing enable/coefficient settings recalculates a fresh sample; direct `Correction` is not scaled twice. Renewing unchanged data refreshes its lifetime and publishes state; changing room permission recalculates even when the correction number is unchanged.
+
+The firmware does not fetch weather. The optional [Home Assistant producer](Examples/HomeAssistant/README.md) computes the three-hour provider trend, sends non-retained samples, and verifies individual room conditions. The ESP32 derives `clamp(-ForecastCoefficient * TemperatureChange, -2, 2)`. MQTT retention is prohibited for these samples because replay would restart their receipt-time lifetime.
+
+Forecast support must be enabled explicitly. It cannot create heating demand from disabled heating or zero valve demand, and does not affect override, boost or fail-safe hold. Static and dynamic valve modes ignore negative corrections unless the same fresh sample carries `RoomsSatisfied: true`; a weighted aggregate cannot authorize that permission. Positive corrections remain bounded by the observed boiler ceiling. Weather-only mode retains both correction signs. Producers must revoke permission promptly when a relevant room develops a deficit or becomes unavailable; absent reliable evidence, send false.
 
 ## System information
 
 ### `GET /api/info`
 
-Returns chip model and revision, CPU frequency and core count, heap and application-flash usage, LittleFS usage, CAN status/error count, MQTT state, and fail-safe state.
+Returns `version` (the running firmware's normalized build `VERSION`), chip model and revision, CPU frequency and core count, heap and application-flash usage, LittleFS usage, CAN status/error count, MQTT state, and fail-safe state. The website's System Status uses this API value beside the MCU model; it does not infer the firmware version from its bundled assets. Older firmware without `version` is displayed as unavailable (`—`).
 
 ### `GET /api/freestorage`
 

@@ -27,11 +27,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "platformio==6.1.19"
+          python -m pip install "platformio==6.1.19" "esptool==4.11.0"
       - name: Build Production Firmware
         run: pio run -e production
       - name: Build Production Filesystem Image

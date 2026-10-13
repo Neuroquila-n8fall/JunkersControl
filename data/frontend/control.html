@@ -1,9 +1,9 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cerasmarter - Fallback Heating Control</title><link rel="stylesheet" href="frontend/css/bootstrap.min.css"><link rel="stylesheet" href="frontend/css/bootstrap-icons.css"><link rel="stylesheet" href="frontend/css/theme.css"></head>
 <body><div id="navigation-container"></div><main class="container py-4">
-<h2 class="mt-4">Fallback Heating Control</h2>
-<div class="alert alert-warning"><strong>Immediate control</strong><br><span>These runtime values are sent directly to the heating controller. They are not saved to configuration.json and may later be replaced by MQTT or Home Assistant commands.</span></div>
-<form id="control-form" class="control-form"><div class="row g-3">
+<h2 id="control-title" class="mt-4">Fallback Heating Control</h2>
+<div class="alert alert-warning"><strong data-i18n="control.immediate">Temporary runtime control</strong><br><span data-i18n="control.warning">Accepted runtime values are queued and applied when the controller's main loop processes them, not immediately. They are not saved to configuration.json and may later be replaced by MQTT or Home Assistant commands.</span></div>
+<form id="control-form" class="control-form"><fieldset id="control-fields" aria-labelledby="control-title" disabled><div class="row g-3">
 <div class="col-lg-6"><div class="card"><div class="card-header">Heating</div><div class="card-body row g-3">
 <div class="col-12 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="Enabled" name="Enabled"><label class="form-check-label" for="Enabled">Heating enabled</label></div>
 <div class="col-6"><label class="form-label" for="FeedSetpoint">Requested Feed Setpoint</label><div class="input-group"><input class="form-control" type="number" step="0.1" min="0" max="100" id="FeedSetpoint" name="FeedSetpoint"><span class="input-group-text">°C</span></div></div>
@@ -26,7 +26,26 @@
 <div class="col-12 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="ValveScaling" name="ValveScaling"><label class="form-check-label" for="ValveScaling">Enable valve scaling</label></div>
 <div class="col-6"><label class="form-label" for="ValveScalingMaxOpening">Maximum valve opening</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="ValveScalingMaxOpening" name="ValveScalingMaxOpening"><span class="input-group-text">%</span></div></div>
 <div class="col-6"><label class="form-label" for="ValveScalingOpening">Current valve opening</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="ValveScalingOpening" name="ValveScalingOpening"><span class="input-group-text">%</span></div></div>
+<div class="col-12">
+<label class="form-label" for="WeatherSupportMaximum" data-i18n="control.weather_maximum">Maximum weather contribution</label>
+<div class="input-group"><input class="form-control" type="number" min="0" max="100" step="1" required id="WeatherSupportMaximum" name="WeatherSupportMaximum" aria-describedby="weather-maximum-unit weather-maximum-help"><span class="input-group-text" id="weather-maximum-unit">%</span></div>
+<div class="form-text" id="weather-maximum-help" data-i18n="control.weather_maximum_help">Caps weather support only in dynamic valve mode during normal heating. 100% restores the previous curve; 0% removes weather support. 60% is an initial setting, not a proven winter calibration. The boiler's physical maximum stays unchanged.</div>
+</div>
+<div class="col-12 border-top pt-3">
+<div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ForecastEnabled" name="ForecastEnabled" aria-describedby="forecast-source-help"><label class="form-check-label" for="ForecastEnabled" data-i18n="control.forecast_enabled">Forecast support (optional)</label></div>
+<div class="form-text" id="forecast-source-help" data-i18n="control.forecast_source_help">Disabled by default. Home Assistant supplies forecast data; this ESP controller does not fetch weather.</div>
+</div>
+<div class="col-12">
+<label class="form-label" for="ForecastCoefficient" data-i18n="control.forecast_coefficient">Forecast coefficient</label>
+<div class="row g-2 align-items-center"><div class="col-5 col-sm-4"><input class="form-control" type="number" min="0" max="1" step="0.05" required id="ForecastCoefficient" name="ForecastCoefficient" aria-describedby="forecast-coefficient-unit forecast-coefficient-help"></div><div class="col-7 col-sm-8"><span id="forecast-coefficient-unit" data-i18n="control.forecast_coefficient_unit">°C feed / °C outside</span></div></div>
+<div class="form-text" id="forecast-coefficient-help" data-i18n="control.forecast_coefficient_help">Strength of the next 3-hour trend: cooling raises the feed target; warming lowers it. The correction is limited to ±2 °C.</div>
+<details class="mt-2"><summary data-i18n="control.forecast_details">How forecast support works</summary>
+<div class="form-text" data-i18n="control.forecast_trend_help">The trend is the average hourly forecast temperature for the next 3 hours minus the same weather provider's current temperature, not the boiler's outside sensor. The coefficient sets the feed-temperature change per degree of this trend.</div>
+<div class="form-text" data-i18n="control.forecast_limits_help">In valve mode, a negative correction is allowed only when all relevant rooms have no heat deficit. Boost, direct override, off and hold ignore forecasts. The boiler's physical maximum still applies.</div>
+<div class="form-text" data-i18n="control.forecast_expiry_help">Enabling this setting does not provide a forecast sample. Only fresh samples affect heating; the correction stops when the sample expires. Samples are cleared on restart. This form changes temporary settings only; Home Assistant supplies samples separately and MQTT or Home Assistant manages persistent settings.</div>
+</details>
+</div>
 </div></div></div>
 <div class="col-lg-6"><div class="card"><div class="card-header">Hot Water</div><div class="card-body"><label class="form-label" for="HotWaterSetpoint">Temperature Setpoint</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="HotWaterSetpoint" name="HotWaterSetpoint"><span class="input-group-text">°C</span></div></div></div></div>
-</div><div id="control-status" class="mt-3"></div><button class="btn btn-primary mt-3" type="submit"><i class="bi bi-send"></i> Apply Control Values</button></form>
+</div><div id="control-status" class="mt-3" role="status" aria-live="polite" aria-atomic="true"></div><button class="btn btn-primary mt-3" type="submit"><i class="bi bi-send"></i> Apply Control Values</button></fieldset></form>
 </main><script src="frontend/js/i18n.js"></script><script src="frontend/js/api.js"></script><script src="frontend/js/framework.js"></script><script src="frontend/js/bootstrap.bundle.min.js"></script><script src="frontend/js/control.js"></script></body></html>

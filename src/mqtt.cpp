@@ -7,6 +7,7 @@
 #include <ArduinoJson.h>
 #include <ha_autodiscovery.h>
 #include <failsafe.h>
+#include <forecast.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MQTT Client (uses Wifi Client)
@@ -23,6 +24,12 @@ static unsigned long runtimeControlSaveRequestedAt = 0;
 static const unsigned long runtimeControlSaveDelay = 3000;
 static const unsigned long runtimeControlSaveRetryDelay = 30000;
 static unsigned long runtimeControlSaveWait = runtimeControlSaveDelay;
+static portMUX_TYPE runtimeControlMux = portMUX_INITIALIZER_UNLOCKED;
+static constexpr size_t pendingControlCapacity = 1024;
+static char pendingControl[pendingControlCapacity];
+static size_t pendingControlLength = 0;
+static uint32_t pendingControlReceivedAt = 0;
+static uint32_t pendingControlForecastSubmission = 0;
 
 namespace
 {
@@ -88,10 +95,242 @@ void scheduleRuntimeControlSave(bool stableStateChanged)
 }
 } // namespace
 
-bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState)
+bool ParseForecastCommand(JsonVariantConst json, const char *correctionKey, const char *ttlKey,
+                          const char *changeKey, const char *roomsKey, ForecastInput &input, bool &present)
 {
+  const JsonObjectConst object = json.as<JsonObjectConst>();
+  const bool direct = !object[correctionKey].isUnbound();
+  const bool raw = !object[changeKey].isUnbound();
+  const bool ttlPresent = !object[ttlKey].isUnbound();
+  const bool roomsPresent = !object[roomsKey].isUnbound();
+  present = direct || raw;
+  if (direct && raw)
+    return false;
+  if (!present)
+    return !ttlPresent && !roomsPresent;
+  input = ForecastInput{};
+  input.TemperatureChange = raw;
+  const JsonVariantConst value = object[raw ? changeKey : correctionKey];
+  if (value.is<bool>() || !value.is<double>())
+    return false;
+  input.Value = value.as<double>();
+  const double limit = raw ? 50.0 : 2.0;
+  if (!isfinite(input.Value) || input.Value < -limit || input.Value > limit)
+    return false;
+  if (roomsPresent)
+  {
+    if (!object[roomsKey].is<bool>())
+      return false;
+    input.RoomsSatisfied = object[roomsKey].as<bool>();
+  }
+  if (ttlPresent)
+  {
+    const JsonVariantConst ttl = object[ttlKey];
+    if (ttl.is<bool>() || (!ttl.is<unsigned int>() && !ttl.is<unsigned long>() && !ttl.is<int>() && !ttl.is<long>()))
+      return false;
+    const double seconds = ttl.as<double>();
+    if (seconds < 1 || seconds > 14400)
+      return false;
+    input.ValidForSeconds = ttl.as<uint32_t>();
+  }
+  return true;
+}
+
+bool ParseForecastSettings(JsonVariantConst json, bool &enabled, bool &enabledPresent,
+                           double &coefficient, bool &coefficientPresent)
+{
+  const JsonVariantConst flag = json["ForecastEnabled"];
+  const JsonVariantConst factor = json["ForecastCoefficient"];
+  enabledPresent = !flag.isUnbound();
+  coefficientPresent = !factor.isUnbound();
+  if (enabledPresent)
+  {
+    if (!flag.is<bool>())
+      return false;
+    enabled = flag.as<bool>();
+  }
+  if (coefficientPresent)
+  {
+    if (factor.is<bool>() || !factor.is<double>())
+      return false;
+    coefficient = factor.as<double>();
+    if (!isfinite(coefficient) || coefficient < 0.0 || coefficient > 1.0)
+      return false;
+  }
+  return true;
+}
+
+bool ParseWeatherSupportMaximum(JsonVariantConst json, double &maximum, bool &present)
+{
+  JsonVariantConst value = json["WeatherSupportMaximum"];
+  present = !value.isUnbound();
+  if (!present)
+    return true;
+  if (value.is<bool>() || !value.is<double>())
+    return false;
+  maximum = value.as<double>();
+  return isfinite(maximum) && maximum >= 0.0 && maximum <= 100.0;
+}
+
+double GetWeatherSupportMaximum()
+{
+  portENTER_CRITICAL(&runtimeControlMux);
+  const double maximum = commandedValues.Heating.WeatherSupportMaximum;
+  portEXIT_CRITICAL(&runtimeControlMux);
+  return maximum;
+}
+
+void SetWeatherSupportMaximum(double maximum)
+{
+  portENTER_CRITICAL(&runtimeControlMux);
+  commandedValues.Heating.WeatherSupportMaximum = maximum;
+  portEXIT_CRITICAL(&runtimeControlMux);
+}
+
+bool SubmitRuntimeControlCommand(JsonVariantConst json)
+{
+  double maximum = 60.0;
+  bool maximumPresent = false;
+  ForecastInput forecast;
+  bool forecastPresent = false;
+  bool forecastEnabled = false, enabledPresent = false, coefficientPresent = false;
+  double forecastCoefficient = 0.5;
+  if (!json.is<JsonObjectConst>() ||
+      !ParseWeatherSupportMaximum(json, maximum, maximumPresent) ||
+      !ParseForecastSettings(json, forecastEnabled, enabledPresent, forecastCoefficient, coefficientPresent) ||
+      !ParseForecastCommand(json, "ForecastCorrection", "ForecastValidForSeconds",
+                            "ForecastTemperatureChange", "ForecastRoomsSatisfied", forecast, forecastPresent))
+    return false;
+
+  // Normalize only accepted fields before publishing a bounded, owned command.
+  // No live control reads, JSON allocation or network side effects occur under the lock.
+  JsonDocument normalized;
+  static const char *const booleanKeys[] = {
+      "Enabled", "ValveScaling", "DynamicAdaption", "OverrideSetpoint",
+      "OnDemandBoost", "Boost", "FastHeatup"};
+  for (const char *key : booleanKeys)
+  {
+    if (json[key].isUnbound())
+      continue;
+    bool value = false;
+    if (!readBoolean(json, key, value))
+      return false;
+    normalized[key] = value;
+  }
+  struct NumericControl { const char *key; double minimum; double maximum; };
+  static const NumericControl numericControls[] = {
+      {"FeedSetpoint", 0, 100}, {"FeedBaseSetpoint", -50, 50}, {"FeedCutOff", -50, 50},
+      {"FeedMinimum", 0, 100}, {"AuxiliaryTemperature", -50, 100},
+      {"AmbientTemperature", -50, 100}, {"TargetAmbientTemperature", 5, 35},
+      {"Adaption", -30, 30}, {"ValveScalingMaxOpening", 1, 100},
+      {"ValveScalingOpening", 0, 100}, {"OnDemandBoostDuration", 0, 86400},
+      {"HotWaterSetpoint", 0, 100}};
+  for (const NumericControl &control : numericControls)
+  {
+    if (json[control.key].isUnbound())
+      continue;
+    double value = 0.0;
+    if (json[control.key].is<bool>() ||
+        !readConstrainedNumber(json, control.key, value, control.minimum, control.maximum))
+      return false;
+    normalized[control.key] = value;
+  }
+  if (maximumPresent)
+    normalized["WeatherSupportMaximum"] = maximum;
+  if (enabledPresent)
+    normalized["ForecastEnabled"] = forecastEnabled;
+  if (coefficientPresent)
+    normalized["ForecastCoefficient"] = forecastCoefficient;
+  if (forecastPresent)
+  {
+    normalized[forecast.TemperatureChange ? "ForecastTemperatureChange" : "ForecastCorrection"] = forecast.Value;
+    normalized["ForecastValidForSeconds"] = forecast.ValidForSeconds;
+    normalized["ForecastRoomsSatisfied"] = forecast.RoomsSatisfied;
+  }
+  if (normalized.overflowed() || normalized.size() == 0)
+    return false;
+  const size_t length = measureJson(normalized);
+  if (length >= pendingControlCapacity)
+    return false;
+  char serialized[pendingControlCapacity];
+  if (serializeJson(normalized, serialized, sizeof(serialized)) != length)
+    return false;
+  const uint32_t forecastSubmission = forecastPresent ? ReserveForecastSubmission() : 0;
+  portENTER_CRITICAL(&runtimeControlMux);
+  memcpy(pendingControl, serialized, length + 1);
+  pendingControlLength = length;
+  pendingControlReceivedAt = millis();
+  pendingControlForecastSubmission = forecastSubmission;
+  portEXIT_CRITICAL(&runtimeControlMux);
+  return true;
+}
+
+void ProcessPendingRuntimeControls()
+{
+  char serialized[pendingControlCapacity];
+  portENTER_CRITICAL(&runtimeControlMux);
+  const size_t length = pendingControlLength;
+  const uint32_t receivedAt = pendingControlReceivedAt;
+  const uint32_t forecastSubmission = pendingControlForecastSubmission;
+  if (length)
+  {
+    memcpy(serialized, pendingControl, length + 1);
+    pendingControlLength = 0;
+  }
+  portEXIT_CRITICAL(&runtimeControlMux);
+  if (!length)
+    return;
+  JsonDocument command;
+  if (deserializeJson(command, serialized, length))
+    return;
+  ApplyHeatingCommand(command.as<JsonVariantConst>(), false, receivedAt, forecastSubmission);
+  if (!command["HotWaterSetpoint"].isUnbound())
+  {
+    JsonDocument water;
+    water["Setpoint"] = command["HotWaterSetpoint"];
+    ApplyHotWaterCommand(water.as<JsonVariantConst>(), false);
+  }
+}
+
+bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState, uint32_t forecastReceivedAtMillis, uint32_t forecastSubmission)
+{
+  ForecastInput forecast;
+  bool forecastPresent = false;
+  bool forecastEnabled = false, enabledPresent = false, coefficientPresent = false;
+  double forecastCoefficient = 0.5;
+  double weatherSupportMaximum = 60.0;
+  bool weatherSupportPresent = false;
+  if (!json.is<JsonObjectConst>() ||
+      !ParseWeatherSupportMaximum(json, weatherSupportMaximum, weatherSupportPresent) ||
+      !ParseForecastSettings(json, forecastEnabled, enabledPresent, forecastCoefficient, coefficientPresent) ||
+      !ParseForecastCommand(json, "ForecastCorrection", "ForecastValidForSeconds",
+                            "ForecastTemperatureChange", "ForecastRoomsSatisfied", forecast, forecastPresent))
+    return false;
+  const bool forecastQueued = forecastPresent && SubmitForecast(forecast, forecastReceivedAtMillis, forecastSubmission);
   bool changed = false;
   bool stableStateChanged = false;
+  if (enabledPresent || coefficientPresent)
+  {
+    const ForecastState current = GetForecastState();
+    const bool newEnabled = enabledPresent ? forecastEnabled : current.Enabled;
+    const double newCoefficient = coefficientPresent ? forecastCoefficient : current.Coefficient;
+    SetForecastSettings(newEnabled, newCoefficient);
+    changed = true;
+    if (persistStableState)
+    {
+      if (enabledPresent)
+        stableStateChanged |= updateIfChanged(configuration.RuntimeControls.ForecastEnabled, newEnabled);
+      if (coefficientPresent)
+        stableStateChanged |= updateIfChanged(configuration.RuntimeControls.ForecastCoefficient, newCoefficient);
+    }
+  }
+  if (weatherSupportPresent)
+  {
+    SetWeatherSupportMaximum(weatherSupportMaximum);
+    changed = true;
+    if (persistStableState)
+      stableStateChanged |= updateIfChanged(configuration.RuntimeControls.WeatherSupportMaximum, weatherSupportMaximum);
+  }
   bool accepted = readBoolean(json, "Enabled", commandedValues.Heating.Active);
   changed |= accepted;
   if (persistStableState && accepted)
@@ -169,7 +408,7 @@ bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState)
     SetFeedTemperature();
     PublishHeatingTemperaturesAndStatus();
   }
-  return changed;
+  return changed || forecastQueued;
 }
 
 bool ApplyHotWaterCommand(JsonVariantConst json, bool persistStableState)
@@ -232,6 +471,14 @@ void reconnectMqtt()
   lastMqttAttempt = now;
 
   Log.print("Attempting MQTT connection...");
+  // Establish TCP with an explicit deadline. PubSubClient reuses this socket
+  // instead of invoking the core's default-timeout connect overload.
+  if (!espClient.connect(configuration.Mqtt.Server, configuration.Mqtt.Port, 250))
+  {
+    Log.printf("TCP connection failed. Retrying in %lu seconds while CAN control continues.\r\n",
+               mqttRetryInterval / 1000);
+    return;
+  }
 
   const String clientId = generateClientId();
   bool connected = false;
@@ -288,9 +535,7 @@ void setupMqttClient()
   client.setServer(configuration.Mqtt.Server, configuration.Mqtt.Port);
   client.setCallback(callback);
   client.setKeepAlive(10);
-  // Bound the remaining synchronous part of PubSubClient connection attempts.
-  // The ESP TCP connect and MQTT CONNACK waits must not stall boiler control.
-  espClient.setConnectionTimeout(250);
+  // The TCP connect is bounded explicitly in reconnectMqtt; bound CONNACK too.
   client.setSocketTimeout(1);
   // Device discovery is intentionally emitted as one Home Assistant device
   // document. The complete command surface currently serializes to about
@@ -531,6 +776,7 @@ void PublishHeatingTemperaturesAndStatus()
   }
 
   jsonObj["FeedMaximum"] = ceraValues.Heating.FeedMaximum;
+  jsonObj["HasFeedMaximum"] = ceraValues.Heating.HasReceivedFeedMaximum;
   jsonObj["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
   if (OverrideControl)
     jsonObj["FeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
@@ -553,12 +799,21 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["AmbientTemperature"] = commandedValues.Heating.AmbientTemperature;
   jsonObj["TargetAmbientTemperature"] = commandedValues.Heating.TargetAmbientTemperature;
   jsonObj["Adaption"] = commandedValues.Heating.FeedAdaption;
+  jsonObj["WeatherSupportMaximum"] = GetWeatherSupportMaximum();
   jsonObj["ValveScaling"] = boolToString(commandedValues.Heating.ValveScaling);
   jsonObj["ValveScalingMaxOpening"] = commandedValues.Heating.MaxValveOpening;
   jsonObj["ValveScalingOpening"] = commandedValues.Heating.ValveOpening;
   jsonObj["DynamicAdaption"] = boolToString(commandedValues.Heating.DynamicAdaption);
   jsonObj["OverrideSetpoint"] = boolToString(commandedValues.Heating.OverrideSetpoint);
   jsonObj["OnDemandBoostDuration"] = commandedValues.Heating.BoostDuration;
+  const ForecastState forecast = GetForecastState();
+  jsonObj["ForecastCorrection"] = forecast.Correction;
+  jsonObj["ForecastRemainingSeconds"] = forecast.RemainingSeconds;
+  jsonObj["ForecastEnabled"] = forecast.Enabled;
+  jsonObj["ForecastCoefficient"] = forecast.Coefficient;
+  jsonObj["ForecastRoomsSatisfied"] = forecast.RoomsSatisfied;
+  if (forecast.HasTemperatureChange)
+    jsonObj["ForecastTemperatureChange"] = forecast.TemperatureChange;
 
   // Compatibility aliases retained for existing dashboards and discovery
   // documents that predate the complete command-state mirror.

@@ -8,6 +8,8 @@
 #include <timesync.h>
 #include <configuration.h>
 #include <failsafe.h>
+#include <cmath>
+#include <feed_temperature.h>
 
 
 //-- Set CS Pin via Build Flag
@@ -30,6 +32,25 @@ ACAN2515 can(MCP2515_CS, SPI, MCP2515_INT);
 
 double temp = 0.00F;
 
+// Fail-safe limits may lower a requested setpoint, but cannot defeat off or
+// increase it beyond the observed physical boiler maximum.
+static double limitEffectiveFeedTemperature(double requested)
+{
+  if (!ceraValues.Heating.HasReceivedFeedMaximum || requested <= 10.0)
+    return 10.0;
+  double maximum = ceraValues.Heating.FeedMaximum;
+  double minimum = 10.0;
+  if (IsFailSafeActive())
+  {
+    if (!std::isfinite(configuration.FailSafe.MaximumFeedTemperature))
+      return 10.0;
+    if (configuration.FailSafe.MaximumFeedTemperature < maximum)
+      maximum = configuration.FailSafe.MaximumFeedTemperature;
+    minimum = configuration.FailSafe.MinimumFeedTemperature;
+  }
+  return LimitFeedTemperatureOutput(ApplyFailSafeFeedLimits(requested), maximum, minimum);
+}
+
 // Simply takes all current states into account and dispatches the setpoint message immediately.
 void SetFeedTemperature()
 {
@@ -37,9 +58,9 @@ void SetFeedTemperature()
   int feedSetpoint;
 
   // Get raw Setpoint
-  double effectiveSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
+  double effectiveSetpoint = limitEffectiveFeedTemperature(CalculateFeedTemperature());
   if (EnforceHeatingSetpointShutdown(effectiveSetpoint))
-    effectiveSetpoint = ApplyFailSafeFeedLimits(CalculateFeedTemperature());
+    effectiveSetpoint = limitEffectiveFeedTemperature(CalculateFeedTemperature());
   commandedValues.Heating.CalculatedFeedSetpoint = effectiveSetpoint;
 
   // Transform it into the int representation
@@ -147,10 +168,12 @@ void processCan()
     //[HC] - [Controller] - Max. possible feed temperature
     // Data Type: INT
     // Value: Data / 2.0
-    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.FeedMax)
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.FeedMax &&
+        !Message.ext && !Message.rtr && Message.len >= 1)
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Heating.FeedMaximum = temp;
+      ceraValues.Heating.HasReceivedFeedMaximum = true;
     }
 
     //[HC] - [Controller] - Current feed temperature

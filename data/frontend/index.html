@@ -20,7 +20,25 @@
     </section>
     <section id="temperature-history-section" class="card dashboard-wide-card mb-4"><div class="card-body"><div class="mb-3"><h5 class="mb-1" data-i18n="dashboard.history">Temperature History</h5><small class="text-muted" data-i18n="dashboard.history_range">Last five minutes</small></div><div class="runtime-chart"><canvas id="temperature-chart"></canvas></div></div></section>
     <section class="dashboard-section-grid mb-4">
-        <div id="heating-section" class="card" hidden><div class="card-header"><i class="bi bi-house-gear"></i> <span data-i18n="dashboard_detail.heating_runtime">Heating runtime</span></div><div id="heating-values" class="card-body metric-grid"></div></div>
+        <div id="heating-section" class="card" hidden>
+            <div class="card-header"><i class="bi bi-house-gear"></i> <span data-i18n="dashboard_detail.heating_runtime">Heating runtime</span></div>
+            <div class="card-body">
+                <div id="heating-values" class="metric-grid"></div>
+                <section class="dashboard-weather mt-4 pt-3 border-top" aria-labelledby="weather-forecast-title">
+                    <h3 id="weather-forecast-title" class="h6" data-i18n="dashboard_weather.title">Weather &amp; forecast monitor</h3>
+                    <p id="weather-forecast-status" class="small text-muted mb-2" data-i18n="common.loading">Loading...</p>
+                    <div id="weather-forecast-values" class="metric-grid"></div>
+                    <p class="small text-muted mt-2 mb-0" data-i18n="dashboard_weather.availability_help">Available correction is not confirmation that it is applied to the feed request.</p>
+                    <details class="small mt-2">
+                        <summary data-i18n="dashboard_weather.details">How to read these values</summary>
+                        <p class="text-muted mt-2 mb-2" data-i18n="dashboard_weather.weather_help">The weather limit applies only during normal heating in dynamic valve mode: 0% removes weather support; 100% restores the full curve contribution.</p>
+                        <p class="text-muted mb-2" data-i18n="dashboard_weather.forecast_help">Home Assistant supplies the forecast sample. The raw trend is the next 3-hour forecast average minus the weather provider's current temperature. Cooling raises the request; warming lowers it, with a correction limited to ±2 °C. Disabled support, expired or missing samples, boost, direct override, off and hold do not apply a forecast correction. A dash means the value is unavailable.</p>
+                        <p class="text-muted mb-2" data-i18n="dashboard_weather.rooms_help">The sample's room flag permits a lower feed request in valve mode. It is not a measurement or confirmation of physical room comfort.</p>
+                        <p class="text-muted mb-0" data-i18n="dashboard_weather.ceiling_help">Weather and forecast support do not bypass the boiler's physical maximum for feed requests. This is a request limit, not a guarantee of measured water temperature.</p>
+                    </details>
+                </section>
+            </div>
+        </div>
         <div id="hotwater-section" class="card" hidden><div class="card-header"><i class="bi bi-droplet-half"></i> <span data-i18n="dashboard_detail.hotwater_runtime">Domestic hot water</span></div><div id="hotwater-values" class="card-body metric-grid"></div></div>
         <div id="mixed-section" class="card" hidden><div class="card-header"><i class="bi bi-shuffle"></i> <span data-i18n="dashboard_detail.mixed_runtime">Mixed circuit</span></div><div id="mixed-values" class="card-body metric-grid"></div></div>
         <div id="auxiliary-section" class="card" hidden><div class="card-header"><i class="bi bi-thermometer-sun"></i> <span data-i18n="dashboard_detail.auxiliary">Auxiliary sensors</span></div><div class="card-body"><div id="auxiliary-values" class="metric-grid"></div><div id="auxiliary-chart-container" class="auxiliary-chart" hidden><canvas id="auxiliary-temperature-chart"></canvas></div></div></div>
@@ -29,6 +47,7 @@
     <section class="mb-3"><h3 data-i18n="dashboard.system_status">System Status</h3></section>
     <div class="row g-3 dashboard-system"><div class="col-lg-8"><ul class="list-group" id="status-list">
         <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard.model">Model</span><span id="model"></span></li>
+        <li class="list-group-item d-flex justify-content-between gap-3"><span data-i18n="dashboard_detail.firmware_version">Firmware version</span><span id="firmware-version" class="text-end">—</span></li>
         <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard_detail.uptime">Uptime</span><span id="uptime"></span></li>
         <li class="list-group-item d-flex justify-content-between"><span data-i18n="dashboard_detail.can_profiles">CAN profiles</span><span id="can-profiles"></span></li>
         <li class="list-group-item"><div class="d-flex justify-content-between mb-1"><span data-i18n="dashboard.ram">RAM</span><span id="heap"></span></div><div class="progress"><div class="progress-bar" id="prog-heap" role="progressbar"></div></div></li>
