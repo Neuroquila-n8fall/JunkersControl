@@ -95,7 +95,11 @@ static void populateRuntimeJson(JsonDocument &doc)
     command["FeedBaseSetpoint"] = commandedValues.Heating.BasepointTemperature;
     command["FeedCutOff"] = commandedValues.Heating.EndpointTemperature;
     command["FeedMinimum"] = commandedValues.Heating.MinimumFeedTemperature;
-    command["AuxiliaryTemperature"] = commandedValues.Heating.AuxiliaryTemperature;
+    // null until a sample arrives, so the control form cannot echo the boot default back as a measurement.
+    if (commandedValues.Heating.HasReceivedAuxiliaryTemperature)
+        command["AuxiliaryTemperature"] = commandedValues.Heating.AuxiliaryTemperature;
+    else
+        command["AuxiliaryTemperature"] = nullptr;
     command["AmbientTemperature"] = commandedValues.Heating.AmbientTemperature;
     command["TargetAmbientTemperature"] = commandedValues.Heating.TargetAmbientTemperature;
     command["Adaption"] = commandedValues.Heating.FeedAdaption;
@@ -379,58 +383,9 @@ void configureGeneralApiEndpoints()
     forecastHandler->setMethod(HTTP_POST);
     server->addHandler(forecastHandler);
 
-    auto *immediateControlHandler = new AsyncCallbackJsonWebHandler(
-        "/api/control", [](AsyncWebServerRequest *request, JsonVariant &json)
-        {
-            if (SetupMode)
-            {
-                request->send(503, "application/json", R"({"status":503,"msg":"Runtime controls are unavailable in setup mode."})");
-                return;
-            }
-            if (!json.is<JsonObject>())
-            {
-                request->send(400, "application/json", R"({"status":400,"msg":"Expected a JSON object."})");
-                return;
-            }
-            if (!json["WeatherSupportMaximum"].isUnbound() ||
-                !json["ForecastEnabled"].isUnbound() || !json["ForecastCoefficient"].isUnbound())
-            {
-                request->send(400, "application/json", R"({"status":400,"msg":"Use /api/control/queued for weather and forecast settings; no controls applied."})");
-                return;
-            }
-            ForecastInput forecast;
-            bool forecastPresent = false;
-            if (!ParseForecastCommand(json.as<JsonVariantConst>(), "ForecastCorrection", "ForecastValidForSeconds",
-                                      "ForecastTemperatureChange", "ForecastRoomsSatisfied", forecast, forecastPresent))
-            {
-                request->send(400, "application/json", R"({"status":400,"msg":"Invalid forecast input; no controls applied."})");
-                return;
-            }
-            bool accepted = ApplyHeatingCommand(json.as<JsonVariantConst>(), false);
-            if (!json["HotWaterSetpoint"].isUnbound())
-            {
-                JsonDocument water;
-                water["Setpoint"] = json["HotWaterSetpoint"];
-                accepted |= ApplyHotWaterCommand(water.as<JsonVariantConst>(), false);
-            }
-            if (!forecastPresent && !accepted)
-            {
-                request->send(400, "application/json", R"({"status":400,"msg":"No recognized control fields."})");
-                return;
-            }
-            if (forecastPresent)
-                request->send(202, "application/json", R"({"status":202,"state":"queued","msg":"Forecast queued."})");
-            else
-            {
-                JsonDocument runtime;
-                populateRuntimeJson(runtime);
-                sendJson(runtime, request);
-            }
-        });
-    immediateControlHandler->setMethod(HTTP_POST);
-
+    // Prefix match: one main-loop-owned handler serves /api/control and /api/control/queued.
     auto *controlHandler = new AsyncCallbackJsonWebHandler(
-        "/api/control/queued", [](AsyncWebServerRequest *request, JsonVariant &json)
+        "/api/control", [](AsyncWebServerRequest *request, JsonVariant &json)
         {
             if (SetupMode)
             {
@@ -451,9 +406,6 @@ void configureGeneralApiEndpoints()
         });
     controlHandler->setMethod(HTTP_POST);
     server->addHandler(controlHandler);
-    // AsyncCallbackJsonWebHandler matches URI prefixes: register the more
-    // specific queued route before the existing immediate-control route.
-    server->addHandler(immediateControlHandler);
 }
 
 #pragma region "General Config"

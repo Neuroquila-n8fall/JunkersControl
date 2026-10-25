@@ -28,7 +28,7 @@
 <div class="col-6"><label class="form-label" for="ValveScalingOpening">Current valve opening</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" id="ValveScalingOpening" name="ValveScalingOpening"><span class="input-group-text">%</span></div></div>
 <div class="col-12">
 <label class="form-label" for="WeatherSupportMaximum" data-i18n="control.weather_maximum">Maximum weather contribution</label>
-<div class="input-group"><input class="form-control" type="number" min="0" max="100" step="1" required id="WeatherSupportMaximum" name="WeatherSupportMaximum" aria-describedby="weather-maximum-unit weather-maximum-help"><span class="input-group-text" id="weather-maximum-unit">%</span></div>
+<div class="input-group"><input class="form-control" type="number" min="0" max="100" step="any" required id="WeatherSupportMaximum" name="WeatherSupportMaximum" aria-describedby="weather-maximum-unit weather-maximum-help"><span class="input-group-text" id="weather-maximum-unit">%</span></div>
 <div class="form-text" id="weather-maximum-help" data-i18n="control.weather_maximum_help">Caps weather support only in dynamic valve mode during normal heating. 100% restores the previous curve; 0% removes weather support. 60% is an initial setting, not a proven winter calibration. The boiler's physical maximum stays unchanged.</div>
 </div>
 <div class="col-12 border-top pt-3">
@@ -37,7 +37,7 @@
 </div>
 <div class="col-12">
 <label class="form-label" for="ForecastCoefficient" data-i18n="control.forecast_coefficient">Forecast coefficient</label>
-<div class="row g-2 align-items-center"><div class="col-5 col-sm-4"><input class="form-control" type="number" min="0" max="1" step="0.05" required id="ForecastCoefficient" name="ForecastCoefficient" aria-describedby="forecast-coefficient-unit forecast-coefficient-help"></div><div class="col-7 col-sm-8"><span id="forecast-coefficient-unit" data-i18n="control.forecast_coefficient_unit">°C feed / °C outside</span></div></div>
+<div class="row g-2 align-items-center"><div class="col-5 col-sm-4"><input class="form-control" type="number" min="0" max="1" step="any" required id="ForecastCoefficient" name="ForecastCoefficient" aria-describedby="forecast-coefficient-unit forecast-coefficient-help"></div><div class="col-7 col-sm-8"><span id="forecast-coefficient-unit" data-i18n="control.forecast_coefficient_unit">°C feed / °C outside</span></div></div>
 <div class="form-text" id="forecast-coefficient-help" data-i18n="control.forecast_coefficient_help">Strength of the next 3-hour trend: cooling raises the feed target; warming lowers it. The correction is limited to ±2 °C.</div>
 <details class="mt-2"><summary data-i18n="control.forecast_details">How forecast support works</summary>
 <div class="form-text" data-i18n="control.forecast_trend_help">The trend is the average hourly forecast temperature for the next 3 hours minus the same weather provider's current temperature, not the boiler's outside sensor. The coefficient sets the feed-temperature change per degree of this trend.</div>

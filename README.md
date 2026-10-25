@@ -131,7 +131,7 @@ At the end of the home page, **System Status** displays the running firmware ver
 
 ![Fallback heating controls](/assets/webui-fallback-control-dark.png)
 
-The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. Both transports use the same firmware command handlers. See the [API reference](assets/API.md) for request schemas, ranges, persistence behavior, the CAN event stream, and security limitations.
+The dashboard data is also available as JSON from `GET /api/runtime`. Runtime commands can be sent as a partial JSON object to `POST /api/control`, using the same field names as the heating MQTT payload plus `Boost`, `FastHeatup`, and `HotWaterSetpoint`. The request is validated as a whole and queued for the main loop (`202`); read `GET /api/runtime` to observe the applied state. See the [API reference](assets/API.md) for request schemas, ranges, persistence behavior, the CAN event stream, and security limitations.
 
 ## Features
 

@@ -55,8 +55,7 @@ FeedTemperatureResult CalculateFeedTemperatureForInputs(const FeedTemperatureInp
     if (inputs.HoldMinimumTemperature)
         return finish(inputs.MinimumFeedTemperature, inputs.FeedMaximum, false);
 
-    if (!std::isfinite(inputs.MinimumFeedTemperature) || inputs.MinimumFeedTemperature < offTemperature ||
-        inputs.MinimumFeedTemperature > inputs.FeedMaximum || !std::isfinite(inputs.FeedAdaption))
+    if (!std::isfinite(inputs.MinimumFeedTemperature) || !std::isfinite(inputs.FeedAdaption))
         return off;
 
 

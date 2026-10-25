@@ -26,7 +26,7 @@ const metricDefinitions = {
     command: [["dashboard_detail.enabled","Enabled","bool"],["dashboard_detail.requested_feed","FeedSetpoint","temperature"],["dashboard_detail.curve_base","FeedBaseSetpoint","temperature"],["dashboard_detail.curve_cutoff","FeedCutOff","temperature"],["dashboard_detail.feed_min","FeedMinimum","temperature"],["dashboard_detail.aux_temperature","AuxiliaryTemperature","temperature"],["dashboard_detail.ambient","AmbientTemperature","temperature"],["dashboard_detail.target_ambient","TargetAmbientTemperature","temperature"],["dashboard_detail.adaption","Adaption","number"],["dashboard_detail.valve_scaling","ValveScaling","bool"],["dashboard_detail.valve_max","ValveScalingMaxOpening","percent"],["dashboard_detail.valve_opening","ValveScalingOpening","percent"],["dashboard_detail.dynamic_adaption","DynamicAdaption","bool"],["dashboard_detail.override_setpoint","OverrideSetpoint","bool"],["dashboard_detail.boost_duration","OnDemandBoostDuration","duration"],["dashboard_detail.boost","Boost","bool"],["dashboard_detail.boost_remaining","BoostTimeLeft","duration"],["dashboard_detail.fast_heatup","FastHeatup","bool"],["dashboard_detail.hotwater_setpoint","HotWaterSetpoint","temperature"]]
 };
 
-function temperature(value) { return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)} °C` : "—"; }
+function temperature(value) { return value !== null && Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)} °C` : "—"; }
 function formatValue(value, type) {
     if (value === undefined || value === null) return "—";
     if (type === "bool") return typeof value === "boolean" ? translate(value ? "common.on" : "common.off") : "—";

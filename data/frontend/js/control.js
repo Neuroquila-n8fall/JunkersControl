@@ -50,7 +50,10 @@ controlForm.addEventListener('submit', async event => {
     event.preventDefault();
     if (controlFields.disabled || !controlForm.reportValidity()) return;
     const payload = {};
-    new FormData(controlForm).forEach((value, key) => payload[key] = booleanFields.has(key) ? true : Number(value));
+    new FormData(controlForm).forEach((value, key) => {
+        if (booleanFields.has(key)) payload[key] = true;
+        else if (value !== '') payload[key] = Number(value);
+    });
     booleanFields.forEach(key => payload[key] = _(key).checked);
     if (Object.values(payload).some(value => typeof value === 'number' && !Number.isFinite(value))) {
         showControlStatus('danger', "control.invalid_values");

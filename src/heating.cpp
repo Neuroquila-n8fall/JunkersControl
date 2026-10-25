@@ -81,7 +81,9 @@ double CalculateFeedTemperature()
     inputs.ValveScaling = commandedValues.Heating.ValveScaling;
     inputs.DynamicAdaption = commandedValues.Heating.DynamicAdaption;
     inputs.FastHeatup = commandedValues.Heating.FastHeatup;
-    inputs.OutsideTemperatureValid = configuration.Features.UseAuxiliaryOutsideTempReference || ceraValues.General.HasReceivedOT;
+    inputs.OutsideTemperatureValid = configuration.Features.UseAuxiliaryOutsideTempReference
+                                         ? commandedValues.Heating.HasReceivedAuxiliaryTemperature
+                                         : ceraValues.General.HasReceivedOT;
     inputs.OutsideTemperature = configuration.Features.UseAuxiliaryOutsideTempReference
                                     ? commandedValues.Heating.AuxiliaryTemperature
                                     : ceraValues.General.OutsideTemperature;

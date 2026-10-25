@@ -99,17 +99,19 @@ void EmptyAndUnknownOnlyDocumentsRejectButUnknownFieldsDoNotBlockRecognizedField
     AssertNear(commandedValues.Heating.FeedSetpoint, 42.0);
 }
 
-void BooleanRepresentationsAreAcceptedAndNumericControlsClampToBounds()
+void BooleanRepresentationsAndExactNumericBoundsAreAccepted()
 {
-    TEST_ASSERT_TRUE(SubmitText("{\"Enabled\":false,\"FeedSetpoint\":-5}"));
+    TEST_ASSERT_TRUE(SubmitText("{\"Enabled\":false,\"FeedSetpoint\":0,\"ValveScalingOpening\":0}"));
     ProcessPendingRuntimeControls();
     TEST_ASSERT_FALSE(commandedValues.Heating.Active);
     AssertNear(commandedValues.Heating.FeedSetpoint, 0.0);
+    AssertNear(commandedValues.Heating.ValveOpening, 0.0);
 
-    TEST_ASSERT_TRUE(SubmitText("{\"Enabled\":0,\"FeedSetpoint\":105}"));
+    TEST_ASSERT_TRUE(SubmitText("{\"Enabled\":0,\"FeedSetpoint\":100,\"ValveScalingOpening\":100}"));
     ProcessPendingRuntimeControls();
     TEST_ASSERT_FALSE(commandedValues.Heating.Active);
     AssertNear(commandedValues.Heating.FeedSetpoint, 100.0);
+    AssertNear(commandedValues.Heating.ValveOpening, 100.0);
 
     TEST_ASSERT_TRUE(SubmitText("{\"Enabled\":1}"));
     ProcessPendingRuntimeControls();
@@ -138,6 +140,87 @@ void InvalidForecastRangeRejectsOtherwiseValidOrdinaryControls()
     TEST_ASSERT_TRUE(commandedValues.Heating.Active);
     AssertNear(commandedValues.Heating.FeedSetpoint, 42.0);
     TEST_ASSERT_FALSE(GetForecastState().Enabled);
+}
+
+void OutOfRangeNumericRejectsDocumentAndPreservesPendingForecastAndControls()
+{
+    TEST_ASSERT_TRUE(SubmitText(
+        "{\"FeedSetpoint\":42,\"ForecastCorrection\":1.25,\"ForecastValidForSeconds\":300,\"ForecastRoomsSatisfied\":true}"));
+    TEST_ASSERT_FALSE(SubmitText(
+        "{\"Enabled\":false,\"ValveScalingOpening\":1000,\"ForecastCorrection\":-1.5,\"ForecastValidForSeconds\":300}"));
+    ProcessPendingRuntimeControls();
+    ProcessForecastCorrection();
+    AssertNear(commandedValues.Heating.FeedSetpoint, 42.0);
+    TEST_ASSERT_TRUE(commandedValues.Heating.Active);
+    AssertNear(GetForecastState().Correction, 1.25);
+    TEST_ASSERT_TRUE(GetForecastState().RoomsSatisfied);
+}
+
+void LegacyHeatingNumbersStillClampToBounds()
+{
+    JsonDocument document;
+    document["FeedSetpoint"] = -5;
+    TEST_ASSERT_TRUE(ApplyHeatingCommand(document.as<JsonVariantConst>()));
+    AssertNear(commandedValues.Heating.FeedSetpoint, 0.0);
+    document["FeedSetpoint"] = 105;
+    TEST_ASSERT_TRUE(ApplyHeatingCommand(document.as<JsonVariantConst>()));
+    AssertNear(commandedValues.Heating.FeedSetpoint, 100.0);
+}
+
+void RepeatedBoostDoesNotRestartCountdownAndDisabledBoostClearsIt()
+{
+    commandedValues.Heating.BoostDuration = 300;
+    TEST_ASSERT_TRUE(SubmitText("{\"Boost\":true}"));
+    ProcessPendingRuntimeControls();
+    TEST_ASSERT_EQUAL_UINT32(300, commandedValues.Heating.BoostTimeCountdown);
+    commandedValues.Heating.BoostTimeCountdown = 123;
+    TEST_ASSERT_TRUE(SubmitText("{\"OnDemandBoost\":true}"));
+    ProcessPendingRuntimeControls();
+    TEST_ASSERT_EQUAL_UINT32(123, commandedValues.Heating.BoostTimeCountdown);
+    ApplyBoostCommand(true);
+    TEST_ASSERT_EQUAL_UINT32(123, commandedValues.Heating.BoostTimeCountdown);
+    TEST_ASSERT_TRUE(SubmitText("{\"Boost\":false}"));
+    ProcessPendingRuntimeControls();
+    TEST_ASSERT_FALSE(commandedValues.Heating.Boost);
+    TEST_ASSERT_EQUAL_UINT32(0, commandedValues.Heating.BoostTimeCountdown);
+    ApplyBoostCommand(true);
+    TEST_ASSERT_EQUAL_UINT32(300, commandedValues.Heating.BoostTimeCountdown);
+    ApplyBoostCommand(false);
+    TEST_ASSERT_EQUAL_UINT32(0, commandedValues.Heating.BoostTimeCountdown);
+}
+
+void RepeatedFastHeatupKeepsOriginalAmbientReference()
+{
+    commandedValues.Heating.AmbientTemperature = 18.0;
+    ApplyFastHeatupCommand(true);
+    AssertNear(commandedValues.Heating.ReferenceAmbientTemperature, 18.0);
+    commandedValues.Heating.AmbientTemperature = 20.0;
+    ApplyFastHeatupCommand(true);
+    TEST_ASSERT_TRUE(SubmitText("{\"FastHeatup\":true}"));
+    ProcessPendingRuntimeControls();
+    AssertNear(commandedValues.Heating.ReferenceAmbientTemperature, 18.0);
+    TEST_ASSERT_TRUE(SubmitText("{\"FastHeatup\":false}"));
+    ProcessPendingRuntimeControls();
+    TEST_ASSERT_FALSE(commandedValues.Heating.FastHeatup);
+    TEST_ASSERT_TRUE(SubmitText("{\"FastHeatup\":true}"));
+    ProcessPendingRuntimeControls();
+    AssertNear(commandedValues.Heating.ReferenceAmbientTemperature, 20.0);
+}
+
+void AuxiliaryTemperatureBecomesValidOnlyAfterAcceptedSample()
+{
+    TEST_ASSERT_FALSE(commandedValues.Heating.HasReceivedAuxiliaryTemperature);
+    JsonDocument document;
+    document["AuxiliaryTemperature"] = "invalid";
+    TEST_ASSERT_FALSE(ApplyHeatingCommand(document.as<JsonVariantConst>()));
+    TEST_ASSERT_FALSE(commandedValues.Heating.HasReceivedAuxiliaryTemperature);
+    TEST_ASSERT_FALSE(SubmitText("{\"AuxiliaryTemperature\":101}"));
+    TEST_ASSERT_FALSE(commandedValues.Heating.HasReceivedAuxiliaryTemperature);
+    TEST_ASSERT_TRUE(SubmitText("{\"AuxiliaryTemperature\":0}"));
+    TEST_ASSERT_FALSE(commandedValues.Heating.HasReceivedAuxiliaryTemperature);
+    ProcessPendingRuntimeControls();
+    TEST_ASSERT_TRUE(commandedValues.Heating.HasReceivedAuxiliaryTemperature);
+    AssertNear(commandedValues.Heating.AuxiliaryTemperature, 0.0);
 }
 } // namespace
 
@@ -205,9 +288,14 @@ void setup()
     RUN_TEST(EveryMalformedPresentFieldRejectsTheWholeDocumentAndPreservesQueuedState);
     RUN_TEST(MalformedRuntimeDocumentCannotReplaceQueuedForecastSample);
     RUN_TEST(EmptyAndUnknownOnlyDocumentsRejectButUnknownFieldsDoNotBlockRecognizedFields);
-    RUN_TEST(BooleanRepresentationsAreAcceptedAndNumericControlsClampToBounds);
+    RUN_TEST(BooleanRepresentationsAndExactNumericBoundsAreAccepted);
     RUN_TEST(NewValidDocumentReplacesRatherThanMergesPendingControls);
     RUN_TEST(InvalidForecastRangeRejectsOtherwiseValidOrdinaryControls);
+    RUN_TEST(OutOfRangeNumericRejectsDocumentAndPreservesPendingForecastAndControls);
+    RUN_TEST(LegacyHeatingNumbersStillClampToBounds);
+    RUN_TEST(RepeatedBoostDoesNotRestartCountdownAndDisabledBoostClearsIt);
+    RUN_TEST(RepeatedFastHeatupKeepsOriginalAmbientReference);
+    RUN_TEST(AuxiliaryTemperatureBecomesValidOnlyAfterAcceptedSample);
     UNITY_END();
 }
 

@@ -85,6 +85,22 @@ bool updateIfChanged(T &destination, const T &source)
   return true;
 }
 
+void applyBoostTransition(bool enabled)
+{
+  if (enabled && !commandedValues.Heating.Boost)
+    commandedValues.Heating.BoostTimeCountdown = commandedValues.Heating.BoostDuration;
+  else if (!enabled)
+    commandedValues.Heating.BoostTimeCountdown = 0;
+  commandedValues.Heating.Boost = enabled;
+}
+
+void applyFastHeatupTransition(bool enabled)
+{
+  if (enabled && !commandedValues.Heating.FastHeatup)
+    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+  commandedValues.Heating.FastHeatup = enabled;
+}
+
 void scheduleRuntimeControlSave(bool stableStateChanged)
 {
   if (!stableStateChanged)
@@ -231,7 +247,9 @@ bool SubmitRuntimeControlCommand(JsonVariantConst json)
       continue;
     double value = 0.0;
     if (json[control.key].is<bool>() ||
-        !readConstrainedNumber(json, control.key, value, control.minimum, control.maximum))
+        !readConstrainedNumber(json, control.key, value, control.minimum, control.maximum) ||
+        json[control.key].as<double>() < control.minimum ||
+        json[control.key].as<double>() > control.maximum)
       return false;
     normalized[control.key] = value;
   }
@@ -351,7 +369,10 @@ bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState, uint32_
   changed |= accepted;
   if (persistStableState && accepted)
     stableStateChanged |= updateIfChanged(configuration.RuntimeControls.MinimumFeedTemperature, commandedValues.Heating.MinimumFeedTemperature);
-  changed |= readConstrainedNumber(json, "AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature, -50.0, 100.0);
+  accepted = readConstrainedNumber(json, "AuxiliaryTemperature", commandedValues.Heating.AuxiliaryTemperature, -50.0, 100.0);
+  changed |= accepted;
+  if (accepted)
+    commandedValues.Heating.HasReceivedAuxiliaryTemperature = true;
   changed |= readConstrainedNumber(json, "AmbientTemperature", commandedValues.Heating.AmbientTemperature, -50.0, 100.0);
   accepted = readConstrainedNumber(json, "TargetAmbientTemperature", commandedValues.Heating.TargetAmbientTemperature, 5.0, 35.0);
   changed |= accepted;
@@ -386,17 +407,14 @@ bool ApplyHeatingCommand(JsonVariantConst json, bool persistStableState, uint32_
   bool boost = commandedValues.Heating.Boost;
   if (readBoolean(json, "OnDemandBoost", boost) || readBoolean(json, "Boost", boost))
   {
-    commandedValues.Heating.Boost = boost;
-    commandedValues.Heating.BoostTimeCountdown = boost ? commandedValues.Heating.BoostDuration : 0;
+    applyBoostTransition(boost);
     changed = true;
   }
 
   bool fastHeatup = commandedValues.Heating.FastHeatup;
   if (readBoolean(json, "FastHeatup", fastHeatup))
   {
-    if (fastHeatup && !commandedValues.Heating.FastHeatup)
-      commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
-    commandedValues.Heating.FastHeatup = fastHeatup;
+    applyFastHeatupTransition(fastHeatup);
     changed = true;
   }
 
@@ -442,8 +460,7 @@ void ProcessRuntimeControlPersistence()
 
 void ApplyBoostCommand(bool enabled)
 {
-  commandedValues.Heating.Boost = enabled;
-  commandedValues.Heating.BoostTimeCountdown = enabled ? commandedValues.Heating.BoostDuration : 0;
+  applyBoostTransition(enabled);
   NotifyValidHeatingCommand();
   SetFeedTemperature();
   PublishHeatingTemperaturesAndStatus();
@@ -451,9 +468,7 @@ void ApplyBoostCommand(bool enabled)
 
 void ApplyFastHeatupCommand(bool enabled)
 {
-  commandedValues.Heating.FastHeatup = enabled;
-  if (enabled)
-    commandedValues.Heating.ReferenceAmbientTemperature = commandedValues.Heating.AmbientTemperature;
+  applyFastHeatupTransition(enabled);
   NotifyValidHeatingCommand();
   SetFeedTemperature();
   PublishHeatingTemperaturesAndStatus();

@@ -1,7 +1,7 @@
 # Temperature input/output verification
 
 The tests and simulator execute the same C++ temperature calculation as production
-firmware. Its 26 scenarios check weather-cap boundaries, winter valve authority,
+firmware. Its 30 scenarios check weather-cap boundaries, winter valve authority,
 coefficient/sign behavior, room permission, mode precedence, malformed inputs,
 physical maximum/half-step limits and fail-safe behavior. Negative valve-mode
 forecast adjustments require a fresh, explicit all-rooms-satisfied permission.

@@ -64,6 +64,8 @@ def main() -> None:
         if not input_file.is_file():
             raise FileNotFoundError(f"Required build input is missing: {input_file}")
         data = input_file.read_bytes()
+        if not data:
+            raise ValueError(f"Required build input is empty: {input_file}")
         if len(data) > capacity:
             raise ValueError(f"{input_file.name} exceeds its flash region")
         if offset < previous_end:

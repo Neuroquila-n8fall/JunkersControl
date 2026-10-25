@@ -229,6 +229,67 @@ void AllOperatingModesRespectReportedNonHalfStepMaximum()
     TEST_ASSERT_TRUE(CalculateFeedTemperatureForInputs(inputs).Setpoint <= inputs.FeedMaximum);
 }
 
+void ZeroMinimumPreservesColdWeatherCurve()
+{
+    FeedTemperatureInputs inputs;
+    inputs.MinimumFeedTemperature = 0.0;
+    inputs.OutsideTemperature = -10.0;
+    AssertSetpoint(inputs, 75.0);
+
+    inputs.OutsideTemperature = 10.0;
+    AssertSetpoint(inputs, 26.5);
+
+    inputs.OutsideTemperature = inputs.EndpointTemperature;
+    AssertSetpoint(inputs, 10.0);
+}
+
+void ZeroMinimumStaticValveFullDemandReachesMaximum()
+{
+    FeedTemperatureInputs inputs;
+    inputs.MinimumFeedTemperature = 0.0;
+    inputs.ValveScaling = true;
+    inputs.ValveOpening = inputs.MaxValveOpening;
+    AssertSetpoint(inputs, 75.0);
+}
+
+void MinimumAboveReducedMaximumIsLimitedRatherThanOff()
+{
+    FeedTemperatureInputs inputs;
+    inputs.MinimumFeedTemperature = 40.0;
+    inputs.FeedMaximum = 35.0;
+    AssertSetpoint(inputs, 35.0);
+
+    inputs.ValveScaling = true;
+    inputs.ValveOpening = 32.0;
+    AssertSetpoint(inputs, 35.0);
+
+    inputs.DynamicAdaption = true;
+    AssertSetpoint(inputs, 35.0);
+
+    inputs.FeedMaximum = 35.3;
+    AssertSetpoint(inputs, 35.0);
+
+    inputs.DynamicAdaption = false;
+    AssertSetpoint(inputs, 35.0);
+
+    inputs.ValveScaling = false;
+    AssertSetpoint(inputs, 35.0);
+}
+
+void NonFiniteMinimumStillFailsOff()
+{
+    FeedTemperatureInputs inputs;
+    inputs.OutsideTemperature = -10.0;
+    inputs.MinimumFeedTemperature = NAN;
+    AssertSetpoint(inputs, 10.0);
+
+    inputs.MinimumFeedTemperature = INFINITY;
+    AssertSetpoint(inputs, 10.0);
+
+    inputs.MinimumFeedTemperature = -INFINITY;
+    AssertSetpoint(inputs, 10.0);
+}
+
 void InvalidRequiredInputsAndDegenerateCurveFailOff()
 {
     FeedTemperatureInputs inputs;
@@ -251,7 +312,7 @@ void InvalidRequiredInputsAndDegenerateCurveFailOff()
     AssertNear(CalculateFeedTemperatureForInputs(inputs).Setpoint, 10.0);
 
     inputs = FeedTemperatureInputs{};
-    inputs.MinimumFeedTemperature = 9.0;
+    inputs.MinimumFeedTemperature = NAN;
     AssertNear(CalculateFeedTemperatureForInputs(inputs).Setpoint, 10.0);
 
     inputs = FeedTemperatureInputs{};
@@ -459,6 +520,10 @@ void setup()
     RUN_TEST(PositiveForecastStillSupportsHybridValveDemand);
     RUN_TEST(NegativeAdaptationAndSaturationStayInRange);
     RUN_TEST(AllOperatingModesRespectReportedNonHalfStepMaximum);
+    RUN_TEST(ZeroMinimumPreservesColdWeatherCurve);
+    RUN_TEST(ZeroMinimumStaticValveFullDemandReachesMaximum);
+    RUN_TEST(MinimumAboveReducedMaximumIsLimitedRatherThanOff);
+    RUN_TEST(NonFiniteMinimumStillFailsOff);
     RUN_TEST(InvalidRequiredInputsAndDegenerateCurveFailOff);
     RUN_TEST(FailSafeHoldReturnsMinimumDespiteInvalidWeatherCurve);
     RUN_TEST(FinalOutputLimiterFloorsActualMaximumAndPreservesOff);

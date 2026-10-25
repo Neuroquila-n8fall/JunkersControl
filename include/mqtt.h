@@ -40,6 +40,7 @@ struct CommandedValues
         bool Active = true;
         // Auxiliary Temperature
         double AuxiliaryTemperature = 0.00F;
+        bool HasReceivedAuxiliaryTemperature = false;
         // Boost will max the feed temperature for BoostTime seconds
         bool Boost = false;
         // Boost Duration (Seconds)
@@ -48,7 +49,7 @@ struct CommandedValues
         int BoostTimeCountdown = BoostDuration;
         // Fast Heatup. This will max out the feed temperature for a prolongued time until TargetAmbientTemperature has been reached. Setting this to false will return to normal mode in any case.
         bool FastHeatup = false;
-        // Stored Ambient Temperatur as reference. Reset everytime the Fastheatup flag is set
+        // Stored ambient temperature captured when FastHeatup changes from false to true.
         double ReferenceAmbientTemperature = 17.0F;
         // Dynamic Adaption Flag
         bool DynamicAdaption = false;

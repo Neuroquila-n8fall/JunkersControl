@@ -12,8 +12,8 @@ Do not expose the controller directly to the internet. If remote access is requi
 
 - JSON requests use `Content-Type: application/json`.
 - Configuration and control property names are case-sensitive.
-- `200 OK` indicates a successful read or save; `202 Accepted` indicates queued forecast processing or a scheduled configuration reload/reboot. `400 Bad Request` indicates invalid input, and `404 Not Found` indicates a missing path. Filesystem or update failures can return `409` or `500`.
-- `POST /api/control` changes the running command state but does not persist it. Stable MQTT and Home Assistant commands are persisted as described in [Configuration](Configuration.md#runtime-controls).
+- `200 OK` indicates a successful read or save; `202 Accepted` indicates queued runtime controls, forecast processing or a scheduled configuration reload/reboot. `400 Bad Request` indicates invalid input, and `404 Not Found` indicates a missing path. Filesystem or update failures can return `409` or `500`.
+- `POST /api/control` and its `/api/control/queued` alias queue temporary running command changes without persisting them. Stable MQTT and Home Assistant commands are persisted as described in [Configuration](Configuration.md#runtime-controls).
 - Temperatures are represented internally in degrees Celsius. Home Assistant converts displayed values according to `HomeAssistant.TempUnit`, normally `°C` or `°F`.
 
 ## Runtime API
@@ -108,9 +108,11 @@ Consumers should check the enabled installation profiles in `System.CanProfiles`
 
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 
+`Command.AuxiliaryTemperature` is `null` until an auxiliary outside temperature has been accepted after boot. With `Features.UseAuxiliaryOutsideTempReference` enabled, weather-based calculation stays at the off value until then.
+
 ### `POST /api/control`
 
-The existing endpoint preserves immediate ordinary controls and returns the complete runtime document with HTTP `200`, including valid repeat submissions. An empty document, unknown-only document or other request with neither an accepted ordinary control nor a forecast returns `400`. With a valid forecast sample it returns `202`: ordinary controls are applied immediately, while the forecast is handed to the main loop. The new stable settings `WeatherSupportMaximum`, `ForecastEnabled` and `ForecastCoefficient` are rejected on this route before any mutation; use `/api/control/queued` for them. Setup mode returns `503` rather than accepting controls without a consumer.
+This endpoint now queues all accepted controls for the main loop instead of applying ordinary controls on the async web task. **Contract change: successful ordinary commands return HTTP `202` with `state: "queued"`, not the previous HTTP `200` runtime document.** `/api/control/queued` is an alias with identical validation and response semantics. Both routes accept `WeatherSupportMaximum`, `ForecastEnabled` and `ForecastCoefficient` as well as ordinary controls and forecast samples. Any malformed recognized field rejects the whole document before replacing pending controls or reserving a forecast submission; setup mode returns `503`. Read `GET /api/runtime` after application to observe the resulting state.
 
 ```shell
 curl -X POST http://cerasmarter.local/api/control \
@@ -128,9 +130,11 @@ curl -X POST http://cerasmarter.local/api/control/queued \
   -d '{"WeatherSupportMaximum":60,"ForecastEnabled":true,"ForecastCoefficient":0.5}'
 ```
 
-Both runtime-control endpoints are temporary. The following table describes the queued endpoint; ordinary properties and forecast samples also retain their existing `/api/control` behavior:
+Both runtime-control routes are temporary and use the same main-loop-owned handler. The following table applies equally to `/api/control` and its `/api/control/queued` alias:
 
 Accepted properties and ranges:
+
+Queued numeric controls reject values outside the inclusive ranges below; they are not clamped. Legacy MQTT numeric clamping is unchanged. Repeating an enabled `Boost`/`OnDemandBoost` or `FastHeatup` command does not restart its countdown or ambient reference; disable and re-enable the mode to start a new transition.
 
 | Property | Type | Range or meaning |
 | --- | --- | --- |
