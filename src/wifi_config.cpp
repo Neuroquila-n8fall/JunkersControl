@@ -1,24 +1,34 @@
 #include <Arduino.h>
 #include "wifi_config.h"
 #include "main.h"
+#include "telnet.h"
 #include "timesync.h"
 #include <configuration.h>
 
 //-- WiFi Check interval for status output
 const int wifiRetryInterval = 30000;
-// Roaming is deliberately conservative: a weak connection must persist before
-// a background scan is started, and a new AP must be materially better.
+// Roaming: a weak connection must persist before a background scan is started.
+// A candidate AP must be clearly better in two consecutive scans, because a
+// single scan reading is noisy and the AP may hear us differently than we hear it.
 static constexpr int32_t wifiRoamRssiThreshold = -75;
-static constexpr int32_t wifiRoamMinimumCandidateRssi = -70;
-static constexpr int32_t wifiRoamMinimumImprovement = 12;
+static constexpr int32_t wifiRoamMinimumImprovement = 8;
 static constexpr unsigned long wifiRoamRssiCheckInterval = 10000;
 static constexpr unsigned long wifiRoamLowRssiHoldTime = 30000;
 static constexpr unsigned long wifiRoamCooldown = 300000;
 static constexpr uint32_t wifiRoamScanTimePerChannel = 120;
+// After a reconnect (not boot, not our own handover) the strongest AP may have
+// been missing during the reconnect scan, e.g. while it restarted. Check once
+// shortly afterwards whether a mediocre link can be improved.
+static constexpr unsigned long wifiRoamPostReconnectDelay = 60000;
+static constexpr int32_t wifiRoamPostReconnectRssiThreshold = -67;
 //-- Wifi Client object
 WiFiClient espClient;
 static unsigned long lastWifiAttempt = 0;
 static bool wifiWasConnected = false;
+static bool wifiConnectedBefore = false;
+static bool wifiRoamHandoverPending = false;
+static bool wifiPostReconnectScanPending = false;
+static unsigned long wifiReconnectedAt = 0;
 static unsigned long lastWifiRssiCheck = 0;
 static unsigned long lowWifiRssiSince = 0;
 static unsigned long lastWifiRoamAttempt = 0;
@@ -26,6 +36,8 @@ static volatile bool wifiRoamScanActive = false;
 static volatile bool manualWifiScanActive = false;
 static int32_t wifiRoamSourceRssi = 0;
 static uint8_t wifiRoamSourceBssid[6] = {};
+static bool wifiRoamConfirmPending = false;
+static uint8_t wifiRoamCandidateBssid[6] = {};
 
 static void completeWifiRoamScan()
 {
@@ -37,7 +49,8 @@ static void completeWifiRoamScan()
 
   if (scanResult == WIFI_SCAN_FAILED)
   {
-    Serial.println("WiFi roaming scan failed.");
+    Log.println("WiFi roaming scan failed.");
+    wifiRoamConfirmPending = false;
     return;
   }
 
@@ -57,9 +70,7 @@ static void completeWifiRoamScan()
       continue;
 
     const int32_t candidateRssi = WiFi.RSSI(i);
-    if (candidateRssi < wifiRoamMinimumCandidateRssi ||
-        candidateRssi < wifiRoamSourceRssi + wifiRoamMinimumImprovement ||
-        candidateRssi <= bestRssi)
+    if (candidateRssi <= bestRssi)
       continue;
 
     bestRssi = candidateRssi;
@@ -70,16 +81,41 @@ static void completeWifiRoamScan()
 
   WiFi.scanDelete();
 
-  if (bestChannel == 0 || !WiFi.isConnected())
+  const bool confirming = wifiRoamConfirmPending;
+  wifiRoamConfirmPending = false;
+
+  if (bestChannel == 0)
   {
-    if (configuration.General.Debug)
-      Serial.printf("No better WiFi AP found (current RSSI: %ld dBm).\r\n", static_cast<long>(wifiRoamSourceRssi));
+    Log.printf("WiFi roaming: no other AP found (current %ld dBm).\r\n",
+               static_cast<long>(wifiRoamSourceRssi));
     return;
   }
 
-  Serial.printf("Roaming WiFi from %ld dBm to %s at %ld dBm on channel %ld.\r\n",
-                static_cast<long>(wifiRoamSourceRssi), bestBssidText.c_str(),
-                static_cast<long>(bestRssi), static_cast<long>(bestChannel));
+  if (bestRssi < wifiRoamSourceRssi + wifiRoamMinimumImprovement)
+  {
+    Log.printf("WiFi roaming: best other AP %s at %ld dBm is not %ld dB better than current %ld dBm.\r\n",
+               bestBssidText.c_str(), static_cast<long>(bestRssi),
+               static_cast<long>(wifiRoamMinimumImprovement),
+               static_cast<long>(wifiRoamSourceRssi));
+    return;
+  }
+
+  if (!confirming || memcmp(bestBssid, wifiRoamCandidateBssid, sizeof(bestBssid)) != 0)
+  {
+    memcpy(wifiRoamCandidateBssid, bestBssid, sizeof(bestBssid));
+    wifiRoamConfirmPending = true;
+    Log.printf("WiFi roaming: candidate %s at %ld dBm (current %ld dBm). Confirming with a second scan.\r\n",
+               bestBssidText.c_str(), static_cast<long>(bestRssi),
+               static_cast<long>(wifiRoamSourceRssi));
+    return;
+  }
+
+  if (!WiFi.isConnected())
+    return;
+
+  Log.printf("Roaming WiFi from %ld dBm to %s at %ld dBm on channel %ld.\r\n",
+             static_cast<long>(wifiRoamSourceRssi), bestBssidText.c_str(),
+             static_cast<long>(bestRssi), static_cast<long>(bestChannel));
 
   // This is an intentional, short break-before-make handover. begin() returns
   // immediately, leaving the networking task to perform the connection while
@@ -89,6 +125,33 @@ static void completeWifiRoamScan()
              bestChannel, bestBssid, true);
   lastWifiAttempt = millis();
   wifiWasConnected = false;
+  wifiRoamHandoverPending = true;
+}
+
+static void startWifiRoamScan(unsigned long now, int32_t currentRssi, const char *reason)
+{
+  const uint8_t *currentBssid = WiFi.BSSID();
+  if (currentBssid == nullptr)
+    return;
+  memcpy(wifiRoamSourceBssid, currentBssid, sizeof(wifiRoamSourceBssid));
+
+  wifiRoamSourceRssi = currentRssi;
+  lastWifiRoamAttempt = now;
+  lowWifiRssiSince = 0;
+
+  const int16_t result = WiFi.scanNetworks(true, false, false,
+                                            wifiRoamScanTimePerChannel, 0,
+                                            configuration.Wifi.SSID);
+  if (result == WIFI_SCAN_RUNNING)
+  {
+    wifiRoamScanActive = true;
+    Log.printf("WiFi roaming: %s (%ld dBm). Scanning for a better AP.\r\n",
+               reason, static_cast<long>(currentRssi));
+    return;
+  }
+
+  wifiRoamConfirmPending = false;
+  Log.printf("Unable to start WiFi roaming scan (result %d).\r\n", result);
 }
 
 static void updateWifiRoaming()
@@ -108,6 +171,23 @@ static void updateWifiRoaming()
   lastWifiRssiCheck = now;
 
   const int32_t currentRssi = WiFi.RSSI();
+
+  if (wifiRoamConfirmPending)
+  {
+    startWifiRoamScan(now, currentRssi, "confirming candidate");
+    return;
+  }
+
+  if (wifiPostReconnectScanPending && now - wifiReconnectedAt >= wifiRoamPostReconnectDelay)
+  {
+    wifiPostReconnectScanPending = false;
+    if (currentRssi < wifiRoamPostReconnectRssiThreshold)
+    {
+      startWifiRoamScan(now, currentRssi, "weak signal after reconnect");
+      return;
+    }
+  }
+
   if (currentRssi >= wifiRoamRssiThreshold)
   {
     lowWifiRssiSince = 0;
@@ -124,28 +204,7 @@ static void updateWifiRoaming()
       (lastWifiRoamAttempt != 0 && now - lastWifiRoamAttempt < wifiRoamCooldown))
     return;
 
-  const uint8_t *currentBssid = WiFi.BSSID();
-  if (currentBssid == nullptr)
-    return;
-  memcpy(wifiRoamSourceBssid, currentBssid, sizeof(wifiRoamSourceBssid));
-
-  wifiRoamSourceRssi = currentRssi;
-  lastWifiRoamAttempt = now;
-  lowWifiRssiSince = 0;
-
-  const int16_t result = WiFi.scanNetworks(true, false, false,
-                                            wifiRoamScanTimePerChannel, 0,
-                                            configuration.Wifi.SSID);
-  if (result == WIFI_SCAN_RUNNING)
-  {
-    wifiRoamScanActive = true;
-    if (configuration.General.Debug)
-      Serial.printf("Weak WiFi signal (%ld dBm). Scanning for a better AP.\r\n",
-                    static_cast<long>(currentRssi));
-    return;
-  }
-
-  Serial.printf("Unable to start WiFi roaming scan (result %d).\r\n", result);
+  startWifiRoamScan(now, currentRssi, "weak signal");
 }
 
 bool beginManualWifiScan()
@@ -178,7 +237,15 @@ void connectWifi()
     if (!wifiWasConnected)
     {
       wifiWasConnected = true;
-      Serial.printf("WiFi connected. Address: %s\r\n", WiFi.localIP().toString().c_str());
+      // Our own handover already chose the best AP; boot used a full scan.
+      wifiPostReconnectScanPending = wifiConnectedBefore && !wifiRoamHandoverPending;
+      wifiReconnectedAt = millis();
+      wifiConnectedBefore = true;
+      wifiRoamHandoverPending = false;
+      wifiRoamConfirmPending = false;
+      Log.printf("WiFi connected to %s on channel %ld at %ld dBm. Address: %s\r\n",
+                 WiFi.BSSIDstr().c_str(), static_cast<long>(WiFi.channel()),
+                 static_cast<long>(WiFi.RSSI()), WiFi.localIP().toString().c_str());
       if (!MDNS.begin(configuration.Wifi.Hostname))
         Serial.println("mDNS responder could not be started.");
     }
@@ -189,13 +256,16 @@ void connectWifi()
   else if (!SetupMode)
   {
     if (wifiWasConnected)
-      Serial.println("WiFi connection lost. Heating control remains active while reconnecting.");
+      Log.println("WiFi connection lost. Heating control remains active while reconnecting.");
     wifiWasConnected = false;
 
     const unsigned long now = millis();
     if (lastWifiAttempt != 0 && now - lastWifiAttempt < wifiRetryInterval)
       return;
     lastWifiAttempt = now;
+    // A failed handover falls back to this unpinned reconnect; treat its
+    // result as an ordinary reconnect so the post-reconnect check runs.
+    wifiRoamHandoverPending = false;
 
     // Start a connection attempt and return immediately. WiFi reconnects in
     // the ESP networking task while the main loop continues servicing CAN.
