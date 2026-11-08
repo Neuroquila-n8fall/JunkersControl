@@ -507,6 +507,7 @@ bool ReadConfiguration()
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = convertHexString(CAN_Addresses_MixedCircuit["FeedSetpoint"].as<const char *>()); // "0x405"
     configuration.CanAddresses.MixedCircuit.FeedCurrent = convertHexString(CAN_Addresses_MixedCircuit["FeedCurrent"].as<const char *>());   // "0x440"
     configuration.CanAddresses.MixedCircuit.Economy = convertHexString(CAN_Addresses_MixedCircuit["Economy"].as<const char *>());           // "0x407"
+    configuration.CanAddresses.MixedCircuit.DayMode = convertHexString(CAN_Addresses_MixedCircuit["DayMode"] | "0x415");                     // "0x415"
 
     int curSensor = 0;
     bool tempReferenceSensorSet = false;
@@ -688,6 +689,7 @@ bool WriteConfiguration()
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
     CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
+    CAN_Addresses_MixedCircuit["DayMode"] = IntToHex(configuration.CanAddresses.MixedCircuit.DayMode);
 
     JsonArray AuxiliarySensors_Sensors = doc["AuxiliarySensors"]["Sensors"].to<JsonArray>();
 

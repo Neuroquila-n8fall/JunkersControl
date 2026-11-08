@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed mixed-circuit decoding (#59): pump, feed setpoint, current feed and economy frames are `<circuit> <value>` (DLC 2) on installations with a TA270 and HMM mixing module, but the firmware read the circuit byte, so the setpoint showed 0.5 °C and the pump always read "on". The value is now read from byte 1; 1-byte frames are still read from byte 0.
+- Added the mixed-circuit economy switch of a TA270 (#61): new CAN address `Addresses.MixedCircuit.DayMode` (default `0x415`, shown on the CAN-Bus page and in the CAN Analyzer). Its `<circuit> <value>` frame carries `1` = normal/day and `0` = economy, so it sets `MixedCircuit.Economy` to the inverse of the value; `Economy` (`0x407`, `1` = economy) is unchanged and both feed the same field. Existing configurations gain `0x415` on load, and older clients may omit it when saving the CAN form. Replayed in `can_decoder_test`; no live-bus verification (no mixed-circuit hardware).
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.

@@ -413,7 +413,8 @@ Home Assistant command entities and the combined legacy MQTT parameter topics us
                 "Pump": "0x404",
                 "FeedSetpoint": "0x405",
                 "FeedCurrent": "0x440",
-                "Economy": "0x407"
+                "Economy": "0x407",
+                "DayMode": "0x415"
             }
         }
     },
@@ -442,6 +443,8 @@ Two TA270 installations were compared with the CAN Analyzer. Use them as hints f
 - The fourth byte of the date/time frame `0x256` is normally `04`. It changed for one minute when the info page was opened (`07` and `26` on the two installations), so it reflects the TA270's display state rather than the time.
 - `0x25A` carried `3F 00` once a minute; its meaning is unknown.
 - A TA270 without a mixing module still sent `0x404` and `0x405` for its second circuit, but not `0x415`, `0x416` or `0x440`.
+
+The mixed circuit's economy state has two sources that write the same value (`GET /api/runtime` `MixedCircuit.Economy`), both using the `<circuit> <value>` layout above. `MixedCircuit.Economy` (default `0x407`) reports `1` = economy. `MixedCircuit.DayMode` (default `0x415`) reports the inverse, `1` = normal/day and `0` = economy: a TA270 sends it as `01 01` / `01 00` when its economy switch (*Sparbetrieb*) is turned off / on, and repeats it every 30 seconds. Observed in the capture of issue #61; no frame on `0x407` was seen with that hardware. `DayMode` is optional in `configuration.json` (a missing key loads as `0x415`), and a `POST /api/config/canbus` that omits it keeps the current address.
 
 `ReadOnly` is a hard transmission interlock. When enabled, received frames remain available to MQTT, the web API, and CAN Analyzer, but no CAN frame can be sent and the normal controller timeout cannot restore write access.
 
@@ -486,7 +489,8 @@ The web interface offers two domestic-hot-water address presets. The established
                 "Pump": "0x404",
                 "FeedSetpoint": "0x405",
                 "FeedCurrent": "0x440",
-                "Economy": "0x407"
+                "Economy": "0x407",
+                "DayMode": "0x415"
             }
         }
 ```

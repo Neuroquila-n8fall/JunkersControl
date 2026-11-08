@@ -203,6 +203,8 @@ struct Configuration
             uint16_t FeedSetpoint;
             uint16_t FeedCurrent;
             uint16_t Economy;
+            // 2-byte <circuit> <value> frame, 1 = day/normal, 0 = economy (inverse of Economy)
+            uint16_t DayMode;
         } MixedCircuit;
 
     } CanAddresses;

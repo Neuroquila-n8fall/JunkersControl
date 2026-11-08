@@ -398,6 +398,16 @@ void processCan()
       ceraValues.MixedCircuit.Economy = Message.data[mixedCircuitValueIndex];
     }
 
+    //[MC] - [RC] - Mixed-Circuit Day Mode (Economy switch of the TA270)
+    // Data Type: Bit
+    // Value: 1 = Day/Normal | 0 = Economy (inverse of the Economy address above)
+    // Observed on 0x415 as <circuit> <value>, repeated every 30 s (issue #61).
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.DayMode &&
+        dataFrame && Message.len >= 1)
+    {
+      ceraValues.MixedCircuit.Economy = Message.data[mixedCircuitValueIndex] == 0;
+    }
+
     //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature
     // Data Type: INT
     // Value: Data / 2.0

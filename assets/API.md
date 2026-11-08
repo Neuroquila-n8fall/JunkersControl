@@ -210,7 +210,7 @@ Configuration endpoints read and update `/configuration.json`. Successful writes
 | `GET/POST /api/config/mqtt` | `mqtt-server`, `mqtt-port`, `mqtt-user`, `mqtt-password` | POST requires all fields; GET exposes the password |
 | `GET/POST /api/config/mqtt-topics` | `status`, `statusrequest`, `auxvalues`, `boost`, `fastheatup`, `heatingparameters`, `heatingvalues`, `waterparameters`, `watervalues` | POST requires all fields |
 | `GET/POST /api/config/homeassistant` | `enabled`, `discovery-prefix`, `device-id`, `temperature-unit`, `off-delay`; GET also returns `state-topic` | POST requires all editable fields and reconnects MQTT |
-| `GET/POST /api/config/canbus` | Installation profiles, read-only mode, oscillator, controller detection, heartbeat, CAN addresses | POST requires the complete CAN form; addresses are 0–`0x7ff` |
+| `GET/POST /api/config/canbus` | Installation profiles, read-only mode, oscillator, controller detection, heartbeat, CAN addresses | POST requires the complete CAN form except `Addresses.MixedCircuit.DayMode`, which keeps its current value when omitted; addresses are 0–`0x7ff` |
 | `GET/POST /api/config/leds` | `wifi-led`, `status-led`, `mqtt-led`, `heating-led` | POST requires all pins; valid range is 0–39 |
 
 The complete persistent schema, validation details, and examples are maintained in [Configuration](Configuration.md) and the [credential-free template](Templates/Configurations/configuration.json).

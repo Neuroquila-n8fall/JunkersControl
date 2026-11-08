@@ -205,6 +205,12 @@
                                     <input name="MixedCircuit.Economy" maxlength="5" type="text" class="form-control" placeholder="0x407" aria-label="Economy Flag"
                                         aria-describedby="lbl.MixedCircuit.Economy" required>
                                 </div>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text col-sm-10" id="lbl.MixedCircuit.DayMode" data-i18n="can.mixed_day_mode">Day Mode Flag (0 = economy)</span>
+                                    <input name="MixedCircuit.DayMode" maxlength="5" type="text" class="form-control" placeholder="0x415" aria-label="Day Mode Flag (0 = economy)" data-i18n-aria-label="can.mixed_day_mode"
+                                        aria-describedby="lbl.MixedCircuit.DayMode" required>
+                                </div>
+                                <div class="form-text mb-3" data-i18n="can.mixed_economy_help">Economy Flag (1 = economy) and Day Mode Flag (0 = economy) both set the mixed circuit's economy state; a TA270 sends the day mode flag.</div>
                                 <div class="row" id="status">
                                 </div>
                                 <div class="mb-3 row">

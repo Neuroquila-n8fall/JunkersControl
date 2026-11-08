@@ -83,6 +83,60 @@ void OneByteMixedCircuitFramesStillUseFirstByte()
     TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
 }
 
+// TA270 economy switch (issue #61): 0x415 <circuit> <value>, 1 = day/normal, 0 = economy.
+// Capture: 'Sparbetrieb ein' 16:39:53 -> 01 01 then 16:40:23 -> 01 00; 'aus' 16:40:40 -> 01 01 at 16:40:53.
+void DayModeFramesFromCaptureSetInverseEconomy()
+{
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:39:53, normal operation
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x00)); // 16:40:23, economy switched on
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x00)); // periodic repeat keeps economy
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:40:53, economy switched off
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:41:23 and later: unchanged
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+}
+
+void DayModeOneByteFrameUsesFirstByte()
+{
+    Process(Frame(0x415, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 1, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+}
+
+void EconomyAddressKeepsOriginalMeaning()
+{
+    Process(Frame(0x407, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 2, 0x01, 0x00));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 1, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+
+    // The two sources feed the same field; each frame is decoded by its own address.
+    Process(Frame(0x415, 2, 0x01, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+}
+
+void DayModeIgnoredWhenProfileDisabledOrFrameMalformed()
+{
+    ceraValues.MixedCircuit.Economy = true;
+    CANMessage remote = Frame(0x415, 2, 0x01, 0x01);
+    remote.rtr = true;
+    Process(remote);
+    Process(Frame(0x415, 0, 0x01, 0x01)); // zero-length frame supplies no value byte
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+
+    configuration.CanModuleConfig.Profiles.MixedCircuit = false;
+    Process(Frame(0x415, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+}
+
 void ShortRemoteAndExtendedFramesAreIgnored()
 {
     ceraValues.MixedCircuit.FeedSetpoint = 20.0;
@@ -173,6 +227,7 @@ void setUp()
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = 0x405;
     configuration.CanAddresses.MixedCircuit.FeedCurrent = 0x440;
     configuration.CanAddresses.MixedCircuit.Economy = 0x407;
+    configuration.CanAddresses.MixedCircuit.DayMode = 0x415;
     // Unrelated decoders must not match the test frames.
     configuration.CanAddresses.Heating.FeedSetpoint = 0x252;
     configuration.CanAddresses.Heating.Pump = 0x20A;
@@ -219,6 +274,10 @@ void setup()
     delay(2000);
     UNITY_BEGIN();
     RUN_TEST(TwoByteMixedCircuitFramesFromCaptureUseValueByte);
+    RUN_TEST(DayModeFramesFromCaptureSetInverseEconomy);
+    RUN_TEST(DayModeOneByteFrameUsesFirstByte);
+    RUN_TEST(EconomyAddressKeepsOriginalMeaning);
+    RUN_TEST(DayModeIgnoredWhenProfileDisabledOrFrameMalformed);
     RUN_TEST(OneByteMixedCircuitFramesStillUseFirstByte);
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);
