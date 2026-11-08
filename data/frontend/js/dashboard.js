@@ -64,6 +64,7 @@ async function refreshDashboard() {
         renderWeatherForecast(heatingDisplay);
         _("model").textContent=`${status.model} r${status.revision} · ${status.cores} cores`; _("uptime").textContent=formatDuration(runtime.System.Uptime); _("can-profiles").textContent=[runtime.System.CanProfiles.Heating&&translate("can_setup.profile_heating"),runtime.System.CanProfiles.MixedCircuit&&translate("can_setup.profile_mixed"),runtime.System.CanProfiles.DomesticHotWater&&translate("can_setup.profile_hotwater")].filter(Boolean).join(" · ")+(runtime.System.CanReadOnly?` · ${translate("can_setup.read_only")}`:"");
         _("firmware-version").textContent=typeof status.version==="string" && status.version.trim() ? status.version : "—";
+        setControllerClock(runtime.General.ControllerClockOff,runtime.General.ControllerClockOffsetMinutes);
         setUsageBar("heap","prog-heap",status.heap-status.freeheap,status.heap); setUsageBar("sketch","prog-sketch",status.sketchsize,status.sketchsize+status.freesketch); setUsageBar("filesystem","prog-filesystem",status.filesystemused,status.filesystemsize); setBadge("can",status.canstatus===0,"common.connected",CanErrorCodes[status.canstatus]||"common.error"); setBadge("canerrorcount",status.canerrorcount===0,"0",String(status.canerrorcount)); setBadge("mqtt",status.mqtt,"common.connected","common.disconnected");
     } catch(error) {
         console.error(error);
@@ -71,6 +72,11 @@ async function refreshDashboard() {
         _("runtime-status").className="badge dashboard-status-pill bg-danger";
         renderWeatherForecast({});
     }
+}
+function setControllerClock(off,offset) {
+    const el=_("controller-clock");
+    el.className=typeof off==="boolean"?`badge ${off?"bg-warning text-dark":"bg-success"}`:"";
+    el.textContent=typeof off!=="boolean"?"—":(off?translate("controller_clock.off",{minutes:`${offset>0?"+":""}${offset}`}):translate("controller_clock.ok"));
 }
 function renderMetrics(containerId,values,definitions,disabled=false) {
     const metrics=document.createDocumentFragment();

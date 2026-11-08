@@ -47,6 +47,16 @@ static void populateRuntimeJson(JsonDocument &doc)
     general["OutsideTemperature"] = ceraValues.General.OutsideTemperature;
     general["HasOutsideTemperature"] = ceraValues.General.HasReceivedOT;
     general["Error"] = ceraValues.General.Error;
+    if (ceraValues.Time.HasClockComparison)
+    {
+        general["ControllerClockOff"] = ceraValues.Time.ControllerClockOff;
+        general["ControllerClockOffsetMinutes"] = ceraValues.Time.ControllerClockOffsetMinutes;
+    }
+    else
+    {
+        general["ControllerClockOff"] = nullptr;
+        general["ControllerClockOffsetMinutes"] = nullptr;
+    }
 
     JsonObject heating = doc["Heating"].to<JsonObject>();
     heating["FeedMaximum"] = ceraValues.Heating.FeedMaximum;

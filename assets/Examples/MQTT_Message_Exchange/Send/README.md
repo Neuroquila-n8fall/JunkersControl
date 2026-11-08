@@ -75,6 +75,7 @@ Labels and DS18B20 addresses are configured as described in [Auxiliary Sensors](
 
 - `GasBurner`: decoded flame state. `null` (unknown) until the first flame frame has arrived and again after 90 s without one: the boiler repeats flame, heating-pump (`Pump`) and season (`Season`) frames only while a controller on the bus sends the zero-length `0x0F9` info request. Home Assistant discovery maps `null` to the unknown state of the binary sensors.
 - `Error`: decimal representation of the boiler error byte; `0` normally means no reported error.
+- `ControllerClockOff`: `"true"` when the room controller's clock differs from the real time by more than 5 minutes, `"false"` when it matches. The property is omitted until a comparison was possible.
 - `FreeHeap`, `HeapSize`: current and total heap bytes.
 - `FilesystemUsed`, `FilesystemSize`: LittleFS usage in bytes.
 - `FlashSize`: detected flash capacity in bytes.

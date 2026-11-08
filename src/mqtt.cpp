@@ -733,6 +733,9 @@ void PublishStatus()
   else
     jsonObj["GasBurner"] = nullptr;
   jsonObj["Error"] = ceraValues.General.Error;
+  // Omitted until a comparison was possible; Home Assistant then shows the sensor as unknown.
+  if (ceraValues.Time.HasClockComparison)
+    jsonObj["ControllerClockOff"] = boolToString(ceraValues.Time.ControllerClockOff);
   jsonObj["FreeHeap"] = ESP.getFreeHeap();
   jsonObj["HeapSize"] = ESP.getHeapSize();
   jsonObj["FilesystemUsed"] = LittleFS.usedBytes();
