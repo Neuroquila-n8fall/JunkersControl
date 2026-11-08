@@ -59,7 +59,7 @@ function formatAddressPath(path) {
         "Heating.Operation":"can_value.heating_operation", "Heating.Power":"can_value.heating_power", "Heating.Mode":"can_value.heating_mode", "Heating.Economy":"can_value.heating_economy",
         "HotWater.SetpointTemperature":"can_value.water_setpoint", "HotWater.MaxTemperature":"can_value.water_max", "HotWater.CurrentTemperature":"can_value.water_current",
         "HotWater.Now":"can_value.water_now", "HotWater.BufferOperation":"can_value.water_buffer", "HotWater.ContinousFlow.SetpointTemperature":"can_value.water_flow",
-        "MixedCircuit.Pump":"can_value.mixed_pump", "MixedCircuit.FeedSetpoint":"can_value.mixed_setpoint", "MixedCircuit.FeedCurrent":"can_value.mixed_current", "MixedCircuit.Economy":"can_value.mixed_economy"
+        "MixedCircuit.Pump":"can_value.mixed_pump", "MixedCircuit.FeedSetpoint":"can_value.mixed_setpoint", "MixedCircuit.FeedCurrent":"can_value.mixed_current", "MixedCircuit.Economy":"can_value.mixed_economy", "MixedCircuit.DayMode":"can_value.mixed_day_mode"
     };
     return translate(keyMap[path] || path);
 }

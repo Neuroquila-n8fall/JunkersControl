@@ -413,7 +413,8 @@ Home Assistant command entities and the combined legacy MQTT parameter topics us
                 "Pump": "0x404",
                 "FeedSetpoint": "0x405",
                 "FeedCurrent": "0x440",
-                "Economy": "0x407"
+                "Economy": "0x407",
+                "DayMode": "0x415"
             }
         }
     },
@@ -442,6 +443,12 @@ Two TA270 installations were compared with the CAN Analyzer. Use them as hints f
 - The fourth byte of the date/time frame `0x256` is normally `04`. It changed for one minute when the info page was opened (`07` and `26` on the two installations), so it reflects the TA270's display state rather than the time.
 - `0x25A` carried `3F 00` once a minute; its meaning is unknown.
 - A TA270 without a mixing module still sent `0x404` and `0x405` for its second circuit, but not `0x415`, `0x416` or `0x440`.
+
+The mixed circuit's economy state has two sources that write the same value (`GET /api/runtime` `MixedCircuit.Economy`), both using the `<circuit> <value>` layout above. `MixedCircuit.Economy` (default `0x407`) reports `1` = economy. `MixedCircuit.DayMode` (default `0x415`) reports the inverse, `1` = normal/day and `0` = economy: a TA270 sends it as `01 01` / `01 00` when its economy switch (*Sparbetrieb*) is turned off / on, and repeats it every 30 seconds. Observed in the capture of issue #61; no frame on `0x407` was seen with that hardware. If `0x415` carries something else on your installation, point `DayMode` at an unused CAN ID (for example `0x7FF`) to neutralise it. `DayMode` is optional in `configuration.json` (a missing key loads as `0x415`), and a `POST /api/config/canbus` that omits it keeps the current address.
+
+`HotWater.MaxTemperature` (default `0x204`, one byte, value / 2 °C) carries the position of the boiler's hot-water dial: 10 °C (`0x14`) is the lowest, holiday (umbrella) position and 60 °C (`0x78`) the maximum ("E") position, observed on a boiler with the dial turned through its range. A value above 0 °C and up to 10 °C is published as `DialHoliday = true` (runtime API `HotWater.DialHoliday`, MQTT water JSON, Home Assistant binary sensor **Hot Water Dial Holiday**; unknown until the first frame). The flag reflects only the boiler's own hot-water dial (evidence: the maintainer's boiler, dial turned through its range). A TA270 vacation is not detected: in the issue #61 capture `0x204` stays `0x78` during a TA270 vacation, while other addresses (`0x255`, `0x416`) change instead. The flag is informational only and does not change any heating or hot-water control.
+
+A live capture on the maintainer's boiler confirmed that the hot-water dial's minimum is a separate step: the next position up reports 34 °C, so no ordinary setting reports 10 °C. The heating dial (`Heating.FeedMax`, default `0x200`) ranges from 35 °C to 75 °C and has no distinct holiday value, so no heating-dial flag is derived. The boiler's dedicated eco button changed no frame in the same capture (burner and pump off at the time), so it is not visible to Cerasmarter.
 
 `ReadOnly` is a hard transmission interlock. When enabled, received frames remain available to MQTT, the web API, and CAN Analyzer, but no CAN frame can be sent and the normal controller timeout cannot restore write access.
 
@@ -488,7 +495,8 @@ The web interface offers two domestic-hot-water address presets. The established
                 "Pump": "0x404",
                 "FeedSetpoint": "0x405",
                 "FeedCurrent": "0x440",
-                "Economy": "0x407"
+                "Economy": "0x407",
+                "DayMode": "0x415"
             }
         }
 ```

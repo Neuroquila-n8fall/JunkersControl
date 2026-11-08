@@ -66,7 +66,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
     "Maximum": 60,
     "Now": false,
     "Buffer": true,
-    "ContinuousFlowSetpoint": 0
+    "ContinuousFlowSetpoint": 0,
+    "DialHoliday": false
   },
   "MixedCircuit": {
     "Pump": false,
@@ -107,6 +108,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
 Consumers should check the enabled installation profiles in `System.CanProfiles` before displaying mixed-circuit or domestic-hot-water sections and should not interpret an unchanged value as proof that a fresh CAN frame was received.
 
 `General.FlameLit`, `Heating.Pump` and `Heating.Season` are `null` (unknown) until the first frame has arrived and again when no frame of that address has arrived for 90 seconds. The boiler repeats these states only while a controller on the bus sends the zero-length `0x0F9` info request; without one the last value would otherwise appear current forever. They return to `true`/`false` with the next frame.
+
+`HotWater.DialHoliday` is `true` while the boiler's hot-water dial is in the holiday (umbrella) position, `false` otherwise, and `null` until the first dial frame has been received. The dial is reported on the `HotWater.MaxTemperature` address (`0x204` by default, `Maximum`): the lowest/holiday position reads 10 °C (`0x14`) and the maximum ("E") position 60 °C (`0x78`), so a value above 0 °C and up to 10 °C means holiday. It reflects only the boiler's own hot-water dial; a TA270 vacation is not detected. It is informational; no control logic uses it.
 
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 
@@ -212,7 +215,7 @@ Configuration endpoints read and update `/configuration.json`. Successful writes
 | `GET/POST /api/config/mqtt` | `mqtt-server`, `mqtt-port`, `mqtt-user`, `mqtt-password` | POST requires all fields; GET exposes the password |
 | `GET/POST /api/config/mqtt-topics` | `status`, `statusrequest`, `auxvalues`, `boost`, `fastheatup`, `heatingparameters`, `heatingvalues`, `waterparameters`, `watervalues` | POST requires all fields |
 | `GET/POST /api/config/homeassistant` | `enabled`, `discovery-prefix`, `device-id`, `temperature-unit`, `off-delay`; GET also returns `state-topic` | POST requires all editable fields and reconnects MQTT |
-| `GET/POST /api/config/canbus` | Installation profiles, read-only mode, oscillator, controller detection, heartbeat, CAN addresses | POST requires the complete CAN form; addresses are 0–`0x7ff` |
+| `GET/POST /api/config/canbus` | Installation profiles, read-only mode, oscillator, controller detection, heartbeat, CAN addresses | POST requires the complete CAN form except `Addresses.MixedCircuit.DayMode`, which keeps its current value when omitted; addresses are 0–`0x7ff` |
 | `GET/POST /api/config/leds` | `wifi-led`, `status-led`, `mqtt-led`, `heating-led` | POST requires all pins; valid range is 0–39 |
 
 The complete persistent schema, validation details, and examples are maintained in [Configuration](Configuration.md) and the [credential-free template](Templates/Configurations/configuration.json).

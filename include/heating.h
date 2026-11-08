@@ -79,6 +79,10 @@ struct CeraValues
     bool HasReceivedContinousFlowSetpoint = false;
     //-- Maximum Temperature
     double MaximumTemperature =0.00F;
+    //-- Boiler dial in holiday (umbrella) position: the dial maximum reported on the MaxTemperature address is <= 10 °C
+    bool DialHoliday = false;
+    //-- Whether a dial maximum has actually been observed on CAN (DialHoliday is unknown before)
+    bool HasReceivedDialHoliday = false;
   } Hotwater;
   //-- Values for mixed circuit installations
   struct MixedCircuit_
