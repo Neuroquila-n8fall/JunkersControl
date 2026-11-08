@@ -19,6 +19,14 @@ void AssertNear(double actual, double expected)
     TEST_ASSERT_TRUE(fabs(actual - expected) <= 0.001);
 }
 
+// Fake "real" time as minutes since Monday 00:00; negative = clock not set yet.
+int actualMinuteOfWeek = -1;
+int warnCount = 0;
+int infoCount = 0;
+
+// ISO day 1 = Monday .. 7 = Sunday.
+int WeekMinute(int isoDay, int hour, int minute) { return (isoDay - 1) * 24 * 60 + hour * 60 + minute; }
+
 CANMessage Frame(uint32_t id, uint8_t length, uint8_t b0 = 0, uint8_t b1 = 0, uint8_t b2 = 0)
 {
     CANMessage frame;
@@ -149,6 +157,80 @@ void InvalidOutsideTemperatureDoesNotAbortDrain()
     ExpectQueueDrained();
 }
 
+// TA270 capture: right after reconnecting it reports Monday 12:0x while the real time is Sunday 19:1x.
+void TA270ClockFromCaptureIsOffAgainstRealTime()
+{
+    actualMinuteOfWeek = WeekMinute(7, 19, 15);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(16 * 60 + 48, ceraValues.Time.ControllerClockOffsetMinutes);
+    TEST_ASSERT_EQUAL_INT(1, warnCount);
+
+    // Further wrong frames do not log again.
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x04));
+    TEST_ASSERT_EQUAL_INT(1, warnCount);
+    TEST_ASSERT_EQUAL_INT(0, infoCount);
+
+    // Once the controller shows the real time again, one info line is logged.
+    actualMinuteOfWeek = WeekMinute(1, 12, 5);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x04));
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(1, warnCount);
+    TEST_ASSERT_EQUAL_INT(1, infoCount);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x05));
+    TEST_ASSERT_EQUAL_INT(1, infoCount);
+}
+
+void ControllerClockWithinToleranceIsNotOff()
+{
+    actualMinuteOfWeek = WeekMinute(1, 12, 5);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(-2, ceraValues.Time.ControllerClockOffsetMinutes);
+
+    actualMinuteOfWeek = WeekMinute(1, 12, 8); // exactly 5 minutes ahead of the controller
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    actualMinuteOfWeek = WeekMinute(1, 12, 9);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(1, warnCount);
+}
+
+void ControllerClockComparisonWrapsAroundTheWeek()
+{
+    actualMinuteOfWeek = WeekMinute(7, 23, 59);
+    Process(Frame(0x256, 4, 0x01, 0x00, 0x01)); // Monday 00:01
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(2, ceraValues.Time.ControllerClockOffsetMinutes);
+
+    actualMinuteOfWeek = WeekMinute(1, 0, 1);
+    Process(Frame(0x256, 4, 0x07, 0x17, 0x3B)); // Sunday 23:59
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(-2, ceraValues.Time.ControllerClockOffsetMinutes);
+    TEST_ASSERT_EQUAL_INT(0, warnCount);
+}
+
+void ControllerClockIsUnknownUntilTheClockIsSet()
+{
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasValidTime);
+    TEST_ASSERT_FALSE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(0, warnCount);
+
+    // An invalid frame is never compared.
+    actualMinuteOfWeek = WeekMinute(7, 19, 15);
+    Process(Frame(0x256, 4, 0x00, 0x0C, 0x03));
+    TEST_ASSERT_FALSE(ceraValues.Time.HasClockComparison);
+
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+}
+
 } // namespace
 
 void setUp()
@@ -181,6 +263,9 @@ void setUp()
     configuration.CanAddresses.Heating.Power = 0x251;
     configuration.CanAddresses.General.FlameLit = 0x209;
     configuration.CanAddresses.General.Error = 0x206;
+    actualMinuteOfWeek = -1;
+    warnCount = 0;
+    infoCount = 0;
 }
 
 void tearDown() {}
@@ -193,9 +278,18 @@ Configuration configuration;
 CommandedValues commandedValues;
 
 void LogError(const char *, ...) {}
-void LogWarn(const char *, ...) {}
-void LogInfo(const char *, ...) {}
+void LogWarn(const char *, ...) { ++warnCount; }
+void LogInfo(const char *, ...) { ++infoCount; }
 void LogDebug(const char *, ...) {}
+
+// Replaces the ezTime-backed helper of src/timesync.cpp so tests choose the "real" time.
+bool LocalMinuteOfWeek(int &minuteOfWeek)
+{
+    if (actualMinuteOfWeek < 0)
+        return false;
+    minuteOfWeek = actualMinuteOfWeek;
+    return true;
+}
 
 void SendMessage(CANMessage) {}
 CANMessage PrepareMessage(uint32_t id, int length)
@@ -223,6 +317,10 @@ void setup()
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);
     RUN_TEST(InvalidOutsideTemperatureDoesNotAbortDrain);
+    RUN_TEST(TA270ClockFromCaptureIsOffAgainstRealTime);
+    RUN_TEST(ControllerClockWithinToleranceIsNotOff);
+    RUN_TEST(ControllerClockComparisonWrapsAroundTheWeek);
+    RUN_TEST(ControllerClockIsUnknownUntilTheClockIsSet);
     UNITY_END();
 }
 

@@ -22,3 +22,12 @@ bool TimeIsSynced()
 {
   return timeStatus() == timeSet;
 }
+
+bool LocalMinuteOfWeek(int &minuteOfWeek)
+{
+  if (timeStatus() == timeNotSet)
+    return false;
+  // ezTime weekdays start at 1 = Sunday; the week here starts on Monday.
+  minuteOfWeek = ((myTZ.weekday() + 5) % 7) * 1440 + myTZ.hour() * 60 + myTZ.minute();
+  return true;
+}

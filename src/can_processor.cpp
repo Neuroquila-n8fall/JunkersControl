@@ -96,6 +96,37 @@ void setupCan()
   }
 }
 
+// Compares the received room controller clock with the NTP clock. Logs only when
+// the verdict changes and never transmits a correction.
+static void CheckControllerClock()
+{
+  static const char *const days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+  constexpr int minutesPerDay = 24 * 60;
+  constexpr int minutesPerWeek = 7 * minutesPerDay;
+  constexpr int toleranceMinutes = 5; // frames have minute resolution; allow clock skew
+
+  int actual;
+  if (!LocalMinuteOfWeek(actual))
+    return;
+
+  const int controller = (ceraValues.Time.DayOfWeek - 1) * minutesPerDay + ceraValues.Time.Hours * 60 + ceraValues.Time.Minutes;
+  // Wrap to ±half a week so Sunday 23:59 vs Monday 00:01 is 2 minutes, not almost a week.
+  const int difference = (controller - actual + minutesPerWeek + minutesPerWeek / 2) % minutesPerWeek - minutesPerWeek / 2;
+  const bool off = abs(difference) > toleranceMinutes;
+  const bool wasOff = ceraValues.Time.HasClockComparison && ceraValues.Time.ControllerClockOff;
+
+  ceraValues.Time.HasClockComparison = true;
+  ceraValues.Time.ControllerClockOff = off;
+  ceraValues.Time.ControllerClockOffsetMinutes = difference;
+
+  if (off && !wasOff)
+    LogWarn("CAN: room controller clock %s %02d:%02d, actual %s %02d:%02d (off by %+d min)",
+            days[ceraValues.Time.DayOfWeek - 1], ceraValues.Time.Hours, ceraValues.Time.Minutes,
+            days[actual / minutesPerDay], actual % minutesPerDay / 60, actual % 60, difference);
+  else if (!off && wasOff)
+    LogInfo("CAN: room controller clock matches the actual time again");
+}
+
 // Process incoming CAN messages
 void processCan()
 {
@@ -352,7 +383,10 @@ void processCan()
       ceraValues.Time.HasValidTime = Message.data[0] >= 1 && Message.data[0] <= 7 &&
                                      Message.data[1] <= 23 && Message.data[2] <= 59;
       if (ceraValues.Time.HasValidTime)
+      {
         ceraValues.Time.LastUpdateMillis = millis();
+        CheckControllerClock();
+      }
     }
 
     //[DHW] - [RC] - Setpoint water temperature (Continuous-Flow Mode)

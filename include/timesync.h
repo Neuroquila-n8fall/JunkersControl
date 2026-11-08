@@ -16,6 +16,8 @@ extern bool AlarmIsSet;
 
 extern void SyncTimeIfRequired();
 extern bool TimeIsSynced();
+// Local time as minutes since Monday 00:00; false until the clock has been set.
+extern bool LocalMinuteOfWeek(int &minuteOfWeek);
 extern void printWifiStatus();
 
 

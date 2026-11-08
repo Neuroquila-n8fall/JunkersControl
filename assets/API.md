@@ -42,7 +42,9 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
     "FlameLit": false,
     "OutsideTemperature": 12.5,
     "HasOutsideTemperature": true,
-    "Error": 0
+    "Error": 0,
+    "ControllerClockOff": false,
+    "ControllerClockOffsetMinutes": 0
   },
   "Heating": {
     "FeedMaximum": 75,
@@ -105,6 +107,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
 ```
 
 Consumers should check the enabled installation profiles in `System.CanProfiles` before displaying mixed-circuit or domestic-hot-water sections and should not interpret an unchanged value as proof that a fresh CAN frame was received.
+
+`General.ControllerClockOff` is `true` when the date/time frame received from the room controller differs from Cerasmarter's NTP clock by more than 5 minutes (compared within the week, so Sunday 23:59 and Monday 00:01 match), `false` when it matches, and `null` until a valid frame arrived while Cerasmarter's clock was set. `ControllerClockOffsetMinutes` is the controller time minus the real time in minutes (wrapped to ±half a week) or `null`. The values hold the last comparison and are not cleared when the controller stops sending.
 
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 

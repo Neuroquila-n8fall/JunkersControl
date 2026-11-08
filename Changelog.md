@@ -6,6 +6,7 @@
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
+- Added a room controller clock check: when a valid date/time frame (`0x256`) arrives and Cerasmarter's NTP clock is set, the two are compared (week-wrapped, 5-minute tolerance). A warning is logged once when the controller's clock is off (its time programs would switch at the wrong times) and an info line once when it matches again; nothing is ever sent to the controller. The verdict is `General.ControllerClockOff` and `General.ControllerClockOffsetMinutes` in `GET /api/runtime` (`null` until known), a Home Assistant diagnostic problem sensor, and a "Room controller clock" row in the dashboard system status (en/de). Covered by new `can_decoder_test` cases.
 
 ## 0.95.1 (Beta) — 2026-11-08
 

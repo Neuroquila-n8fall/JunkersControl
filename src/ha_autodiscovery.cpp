@@ -255,6 +255,10 @@ void addCoreComponents(JsonObject components)
 
     addBinarySensor(components, "general_gas_burner", "Flame Lit", "General",
                     "{{ value_json.General.GasBurner }}", nullptr, "mdi:fire");
+    // "None" is the MQTT binary sensor's unknown state, used until the clocks could be compared.
+    addBinarySensor(components, "diagnostic_controller_clock", "Room Controller Clock Wrong", "General",
+                    "{{ value_json.General.ControllerClockOff | default('None') }}", "problem",
+                    "mdi:clock-alert-outline", "diagnostic");
     addBinarySensor(components, "heating_pump", "Heating Pump", "Heating",
                     "{{ value_json.Heating.Pump }}", "running", "mdi:pump");
     addBinarySensor(components, "heating_season", "Heating Season", "Heating",
