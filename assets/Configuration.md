@@ -352,7 +352,7 @@ The discovered device contains:
 - Hot-water temperatures and operating states.
 - A temperature entity and diagnostic connectivity entity for every configured auxiliary sensor.
 - Diagnostic entities for heap memory, filesystem and flash storage, chip model and revision, and CPU core count and frequency.
-- A diagnostic problem sensor, "Room Controller Clock Wrong", which is on when the clock received from the room controller differs from the real time and unknown until a comparison was possible.
+- A diagnostic problem sensor, "Room Controller Clock Wrong", which is on when the clock received from the room controller differs from the real time and unknown until a comparison was possible or after the controller's date/time frames have been missing for 180 seconds.
 - Number controls for requested feed temperature, heating-curve basepoint/cutoff/minimum, manual adaptation, target/auxiliary/room-reference temperatures, valve opening/max opening, boost duration, and hot-water setpoint.
 - Switch controls for heating enablement, direct setpoint override, dynamic adaptation, valve scaling, boost, and fast heat-up.
 - A read-only remaining-boost-time sensor reported by the controller logic.
@@ -442,7 +442,7 @@ Two TA270 installations were compared with the CAN Analyzer. Use them as hints f
 - The room dial, time programs, the "P" page and the "hot water now" setting produced no bus frame in the tests; the TA270 evaluates them internally and only sends the result.
 - One TA270 sent the info request `0x0F9` every 30 seconds permanently; another sent it only while its info mode was active. In the second case the boiler stops repeating burner, pump and season, which Cerasmarter then reports as unknown after 90 seconds.
 - The fourth byte of the date/time frame `0x256` is normally `04`. It changed for one minute when the info page was opened (`07` and `26` on the two installations), so it reflects the TA270's display state rather than the time.
-- Cerasmarter compares the day, hour and minute of `0x256` with its own NTP clock (tolerance 5 minutes, wrapping at the week boundary). A mismatch is logged once as a warning and reported by `General.ControllerClockOff` in `GET /api/runtime`, because the controller's time programs would then switch at the wrong times. One TA270 reported Monday 12:01 while the real time was Sunday 19:13, and Monday 12:55 at 20:06 after being disconnected in between: its clock kept running but was set about 17 hours wrong. Cerasmarter never sends a time correction to the controller.
+- Cerasmarter compares the day, hour and minute of `0x256` with its own NTP clock (tolerance 5 minutes, wrapping at the week boundary). A mismatch is logged once as a warning and reported by `General.ControllerClockOff` in `GET /api/runtime`, because the controller's time programs would then switch at the wrong times. If no valid frame arrives for 180 seconds (three missed one-minute frames, for example when the controller is unplugged) the result is reset to unknown and the next frame compares again. One TA270 reported Monday 12:01 while the real time was Sunday 19:13, and Monday 12:55 at 20:06 after being disconnected in between: its clock kept running but was set about 17 hours wrong. Cerasmarter never sends a time correction to the controller.
 - `0x25A` carried `3F 00` once a minute; its meaning is unknown.
 - A TA270 without a mixing module still sent `0x404` and `0x405` for its second circuit, but not `0x415`, `0x416` or `0x440`.
 
