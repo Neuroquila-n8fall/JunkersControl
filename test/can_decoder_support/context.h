@@ -4,6 +4,7 @@
 // PlatformIO force-includes this file in dependency translation units too.
 // Only project translation units have the project's public headers available.
 #if __has_include(<mqtt.h>)
+#include <Arduino.h>
 #include <ACAN2515.h>
 
 // Replaces only the MCP2515 driver: the real src/can_processor.cpp drains
@@ -36,6 +37,19 @@ private:
     uint32_t tail = 0;
 };
 #define ACAN2515 TestCan
+
+// Controllable clock: project translation units read this instead of the
+// hardware millis(). Tests move time with TestClock::Now() += ms. Arduino.h is
+// included above so only later uses, not its declaration, are redirected.
+namespace TestClock
+{
+inline unsigned long &Now()
+{
+    static unsigned long now = 0;
+    return now;
+}
+} // namespace TestClock
+#define millis() TestClock::Now()
 
 // Production data types with main-loop and peripheral declarations replaced.
 #include <mqtt.h>

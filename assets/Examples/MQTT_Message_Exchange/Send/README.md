@@ -33,7 +33,7 @@ Important fields:
 - `FeedSetpoint`: effective setpoint. It is `null` until a CAN setpoint has been observed when Cerasmarter is not controlling the bus.
 - `RequestedFeedSetpoint`: last requested direct setpoint, which can differ from the effective calculated setpoint.
 - `Outside`: boiler or configured auxiliary outside temperature.
-- `Pump`, `Season`, `Working`: decoded heating operating states.
+- `Pump`, `Season`, `Working`: decoded heating operating states. `Pump` and `Season` are `null` while unknown (see [General status](#general-status-and-diagnostics)); the example files show the usual string values.
 - `Enabled`, `FeedBaseSetpoint`, `FeedCutOff`, `FeedMinimum`, `Adaption`, `DynamicAdaption`, `OverrideSetpoint`: current stable command state.
 - `AuxiliaryTemperature`, `AmbientTemperature`, `TargetAmbientTemperature`: external and room-reference inputs.
 - `ValveScaling`, `ValveScalingMaxOpening`, `ValveScalingOpening`: valve-based control state.
@@ -71,7 +71,7 @@ Labels and DS18B20 addresses are configured as described in [Auxiliary Sensors](
 
 [ExampleStatus.json](ExampleStatus.json) contains the burner and controller diagnostics:
 
-- `GasBurner`: decoded flame state.
+- `GasBurner`: decoded flame state. `null` (unknown) until the first flame frame has arrived and again after 90 s without one: the boiler repeats flame, heating-pump (`Pump`) and season (`Season`) frames only while a controller on the bus sends the zero-length `0x0F9` info request. Home Assistant discovery maps `null` to the unknown state of the binary sensors.
 - `Error`: decimal representation of the boiler error byte; `0` normally means no reported error.
 - `FreeHeap`, `HeapSize`: current and total heap bytes.
 - `FilesystemUsed`, `FilesystemSize`: LittleFS usage in bytes.

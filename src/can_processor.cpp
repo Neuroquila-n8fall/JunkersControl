@@ -96,6 +96,61 @@ void setupCan()
   }
 }
 
+// The boiler repeats burner, heating pump and season frames only while a
+// controller keeps sending the zero-length info request 0x0F9 (issue #60).
+// Without it the last value would otherwise be displayed as current forever.
+static const unsigned long StatusValueTimeoutMs = 90UL * 1000UL;
+
+enum StatusValue : uint8_t
+{
+  StatusFlame,
+  StatusHeatingPump,
+  StatusHeatingSeason,
+  StatusValueCount
+};
+
+static const char *const StatusValueName[StatusValueCount] = {"burner flame", "heating pump", "heating season"};
+static unsigned long statusValueLastFrame[StatusValueCount];
+
+static bool &statusValueKnown(StatusValue value)
+{
+  switch (value)
+  {
+  case StatusFlame:
+    return ceraValues.General.FlameLitKnown;
+  case StatusHeatingPump:
+    return ceraValues.Heating.PumpActiveKnown;
+  default:
+    return ceraValues.Heating.SeasonKnown;
+  }
+}
+
+static void noteStatusValueFrame(StatusValue value, unsigned long now)
+{
+  statusValueLastFrame[value] = now;
+  bool &known = statusValueKnown(value);
+  if (!known)
+  {
+    known = true;
+    LogInfo("CAN: %s status received, value known", StatusValueName[value]);
+  }
+}
+
+static void expireStatusValues()
+{
+  const unsigned long now = millis();
+  for (uint8_t i = 0; i < StatusValueCount; i++)
+  {
+    bool &known = statusValueKnown(static_cast<StatusValue>(i));
+    if (known && now - statusValueLastFrame[i] >= StatusValueTimeoutMs)
+    {
+      known = false;
+      LogInfo("CAN: no %s status for %lu s, value unknown. The boiler only sends it while a controller sends the 0x0F9 info request",
+              StatusValueName[i], StatusValueTimeoutMs / 1000UL);
+    }
+  }
+}
+
 // Process incoming CAN messages
 void processCan()
 {
@@ -258,6 +313,7 @@ void processCan()
     if (Message.id == configuration.CanAddresses.General.FlameLit && dataFrame && Message.len >= 1)
     {
       ceraValues.General.FlameLit = Message.data[0];
+      noteStatusValueFrame(StatusFlame, curMillis);
     }
 
     //[HC] - [Controller] - HC Pump Operation
@@ -267,6 +323,7 @@ void processCan()
         dataFrame && Message.len >= 1)
     {
       ceraValues.Heating.PumpActive = Message.data[0];
+      noteStatusValueFrame(StatusHeatingPump, curMillis);
     }
 
     //[DHW] - [Controller] - Hot Water Buffer Operation
@@ -285,6 +342,7 @@ void processCan()
         dataFrame && Message.len >= 1)
     {
       ceraValues.Heating.Season = Message.data[0];
+      noteStatusValueFrame(StatusHeatingSeason, curMillis);
     }
 
     //[HC] - [RC] - Heating Operating
@@ -408,4 +466,6 @@ void processCan()
       ceraValues.MixedCircuit.FeedCurrent = temp;
     }
   }
+
+  expireStatusValues();
 }

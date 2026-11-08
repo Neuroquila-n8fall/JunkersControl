@@ -39,7 +39,11 @@ static void populateRuntimeJson(JsonDocument &doc)
     system["CanProfiles"]["DomesticHotWater"] = configuration.CanModuleConfig.Profiles.DomesticHotWater;
 
     JsonObject general = doc["General"].to<JsonObject>();
-    general["FlameLit"] = ceraValues.General.FlameLit;
+    // Burner, pump and season are null while unknown (no frame for 90 s, e.g. no 0x0F9 info request on the bus).
+    if (ceraValues.General.FlameLitKnown)
+        general["FlameLit"] = ceraValues.General.FlameLit;
+    else
+        general["FlameLit"] = nullptr;
     general["OutsideTemperature"] = ceraValues.General.OutsideTemperature;
     general["HasOutsideTemperature"] = ceraValues.General.HasReceivedOT;
     general["Error"] = ceraValues.General.Error;
@@ -50,10 +54,16 @@ static void populateRuntimeJson(JsonDocument &doc)
     heating["FeedCurrent"] = ceraValues.Heating.FeedCurrent;
     heating["FeedSetpoint"] = ceraValues.Heating.FeedSetpoint;
     heating["CalculatedFeedSetpoint"] = commandedValues.Heating.CalculatedFeedSetpoint;
-    heating["Pump"] = ceraValues.Heating.PumpActive;
+    if (ceraValues.Heating.PumpActiveKnown)
+        heating["Pump"] = ceraValues.Heating.PumpActive;
+    else
+        heating["Pump"] = nullptr;
     heating["Active"] = ceraValues.Heating.Active;
     heating["Power"] = ceraValues.Heating.HeatingPower;
-    heating["Season"] = ceraValues.Heating.Season;
+    if (ceraValues.Heating.SeasonKnown)
+        heating["Season"] = ceraValues.Heating.Season;
+    else
+        heating["Season"] = nullptr;
     heating["Economy"] = ceraValues.Heating.Economy;
     heating["BufferMaximum"] = ceraValues.Heating.BufferWaterTemperatureMaximum;
     heating["BufferCurrent"] = ceraValues.Heating.BufferWaterTemperatureCurrent;

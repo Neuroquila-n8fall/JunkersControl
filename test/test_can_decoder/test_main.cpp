@@ -149,6 +149,114 @@ void InvalidOutsideTemperatureDoesNotAbortDrain()
     ExpectQueueDrained();
 }
 
+// Moves the test clock forward in 6 s steps (the boiler's status cadence) while an
+// unrelated frame (heating feed temperature 0x201) keeps arriving on every step.
+void AdvanceWithUnrelatedTraffic(unsigned long milliseconds)
+{
+    for (unsigned long elapsed = 0; elapsed < milliseconds; elapsed += 6000)
+    {
+        TestClock::Now() += 6000;
+        Process(Frame(0x201, 1, 0x55));
+    }
+}
+
+void StatusValuesAreUnknownUntilFirstFrame()
+{
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+
+    // Malformed frames (zero length, remote) do not make a value known.
+    Process(Frame(0x209, 0, 0x01));
+    CANMessage remote = Frame(0x20A, 1, 0x01);
+    remote.rtr = true;
+    Process(remote);
+    Process(Frame(0x201, 1, 0x55));
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+
+    Process(Frame(0x209, 1, 0x01));
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLit);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActive);
+    TEST_ASSERT_FALSE(ceraValues.Heating.Season);
+}
+
+void StatusValuesBecomeUnknownAfterNinetySecondsWithoutFrames()
+{
+    Process(Frame(0x209, 1, 0x01));
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x01));
+
+    // Issue #60: the boiler stops these frames, other traffic continues.
+    AdvanceWithUnrelatedTraffic(84000);
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+
+    AdvanceWithUnrelatedTraffic(6000); // 90 s since the last frame
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+
+    // Unrelated values keep decoding the whole time.
+    AssertNear(ceraValues.Heating.FeedCurrent, 42.5);
+}
+
+void NewFrameRestoresOnlyItsOwnStatusValue()
+{
+    Process(Frame(0x209, 1, 0x01));
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x01));
+    AdvanceWithUnrelatedTraffic(96000);
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+
+    Process(Frame(0x209, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLit);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActive);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.Season);
+}
+
+void SteadyBoilerCadenceKeepsStatusValuesKnown()
+{
+    // 0x209 / 0x20A every 6 s, 0x20C every 30 s (capture of issue #60) for 5 minutes.
+    for (unsigned long elapsed = 0; elapsed < 300000; elapsed += 6000)
+    {
+        TestClock::Now() += 6000;
+        Push(Frame(0x209, 1, 0x01));
+        Push(Frame(0x20A, 1, 0x01));
+        if (elapsed % 30000 == 0)
+            Push(Frame(0x20C, 1, 0x01));
+        processCan();
+        TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+        TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+        TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+    }
+
+    // All three stop (the 30 s season frame was last seen 24 s before the 6 s frames); each expires on its own age.
+    AdvanceWithUnrelatedTraffic(48000);
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+    AdvanceWithUnrelatedTraffic(48000);
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+}
+
 } // namespace
 
 void setUp()
@@ -223,6 +331,10 @@ void setup()
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);
     RUN_TEST(InvalidOutsideTemperatureDoesNotAbortDrain);
+    RUN_TEST(StatusValuesAreUnknownUntilFirstFrame);
+    RUN_TEST(StatusValuesBecomeUnknownAfterNinetySecondsWithoutFrames);
+    RUN_TEST(NewFrameRestoresOnlyItsOwnStatusValue);
+    RUN_TEST(SteadyBoilerCadenceKeepsStatusValuesKnown);
     UNITY_END();
 }
 
