@@ -12,7 +12,7 @@
 
 Documentation tracks the current development firmware. Please open an issue when controller-specific behavior differs from the documented BM1 installation profiles.
 
-**Beta release: `0.95.0` (2026-10-13).** Adds bounded dynamic-valve weather support, optional forecast assistance and updated ESP32 packaging. Forecast assistance is disabled by default. Read the [English release notes](assets/Releases/0.95.0.md) for installation assets, configuration backups, trusted-LAN requirements and verification limits before upgrading.
+**Beta release: `0.95.1` (2026-11-08).** Improves Wi-Fi recovery after an access-point change and replaces the telnet console with a reliable system log, including a web log page and events kept across crashes. Read the [release notes](assets/Releases/0.95.1.md) before upgrading; the [0.95.0 notes](assets/Releases/0.95.0.md) still apply for installation assets and configuration backups.
 
 ## Community
 You can reach out on [Discord](https://discord.gg/9Wrndbqu7t) to discuss the project and get help from the community.
@@ -414,7 +414,9 @@ You can also use the web UI (See: Firmware Update on the menu bar) to upload the
 
 ## Telnet Console
 
-Debug info can be retrieved using a very basic telnet implementation. Simply connect to the ESP32 using telnet and watch as the messages flow. You can reboot the ESP by typing `reboot` and press enter. Be aware you have to type very quickly because this is truly a very minimalistic and barebone implementation of a client-server console communication which is primarily designed to see debug output without having to stand near the esp.
+Connect to port 23 with any telnet client to follow the system log live; CAN traces appear there too while Debug or Sniffing is enabled. Type `reboot` and Enter to restart the controller. One client is served at a time; output never blocks the controller, and lines are dropped (with a `… N lines dropped` note) when the client cannot keep up.
+
+The **System Log** page (`/logs`) shows the same messages in the browser with level and text filters, plus the events kept across crashes and software restarts. See the [API reference](assets/API.md#system-log).
 
 ## Home Assistant Integration
 
