@@ -60,6 +60,14 @@ preservation/replacement of queued control and forecast input, recognized versus
 unknown fields, accepted boolean forms, numeric bounds, and the resulting
 ordinary feed-temperature calculation.
 
+## CAN frame decoder tests (ESP32 / COM3)
+
+```sh
+python -m platformio test -e can_decoder_test --upload-port COM3
+```
+
+This environment compiles the real `src/can_processor.cpp` and `src/feed_temperature.cpp`. `test/can_decoder_support/context.h` replaces only the MCP2515 driver with a receive queue the tests fill, so frames travel through the production `processCan()` drain loop. The 5 cases cover 2-byte `<circuit> <value>` mixed-circuit frames taken from the capture of issue #61, 1-byte legacy frames, rejection of short, remote and extended frames, and outside-temperature spike/invalid frames not abandoning the rest of the drain.
+
 ## Interactive temperature simulator
 
 Build and upload the serial JSON simulator to the test ESP32:

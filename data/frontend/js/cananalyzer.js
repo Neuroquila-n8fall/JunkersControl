@@ -164,6 +164,8 @@ function candidateValues(data) {
     if (!data.length) return translate("can_analyzer.empty_payload");
     const values = [`u8=${data[0]}`, `u8/2=${(data[0] / 2).toFixed(1)} °C`, `bool=${data[0] ? 1 : 0}`];
     if (data.length >= 2) {
+        // Mixed-circuit frames are "<circuit> <value>"; the value sits in byte 1.
+        values.push(`u8[1]=${data[1]}`, `u8[1]/2=${(data[1] / 2).toFixed(1)} °C`, `bool[1]=${data[1] ? 1 : 0}`);
         let signed = (data[0] << 8) | data[1];
         if (signed & 0x8000) signed -= 0x10000;
         values.push(`s16be/100=${(signed / 100).toFixed(2)} °C`);
