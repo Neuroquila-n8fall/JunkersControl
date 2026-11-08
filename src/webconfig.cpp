@@ -73,6 +73,10 @@ static void populateRuntimeJson(JsonDocument &doc)
     water["Now"] = ceraValues.Hotwater.Now;
     water["Buffer"] = ceraValues.Hotwater.BufferMode;
     water["ContinuousFlowSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+    if (ceraValues.Hotwater.HasReceivedDialHoliday)
+        water["DialHoliday"] = ceraValues.Hotwater.DialHoliday;
+    else
+        water["DialHoliday"] = nullptr;
 
     JsonObject mixed = doc["MixedCircuit"].to<JsonObject>();
     mixed["Pump"] = ceraValues.MixedCircuit.PumpActive;

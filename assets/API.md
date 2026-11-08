@@ -66,7 +66,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
     "Maximum": 60,
     "Now": false,
     "Buffer": true,
-    "ContinuousFlowSetpoint": 0
+    "ContinuousFlowSetpoint": 0,
+    "DialHoliday": false
   },
   "MixedCircuit": {
     "Pump": false,
@@ -105,6 +106,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
 ```
 
 Consumers should check the enabled installation profiles in `System.CanProfiles` before displaying mixed-circuit or domestic-hot-water sections and should not interpret an unchanged value as proof that a fresh CAN frame was received.
+
+`HotWater.DialHoliday` is `true` while the boiler's hot-water dial is in the holiday (umbrella) position, `false` otherwise, and `null` until the first dial frame has been received. The dial is reported on the `HotWater.MaxTemperature` address (`0x204` by default, `Maximum`): the lowest/holiday position reads 10 °C (`0x14`) and the maximum ("E") position 60 °C (`0x78`), so a value of 10 °C or lower means holiday. It is informational; no control logic uses it.
 
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 

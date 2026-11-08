@@ -51,6 +51,7 @@ An effective 10 °C setpoint represents the manufacturer's heating-off request. 
 - `CFSetpoint`: continuous-flow setpoint; `null` until observed.
 - `Now`: instant-demand state.
 - `Buffer`: storage-buffer operating state.
+- `DialHoliday`: `"true"` while the boiler's hot-water dial is in the holiday (umbrella) position, i.e. `Maximum` is 10 °C or lower; `"false"` otherwise; `null` until the first dial frame has been received. Home Assistant discovery exposes it as the binary sensor **Hot Water Dial Holiday** (unknown while `null`).
 
 ## Auxiliary sensors
 

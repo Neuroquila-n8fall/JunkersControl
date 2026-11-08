@@ -4,5 +4,6 @@
     "Setpoint": 10.10,
     "CFSetpoint": 20.00,
     "Now": "true",
-    "Buffer": "false"
+    "Buffer": "false",
+    "DialHoliday": "false"
 }

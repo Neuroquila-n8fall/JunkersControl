@@ -137,6 +137,63 @@ void DayModeIgnoredWhenProfileDisabledOrFrameMalformed()
     TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
 }
 
+// Boiler hot-water dial, reported on 0x204 (HotWater.MaxTemperature) as value/2 °C:
+// holiday (umbrella) 0x14 = 10 °C, maximum ("E") 0x78 = 60 °C.
+void DialHolidayIsUnknownUntilFirstFrame()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    Process(Frame(0x207, 2, 0x03, 0xE8)); // unrelated traffic leaves it unknown
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    AssertNear(ceraValues.Hotwater.MaximumTemperature, 10.0);
+}
+
+void DialHolidayFollowsLastDialPosition()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    Process(Frame(0x204, 1, 0x78));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    AssertNear(ceraValues.Hotwater.MaximumTemperature, 60.0);
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x15)); // 10.5 °C is above the holiday position
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x00)); // at or below 10 °C
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+}
+
+void DialHolidayIgnoresMalformedFramesAndDisabledProfile()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    CANMessage remote = Frame(0x204, 1, 0x14);
+    remote.rtr = true;
+    Process(remote);
+    CANMessage extended = Frame(0x204, 1, 0x14);
+    extended.ext = true;
+    Process(extended);
+    Process(Frame(0x204, 0, 0x14)); // zero-length frame supplies no value byte
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+
+    Process(Frame(0x204, 1, 0x78));
+    Process(remote);
+    Process(extended);
+    Process(Frame(0x204, 0, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+
+    ceraValues.Hotwater = CeraValues::HotWater_{};
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = false;
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+}
+
 void ShortRemoteAndExtendedFramesAreIgnored()
 {
     ceraValues.MixedCircuit.FeedSetpoint = 20.0;
@@ -227,6 +284,12 @@ void setUp()
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = 0x405;
     configuration.CanAddresses.MixedCircuit.FeedCurrent = 0x440;
     configuration.CanAddresses.MixedCircuit.Economy = 0x407;
+    configuration.CanAddresses.HotWater.SetpointTemperature = 0x203;
+    configuration.CanAddresses.HotWater.MaxTemperature = 0x204;
+    configuration.CanAddresses.HotWater.CurrentTemperature = 0x205;
+    configuration.CanAddresses.HotWater.Now = 0x254;
+    configuration.CanAddresses.HotWater.BufferOperation = 0x20B;
+    configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature = 0x255;
     configuration.CanAddresses.MixedCircuit.DayMode = 0x415;
     // Unrelated decoders must not match the test frames.
     configuration.CanAddresses.Heating.FeedSetpoint = 0x252;
@@ -278,6 +341,9 @@ void setup()
     RUN_TEST(DayModeOneByteFrameUsesFirstByte);
     RUN_TEST(EconomyAddressKeepsOriginalMeaning);
     RUN_TEST(DayModeIgnoredWhenProfileDisabledOrFrameMalformed);
+    RUN_TEST(DialHolidayIsUnknownUntilFirstFrame);
+    RUN_TEST(DialHolidayFollowsLastDialPosition);
+    RUN_TEST(DialHolidayIgnoresMalformedFramesAndDisabledProfile);
     RUN_TEST(OneByteMixedCircuitFramesStillUseFirstByte);
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);

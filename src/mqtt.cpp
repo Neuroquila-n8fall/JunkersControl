@@ -865,7 +865,8 @@ void PublishWaterTemperatures()
       "Setpoint": 10.10,
       "CFSetpoint": 20.00,
       "Now": true,
-      "Buffer": false
+      "Buffer": false,
+      "DialHoliday": false
     }
   */
 
@@ -893,6 +894,10 @@ void PublishWaterTemperatures()
     jsonObj["CFSetpoint"] = nullptr;
   jsonObj["Now"] = boolToString(ceraValues.Hotwater.Now);
   jsonObj["Buffer"] = boolToString(ceraValues.Hotwater.BufferMode);
+  if (ceraValues.Hotwater.HasReceivedDialHoliday)
+    jsonObj["DialHoliday"] = boolToString(ceraValues.Hotwater.DialHoliday);
+  else
+    jsonObj["DialHoliday"] = nullptr;
 
   // Mute Flag Set. Don't send message.
   if (MUTE_MQTT == 1)
