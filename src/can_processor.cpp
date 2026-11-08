@@ -127,6 +127,20 @@ static void CheckControllerClock()
     LogInfo("CAN: room controller clock matches the actual time again");
 }
 
+// Forgets the clock verdict when the controller stopped sending date/time frames
+// (unplugged), so a stale warning does not stay. Runs on every pass, also on a silent bus.
+static void ExpireControllerClock()
+{
+  constexpr unsigned long timeoutMs = 180000UL; // the TA270 sends one frame per minute
+  if (!ceraValues.Time.HasClockComparison || millis() - ceraValues.Time.LastUpdateMillis < timeoutMs)
+    return;
+
+  ceraValues.Time.HasClockComparison = false;
+  ceraValues.Time.ControllerClockOff = false;
+  ceraValues.Time.ControllerClockOffsetMinutes = 0;
+  LogInfo("CAN: room controller clock no longer received, clock check reset");
+}
+
 // Process incoming CAN messages
 void processCan()
 {
@@ -442,4 +456,6 @@ void processCan()
       ceraValues.MixedCircuit.FeedCurrent = temp;
     }
   }
+
+  ExpireControllerClock();
 }

@@ -7,6 +7,7 @@
 #include <failsafe.h>
 #include <math.h>
 #include <string.h>
+#include <limits.h>
 
 // The real src/can_processor.cpp decodes frames pushed into a stubbed receive
 // queue (test/can_decoder_support/context.h). Mixed-circuit frames below are
@@ -231,6 +232,66 @@ void ControllerClockIsUnknownUntilTheClockIsSet()
     TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
 }
 
+// Unplugging the controller must not leave its warning behind: 3 missed one-minute frames reset it.
+void ControllerClockResetsAfterThreeMissedFrames()
+{
+    actualMinuteOfWeek = WeekMinute(7, 19, 15);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(1, warnCount);
+
+    // Silent bus: processCan() runs with an empty queue.
+    TestClock::Now() += 179000;
+    processCan();
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(0, infoCount);
+
+    TestClock::Now() += 1000;
+    processCan();
+    TEST_ASSERT_FALSE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(1, infoCount);
+    processCan();
+    TEST_ASSERT_EQUAL_INT(1, infoCount);
+
+    // The controller is back and still wrong: compared again, warned again.
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x04));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_TRUE(ceraValues.Time.ControllerClockOff);
+    TEST_ASSERT_EQUAL_INT(2, warnCount);
+
+    // Frames of other ids do not keep the verdict alive.
+    TestClock::Now() += 180000;
+    Process(Frame(0x207, 2, 0x03, 0xE8));
+    TEST_ASSERT_FALSE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_EQUAL_INT(2, infoCount);
+}
+
+void ControllerClockExpiryIsWrapSafeAndQuietWithoutComparison()
+{
+    // No comparison (clock not set): silence logs nothing.
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TestClock::Now() += 300000;
+    processCan();
+    TEST_ASSERT_EQUAL_INT(0, infoCount);
+
+    // A matching clock expires across the millis() rollover, with one info line.
+    TestClock::Now() = ULONG_MAX - 1000;
+    actualMinuteOfWeek = WeekMinute(1, 12, 3);
+    Process(Frame(0x256, 4, 0x01, 0x0C, 0x03));
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_FALSE(ceraValues.Time.ControllerClockOff);
+    TestClock::Now() += 179999;
+    processCan();
+    TEST_ASSERT_TRUE(ceraValues.Time.HasClockComparison);
+    TestClock::Now() += 1;
+    processCan();
+    TEST_ASSERT_FALSE(ceraValues.Time.HasClockComparison);
+    TEST_ASSERT_EQUAL_INT(1, infoCount);
+    TEST_ASSERT_EQUAL_INT(0, warnCount);
+}
+
 } // namespace
 
 void setUp()
@@ -266,6 +327,7 @@ void setUp()
     actualMinuteOfWeek = -1;
     warnCount = 0;
     infoCount = 0;
+    TestClock::Now() = 0;
 }
 
 void tearDown() {}
@@ -321,6 +383,8 @@ void setup()
     RUN_TEST(ControllerClockWithinToleranceIsNotOff);
     RUN_TEST(ControllerClockComparisonWrapsAroundTheWeek);
     RUN_TEST(ControllerClockIsUnknownUntilTheClockIsSet);
+    RUN_TEST(ControllerClockResetsAfterThreeMissedFrames);
+    RUN_TEST(ControllerClockExpiryIsWrapSafeAndQuietWithoutComparison);
     UNITY_END();
 }
 

@@ -73,7 +73,7 @@ Labels and DS18B20 addresses are configured as described in [Auxiliary Sensors](
 
 - `GasBurner`: decoded flame state.
 - `Error`: decimal representation of the boiler error byte; `0` normally means no reported error.
-- `ControllerClockOff`: `"true"` when the room controller's clock differs from the real time by more than 5 minutes, `"false"` when it matches. The property is omitted until a comparison was possible.
+- `ControllerClockOff`: `"true"` when the room controller's clock differs from the real time by more than 5 minutes, `"false"` when it matches. The property is omitted until a comparison was possible and again after 180 seconds without a date/time frame from the controller.
 - `FreeHeap`, `HeapSize`: current and total heap bytes.
 - `FilesystemUsed`, `FilesystemSize`: LittleFS usage in bytes.
 - `FlashSize`: detected flash capacity in bytes.
