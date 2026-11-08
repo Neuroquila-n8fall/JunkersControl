@@ -19,11 +19,11 @@ The CAN Message Analyzer in **Utilities > CAN Message Analyzer** records the liv
 1. Enter a descriptive capture name, such as `heating-idle`, `hot-water-request`, or `mixer-opening`.
 2. Select **Clear** immediately before the observation period. This removes all captured frames and resets change comparisons and statistics.
 3. Record a stable baseline for at least 30 seconds. Slow status messages may need several minutes.
-4. Change exactly one observable condition, for example request domestic hot water or adjust one setpoint. Avoid combining several actions in one capture.
-5. Watch the **Identifier summary** for IDs whose payload or cadence changes. Select a summary row to filter the frame log to that ID.
+4. Change exactly one observable condition, for example request domestic hot water or adjust one setpoint. Avoid combining several actions in one capture. Type a label such as `dial to 22 °C` under **Markers** and select **Mark** (or press Enter) at the moment you act, so the export shows exactly when it happened.
+5. Watch the **Identifier summary** for IDs whose payload or cadence changes. Select a summary row to filter the frame log to that ID and list its distinct payloads.
 6. Use the × button beside the filter to reset the text, direction, and **Changes only** filters. It does not clear the capture.
 7. Select **Pause** before reviewing or exporting so the evidence remains stable.
-8. Export JSON for complete machine-readable evidence or CSV for a spreadsheet comparison. Preserve both the baseline and changed-state captures and describe the action and timing when sharing them.
+8. Export JSON for complete machine-readable evidence or CSV for a spreadsheet comparison. Both contain the candidate values of every frame (CSV column `candidates`, JSON field `candidates`; empty for an empty payload) and the markers (see [Markers](#markers)). Preserve both the baseline and changed-state captures and describe the action and timing when sharing them.
 
 Captures exist only in the current browser page. Reloading or leaving the page discards them unless they were exported.
 
@@ -32,8 +32,9 @@ Captures exist only in the current browser page. Reloading or leaving the page d
 | Control | Effect |
 | --- | --- |
 | Pause / Resume | Stops or resumes adding frames without clearing existing data. |
-| Clear | Removes frames, per-ID statistics, and previous-payload comparisons. |
+| Clear | Removes frames, markers, per-ID statistics, distinct-payload lists, and previous-payload comparisons. |
 | Capture name | Becomes part of the exported filename and JSON metadata. |
+| Marker label / Mark | Records a marker at the current moment with the typed label, or `Mark n` when the field is empty. Enter in the field also marks. |
 | ID or value-name filter | Matches a hexadecimal identifier such as `0x254` or a configured name such as `hot water`. Selecting a summary row fills this filter. |
 | Reset filters (×) | Clears the text filter, restores direction to **All**, and disables **Changes only**. |
 | Direction | Shows received frames, frames sent by Cerasmarter, or both. |
@@ -51,13 +52,29 @@ Captures exist only in the current browser page. Reloading or leaving the page d
 - **Last payload** is the most recent sequence of data bytes.
 - **Candidate values** shows common interpretations of the leading bytes. For payloads of two or more bytes it lists byte 0 (`u8`, `u8/2`, `bool`), byte 1 (`u8[1]`, `u8[1]/2`, `bool[1]`) and a 16-bit big-endian value (`s16be/100`); the byte-1 values fit mixed-circuit frames in the form `<circuit> <value>`, where `01 55` reads as `u8[1]/2 = 42.5 °C`. These are investigation hints only; they do not prove the unit, scaling, signedness, byte order, or meaning.
 
+### Distinct payloads of one identifier
+
+When the filter leaves exactly one identifier in the summary, for example after selecting its row, a **Distinct payloads** table appears below the summary. It lists every different payload seen for that ID in the order it first appeared, with its count, the capture time it was first and last seen, and its candidate values. Value transitions therefore read top to bottom: `0x415` alternating between `01 01` and `01 00` shows two rows, and the first and last times tell when each state occurred. Up to 64 distinct payloads are listed per ID; frames with further payloads are counted in a note below the table. **Clear** resets the list.
+
+## Markers
+
+A marker records the moment of an action during a capture, so its timing does not have to be reconstructed afterwards. Each marker keeps its label, its capture time and the wall-clock time of the browser. The **Markers** list shows them in order with their count.
+
+- In the frame log a marker is a highlighted row with a flag, placed between the frames at its capture time. Markers are always shown, whatever the ID, direction or **Changes only** filters; **Visible rows** counts frames only, and markers older than the oldest visible frame are left out with it.
+- The capture time is placed on the frame clock using the latest received frame, so it is as exact as the event stream delivers frames (typically a few milliseconds). A marker set before the first frame after loading the page shows `—` until a frame arrives and then a negative time.
+- Markers can be set while the capture is paused; they still get their real time.
+- **CSV** adds two columns at the end, `wall_clock` and `marker`. Marker rows sit between the frames in time order, fill only `timestamp_ms` (on the same clock as the frames), `wall_clock` (ISO 8601, UTC) and `marker` (the label), and leave all frame columns empty. Frame rows leave the two new columns empty. A label starting with `=`, `+`, `-` or `@` is written with a leading `'` so a spreadsheet shows it as text instead of running it as a formula.
+- **JSON** adds a `markers` array: `label`, `wallClock` (ISO 8601, UTC), `timestamp` (same clock as the frames' `timestamp`) and `captureTimeMs` (milliseconds since the first frame). `metadata.markerCount` gives their number.
+
 ## Reading the frame log
 
 - **Time** is elapsed capture time, not wall-clock time.
 - **Dir.** points left for received traffic and right for traffic sent by Cerasmarter.
 - **Payload** is the raw hexadecimal byte sequence.
 - **Delta** is the signed decimal change of each byte compared with the preceding frame of the same ID and direction. Blank positions did not change.
-- Highlighted rows have at least one changed byte or a changed payload length.
+- **Candidate values** shows the same interpretations as the summary for every frame. Long text is shortened; hover over it, or open the distinct-payload table, for the full text.
+- Rows highlighted in yellow have at least one changed byte or a changed payload length.
+- Rows with a flag and a colored border are [markers](#markers), not frames.
 
 Look for repeatable correlations. If the same byte changes whenever one physical value changes, capture several known points and test the proposed scaling. A temperature that appears plausible in one frame may still be a flag, counter, unrelated sensor, or part of a multi-byte value.
 

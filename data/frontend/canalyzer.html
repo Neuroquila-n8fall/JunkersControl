@@ -16,7 +16,10 @@
         html[data-theme="dark"] .can-table-wrap thead th { background-color: var(--ui-surface-alt); color: var(--ui-text); }
         .can-bytes code { display: inline-block; min-width: 3.6rem; margin-right: .25rem; }
         .can-changed { background: rgba(var(--bs-warning-rgb), .22); }
+        .can-candidates { max-width: 20rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .can-stat { min-width: 8rem; }
+        #frame-body .can-marker > td { background-color: rgba(var(--bs-primary-rgb), .16); border-top: 2px solid var(--bs-primary); border-bottom: 2px solid var(--bs-primary); font-weight: 600; }
+        .can-marker-list { max-height: 9rem; overflow: auto; }
         @media (max-width: 575.98px) { .can-analyzer-page { padding-top: 5rem; } }
     </style>
 </head>
@@ -74,6 +77,28 @@
         </div>
     </section>
 
+    <section class="card mb-3" aria-labelledby="marker-title">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span id="marker-title"><i class="bi bi-flag-fill" aria-hidden="true"></i> <span data-i18n="can_analyzer.markers">Markers</span> <span id="marker-count" class="badge text-bg-secondary">0</span></span>
+            <small class="text-muted" data-i18n="can_analyzer.marker_help">Mark the moment of an action; markers appear in the frame log and in exports.</small>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <label for="marker-label" class="form-label" data-i18n="can_analyzer.marker_label">Marker label</label>
+                    <div class="input-group">
+                        <input id="marker-label" class="form-control" autocomplete="off" placeholder="e.g. dial turned to 22 °C" data-i18n-placeholder="can_analyzer.marker_placeholder">
+                        <button id="add-marker" class="btn btn-primary" type="button" title="Mark the current moment" aria-label="Mark the current moment" data-i18n-title="can_analyzer.mark_help" data-i18n-aria-label="can_analyzer.mark_help"><i class="bi bi-flag" aria-hidden="true"></i> <span data-i18n="can_analyzer.mark">Mark</span></button>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <ol id="marker-list" class="list-unstyled small mb-0 can-marker-list" aria-labelledby="marker-title"><li class="text-muted" data-i18n="can_analyzer.no_markers">No markers yet.</li></ol>
+                </div>
+            </div>
+            <div id="marker-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
+        </div>
+    </section>
+
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><small class="text-muted" data-i18n="can_analyzer.frames">Captured frames</small><div id="frame-count" class="fs-4">0</div></div></div></div>
         <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body"><small class="text-muted" data-i18n="can_analyzer.identifiers">Identifiers</small><div id="id-count" class="fs-4">0</div></div></div></div>
@@ -91,12 +116,22 @@
         </div>
     </section>
 
+    <section id="payload-section" class="card mb-3" aria-labelledby="payload-title" hidden>
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><span id="payload-title"></span><small class="text-muted" data-i18n="can_analyzer.distinct_help">In order of first appearance.</small></div>
+        <div class="can-table-wrap">
+            <table class="table table-sm mb-0 align-middle" aria-labelledby="payload-title">
+                <thead><tr><th data-i18n="can_analyzer.payload">Payload</th><th data-i18n="can_analyzer.count">Count</th><th data-i18n="can_analyzer.first_seen">First seen</th><th data-i18n="can_analyzer.last_seen">Last seen</th><th data-i18n="can_analyzer.candidates">Candidate values</th></tr></thead>
+                <tbody id="payload-body"></tbody>
+            </table>
+        </div>
+    </section>
+
     <section class="card">
         <div class="card-header" data-i18n="can_analyzer.frame_log">Frame log</div>
         <div id="frame-log-wrap" class="can-table-wrap">
             <table class="table table-sm mb-0 align-middle">
-                <thead><tr><th data-i18n="can_analyzer.time">Time</th><th data-i18n="can_analyzer.direction_short">Dir.</th><th>ID</th><th data-i18n="can_analyzer.value_name">Value name</th><th>DLC</th><th data-i18n="can_analyzer.payload">Payload</th><th data-i18n="can_analyzer.delta">Delta</th></tr></thead>
-                <tbody id="frame-body"><tr><td colspan="7" class="text-center text-muted py-4" data-i18n="can_analyzer.no_frames">No frames captured yet.</td></tr></tbody>
+                <thead><tr><th data-i18n="can_analyzer.time">Time</th><th data-i18n="can_analyzer.direction_short">Dir.</th><th>ID</th><th data-i18n="can_analyzer.value_name">Value name</th><th>DLC</th><th data-i18n="can_analyzer.payload">Payload</th><th data-i18n="can_analyzer.delta">Delta</th><th data-i18n="can_analyzer.candidates">Candidate values</th></tr></thead>
+                <tbody id="frame-body"><tr><td colspan="8" class="text-center text-muted py-4" data-i18n="can_analyzer.no_frames">No frames captured yet.</td></tr></tbody>
             </table>
         </div>
     </section>
