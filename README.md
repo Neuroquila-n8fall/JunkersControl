@@ -436,6 +436,8 @@ Memory, filesystem and flash capacity, chip model and revision, CPU core count, 
 
 Discovery assigns purpose-specific Material Design icons to every entity. The **Flame Lit** binary sensor intentionally has no Home Assistant device class: it therefore reports plain **On/Off** while using a flame icon whose active color follows the burner state. MQTT discovery supports one static icon per entity, so using different custom glyphs for its on and off states would require a separate Home Assistant template entity.
 
+The **Flame Lit**, **Heating Pump** and **Heating Season** binary sensors show Home Assistant's **Unknown** state while the firmware has no current value: before the first frame and after 90 seconds without one. The boiler only repeats these frames while a controller on the bus sends the `0x0F9` info request, so Unknown is expected while another room controller is on the bus but does not send that request (for example a TA270 outside its info mode) and Cerasmarter does not send its own heartbeat, or while CAN `ReadOnly` mode is active. The dashboard shows "—" and the heating LED is off in that case.
+
 Runtime state and command topics use `cerasmarter/<DeviceId>/...`, independently of the discovery prefix. Discovery and state messages are retained, and MQTT Last Will availability marks the device offline if its connection is lost. The controller also listens for Home Assistant's `<AutoDiscoveryPrefix>/status` birth message and republishes discovery when Home Assistant restarts.
 
 ![Home Assistant device created through MQTT discovery](/assets/home-assistant-autodiscovery-device.png)

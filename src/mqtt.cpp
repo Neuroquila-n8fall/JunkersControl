@@ -727,7 +727,11 @@ void PublishStatus()
     jsonObj = doc["General"].to<JsonObject>();
   }
 
-  jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
+  // Null while unknown (no frame for 90 s); Home Assistant renders it as "None" = unknown.
+  if (ceraValues.General.FlameLitKnown)
+    jsonObj["GasBurner"] = boolToString(ceraValues.General.FlameLit);
+  else
+    jsonObj["GasBurner"] = nullptr;
   jsonObj["Error"] = ceraValues.General.Error;
   jsonObj["FreeHeap"] = ESP.getFreeHeap();
   jsonObj["HeapSize"] = ESP.getHeapSize();
@@ -798,8 +802,14 @@ void PublishHeatingTemperaturesAndStatus()
   else
     jsonObj["FeedSetpoint"] = nullptr;
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
-  jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
-  jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  if (ceraValues.Heating.PumpActiveKnown)
+    jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
+  else
+    jsonObj["Pump"] = nullptr;
+  if (ceraValues.Heating.SeasonKnown)
+    jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  else
+    jsonObj["Season"] = nullptr;
   jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;

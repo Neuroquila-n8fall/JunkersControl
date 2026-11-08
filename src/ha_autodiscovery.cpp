@@ -253,12 +253,14 @@ void addCoreComponents(JsonObject components)
               "{{ value_json.Water.CFSetpoint | float(default=0) }}", "temperature", temperatureUnit,
               "mdi:water-sync");
 
+    // Burner, pump and season are JSON null while unknown. HA's MQTT binary_sensor maps the payload "None" to
+    // the unknown state; the template renders null (or a missing key) as exactly that.
     addBinarySensor(components, "general_gas_burner", "Flame Lit", "General",
-                    "{{ value_json.General.GasBurner }}", nullptr, "mdi:fire");
+                    "{{ value_json.General.GasBurner | default('None', true) }}", nullptr, "mdi:fire");
     addBinarySensor(components, "heating_pump", "Heating Pump", "Heating",
-                    "{{ value_json.Heating.Pump }}", "running", "mdi:pump");
+                    "{{ value_json.Heating.Pump | default('None', true) }}", "running", "mdi:pump");
     addBinarySensor(components, "heating_season", "Heating Season", "Heating",
-                    "{{ value_json.Heating.Season }}", nullptr, "mdi:radiator");
+                    "{{ value_json.Heating.Season | default('None', true) }}", nullptr, "mdi:radiator");
     addBinarySensor(components, "heating_working", "Heating Operation", "Heating",
                     "{{ value_json.Heating.Working }}", "running", "mdi:heating-coil");
     addBinarySensor(components, "water_now", "Hot Water Now", "Water",

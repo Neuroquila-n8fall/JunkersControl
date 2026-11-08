@@ -106,6 +106,8 @@ Returns the complete dashboard snapshot. This is the preferred endpoint for dash
 
 Consumers should check the enabled installation profiles in `System.CanProfiles` before displaying mixed-circuit or domestic-hot-water sections and should not interpret an unchanged value as proof that a fresh CAN frame was received.
 
+`General.FlameLit`, `Heating.Pump` and `Heating.Season` are `null` (unknown) until the first frame has arrived and again when no frame of that address has arrived for 90 seconds. The boiler repeats these states only while a controller on the bus sends the zero-length `0x0F9` info request; without one the last value would otherwise appear current forever. They return to `true`/`false` with the next frame.
+
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 
 ### `POST /api/control`

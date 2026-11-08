@@ -6,6 +6,7 @@
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
+- **Breaking (MQTT/API):** `GasBurner`, `Pump` and `Season` in the MQTT status/heating JSON and `FlameLit`, `Pump` and `Season` in `GET /api/runtime` can now be `null`; consumers that expect a boolean or `"true"`/`"false"` must handle it. Fixed stale burner, heating-pump and season states (#60): the boiler repeats `0x209` (flame), `0x20A` (heating pump) and `0x20C` (season) only while a controller on the bus sends the zero-length `0x0F9` info request, so the last value was displayed as current forever. `General.FlameLit`, `Heating.PumpActive` and `Heating.Season` are now unknown until the first frame and again after 90 s without one. `GET /api/runtime` (`General.FlameLit`, `Heating.Pump`, `Heating.Season`), the MQTT `GasBurner`, `Pump` and `Season` fields and Home Assistant report `null`/unknown, the dashboard shows "—" and the heating LED turns off. They are known again with the next frame. The system log notes both transitions.
 
 ## 0.95.1 (Beta) — 2026-11-08
 

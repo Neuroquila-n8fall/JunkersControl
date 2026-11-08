@@ -33,8 +33,12 @@ struct CeraValues
     double BufferWaterTemperatureCurrent = 0.0F;
     //-- Circulation Pump Active
     bool PumpActive = false;
+    //-- Whether PumpActive is current: false until a frame arrived and again after StatusValueTimeoutMs without one
+    bool PumpActiveKnown = false;
     //-- Seasonal Mode: True = Summer | False = Winter
     bool Season = false;
+    //-- Whether Season is current (see PumpActiveKnown)
+    bool SeasonKnown = false;
     //-- Heating active / operational
     bool Active = true;
     //-- Analog value of heating power
@@ -47,6 +51,8 @@ struct CeraValues
   {
     //-- Flame status as reported by the gas burner
     bool FlameLit = false;
+    //-- Whether FlameLit is current (see Heating.PumpActiveKnown)
+    bool FlameLitKnown = false;
     //-- Readings of the temperature sensor on the outside
     double OutsideTemperature = 0.00F;
     //-- Received OutsideTemperature

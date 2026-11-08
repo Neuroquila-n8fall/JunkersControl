@@ -659,7 +659,7 @@ void UpdateLeds(void *pvParameter)
     {
       // The heating LED is the flame indicator. CAN errors retain priority and
       // blink this output from ShowCanError instead.
-      digitalWrite(configuration.LEDs.HeatingLed, ceraValues.General.FlameLit ? HIGH : LOW);
+      digitalWrite(configuration.LEDs.HeatingLed, ceraValues.General.FlameLitKnown && ceraValues.General.FlameLit ? HIGH : LOW);
     }
     vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
