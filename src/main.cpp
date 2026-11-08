@@ -544,6 +544,10 @@ void WriteMessage(CANMessage msg, bool received /* = true */)
 
 void SetDateTime()
 {
+  // Before the first NTP sync the clock still reads the 1970 power-on default
+  // (Thursday 01:00); sending it would set a wrong time on the boiler.
+  if (timeStatus() == timeNotSet)
+    return;
   runEverySeconds(dateTimeSendDelay)
   {
     if (millis() - lastSentMessageTime >= 1000)

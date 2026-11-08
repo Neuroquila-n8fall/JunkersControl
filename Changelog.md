@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the controller sending a wrong date and time to the boiler after every boot: before the first NTP sync the clock still read its power-on default (Thursday 01:00), and that was sent on the date/time frame. Date and time are now sent only once the clock has been synchronized.
+
 ## 0.95.1 (Beta) — 2026-11-08
 
 - Wi-Fi recovery after an access-point change: about 60 s after any reconnect that is not a boot or the controller's own roaming switch, a signal below −67 dBm triggers one scan for a better AP. Roaming now needs an AP at least 8 dB stronger (was 12 dB plus a −70 dBm floor), confirmed by two consecutive scans. Connections, losses and roaming decisions are logged at info level.
