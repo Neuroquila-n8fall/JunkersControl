@@ -265,8 +265,6 @@ void loop()
     return;
   }
 
-  // store the current timer millis
-  unsigned long currentMillis = millis();
   // Connect WiFi (if disconnected)
   connectWifi();
   //-------------------------------------
@@ -308,8 +306,10 @@ void loop()
   {
     // If we didn't spot a controller message on the network for x seconds we will take over control.
     // As soon as a message is spotted on the network it will be disabled again. This is controlled within processCan()
+    // Read the clock here: processCan() above may have stamped a frame after any earlier reading,
+    // and the unsigned difference would wrap and enable override while a controller is active.
     if (!configuration.CanModuleConfig.ReadOnly &&
-        currentMillis - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
+        millis() - controllerMessageTimer >= configuration.General.BusMessageTimeout * 1000)
     {
       // Bail out if we already set this...
       if (!OverrideControl)
