@@ -430,7 +430,18 @@ Your CAN-Module might have a 8MHz or 16MHz oscillator (quartz) installed. Adjust
 
 `Profiles.Heating`, `Profiles.MixedCircuit`, and `Profiles.DomesticHotWater` describe the functional parts actually installed. Disabled profiles are neither decoded nor driven. They intentionally do not identify TA250, TA270, or another room controller: BM1 installations vary by boiler and hydraulic configuration, while all CAN addresses remain independently editable.
 
-Mixed-circuit frames (`MixedCircuit.Pump`, `FeedSetpoint`, `FeedCurrent`, `Economy`) are decoded as `<circuit> <value>`: a 2-byte payload whose first byte is the circuit/module number (observed `0x01` with a TA270 and HMM mixing module) and whose second byte is the value. Temperatures are the value byte divided by 2, for example `0x405` `01 55` is a 42.5 °C setpoint and `0x440` `01 43` a 33.5 °C feed; `0x404` `01 01` / `01 00` is pump on / off (both observed live with a TA270). A 1-byte frame is still read from its only byte, so installations that send no circuit byte keep working. The circuit byte is not evaluated, so frames of a second mixed circuit would overwrite the first. Every decoder ignores remote and extended frames and frames shorter than the bytes it reads.
+Mixed-circuit frames (`MixedCircuit.Pump`, `FeedSetpoint`, `FeedCurrent`, `Economy`) are decoded as `<circuit> <value>`: a 2-byte payload whose first byte is the circuit/module number (observed `0x01` with a TA270 and HMM mixing module) and whose second byte is the value. Temperatures are the value byte divided by 2, for example `0x405` `01 55` is a 42.5 °C setpoint and `0x440` `01 43` a 33.5 °C feed; `0x404` `01 01` is pump on. `01 00` was observed from a TA270 on an installation without a mixing module, where it followed the TA270's night/day switching; that it means pump off on a real mixing module is inferred. A 1-byte frame is still read from its only byte, so installations that send no circuit byte keep working. The circuit byte is not evaluated, so frames of a second mixed circuit would overwrite the first. Every decoder ignores remote and extended frames and frames shorter than the bytes it reads.
+
+### TA270 observations
+
+Two TA270 installations were compared with the CAN Analyzer. Use them as hints for your own captures, not as a protocol specification:
+
+- The night (moon) and day (sun) buttons switch the heating feed request on `0x252` immediately (for example 75 °C ↔ 10 °C) and the heating economy state on `0x253` (`01` = economy, `00` = normal) at its next 30-second cycle.
+- The room dial, time programs, the "P" page and the "hot water now" setting produced no bus frame in the tests; the TA270 evaluates them internally and only sends the result.
+- One TA270 sent the info request `0x0F9` every 30 seconds permanently; another sent it only while its info mode was active. In the second case the boiler stops repeating burner, pump and season, which Cerasmarter then reports as unknown after 90 seconds.
+- The fourth byte of the date/time frame `0x256` is normally `04`. It changed for one minute when the info page was opened (`07` and `26` on the two installations), so it reflects the TA270's display state rather than the time.
+- `0x25A` carried `3F 00` once a minute; its meaning is unknown.
+- A TA270 without a mixing module still sent `0x404` and `0x405` for its second circuit, but not `0x415`, `0x416` or `0x440`.
 
 `ReadOnly` is a hard transmission interlock. When enabled, received frames remain available to MQTT, the web API, and CAN Analyzer, but no CAN frame can be sent and the normal controller timeout cannot restore write access.
 
