@@ -5,6 +5,7 @@
     "Outside": 15.10,
     "Pump": "true",
     "Season": "true",
+    "Economy": "false",
     "Working": "true",
     "Boost": "false",
     "BoostTimeLeft": 0,
