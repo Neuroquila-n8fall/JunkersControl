@@ -200,7 +200,7 @@ void processCan()
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.MaximumTemperature = temp;
       // Dial positions seen on a boiler: holiday (umbrella) 0x14 = 10 °C, maximum ("E") 0x78 = 60 °C.
-      ceraValues.Hotwater.DialHoliday = temp <= 10.0;
+      ceraValues.Hotwater.DialHoliday = temp > 0.0 && temp <= 10.0;
       ceraValues.Hotwater.HasReceivedDialHoliday = true;
     }
 

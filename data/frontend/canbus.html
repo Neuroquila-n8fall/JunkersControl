@@ -271,7 +271,7 @@
             _("heartbeat-interval").value = result.Heartbeat.IntervalSeconds;
             const keys = getDeepKeys(result.Addresses);
             keys.forEach(e => {
-                form.elements[e].value = jsonPathToValue(result.Addresses, e);
+                if (form.elements[e]) form.elements[e].value = jsonPathToValue(result.Addresses, e);
             })
         } 
 

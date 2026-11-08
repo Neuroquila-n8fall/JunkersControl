@@ -130,6 +130,9 @@ void DayModeIgnoredWhenProfileDisabledOrFrameMalformed()
     remote.rtr = true;
     Process(remote);
     Process(Frame(0x415, 0, 0x01, 0x01)); // zero-length frame supplies no value byte
+    CANMessage extended = Frame(0x415, 2, 0x01, 0x01);
+    extended.ext = true;
+    Process(extended);
     TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
 
     configuration.CanModuleConfig.Profiles.MixedCircuit = false;
@@ -165,8 +168,11 @@ void DialHolidayFollowsLastDialPosition()
     TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
     Process(Frame(0x204, 1, 0x14));
     TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
-    Process(Frame(0x204, 1, 0x00)); // at or below 10 °C
+    Process(Frame(0x204, 1, 0x01)); // 0.5 °C: still the lowest range
     TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x00)); // 0 °C is not a dial position: not holiday
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
 }
 
 void DialHolidayIgnoresMalformedFramesAndDisabledProfile()
