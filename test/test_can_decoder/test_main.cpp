@@ -7,6 +7,7 @@
 #include <failsafe.h>
 #include <math.h>
 #include <string.h>
+#include <limits.h>
 
 // The real src/can_processor.cpp decodes frames pushed into a stubbed receive
 // queue (test/can_decoder_support/context.h). Mixed-circuit frames below are
@@ -257,6 +258,55 @@ void SteadyBoilerCadenceKeepsStatusValuesKnown()
     TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
 }
 
+void StatusValuesExpireAcrossMillisWraparound()
+{
+    // millis() wraps after 49.7 days; the 90 s span starts 30 s before the wrap.
+    TestClock::Now() = ULONG_MAX - 30000;
+    Process(Frame(0x209, 1, 0x01));
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x01));
+
+    AdvanceWithUnrelatedTraffic(84000);
+    TEST_ASSERT_TRUE(TestClock::Now() < 60000); // wrapped
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+
+    AdvanceWithUnrelatedTraffic(6000);
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+}
+
+void StatusValuesExpireOnSilentBus()
+{
+    Process(Frame(0x209, 1, 0x01));
+    Process(Frame(0x20A, 1, 0x01));
+    Process(Frame(0x20C, 1, 0x01));
+
+    // No frame at all: processCan() still runs every loop pass with an empty queue.
+    for (unsigned long elapsed = 0; elapsed < 84000; elapsed += 6000)
+    {
+        TestClock::Now() += 6000;
+        processCan();
+    }
+    TEST_ASSERT_TRUE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_TRUE(ceraValues.Heating.SeasonKnown);
+
+    TestClock::Now() += 6000;
+    processCan();
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.SeasonKnown);
+
+    // A single late frame still restores its value on an otherwise silent bus.
+    Process(Frame(0x20A, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.Heating.PumpActiveKnown);
+    TEST_ASSERT_FALSE(ceraValues.Heating.PumpActive);
+    TEST_ASSERT_FALSE(ceraValues.General.FlameLitKnown);
+}
+
 } // namespace
 
 void setUp()
@@ -335,6 +385,8 @@ void setup()
     RUN_TEST(StatusValuesBecomeUnknownAfterNinetySecondsWithoutFrames);
     RUN_TEST(NewFrameRestoresOnlyItsOwnStatusValue);
     RUN_TEST(SteadyBoilerCadenceKeepsStatusValuesKnown);
+    RUN_TEST(StatusValuesExpireAcrossMillisWraparound);
+    RUN_TEST(StatusValuesExpireOnSilentBus);
     UNITY_END();
 }
 

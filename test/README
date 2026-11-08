@@ -66,7 +66,7 @@ ordinary feed-temperature calculation.
 python -m platformio test -e can_decoder_test --upload-port COM3
 ```
 
-This environment compiles the real `src/can_processor.cpp` and `src/feed_temperature.cpp`. `test/can_decoder_support/context.h` replaces only the MCP2515 driver with a receive queue the tests fill, so frames travel through the production `processCan()` drain loop. The 5 cases cover 2-byte `<circuit> <value>` mixed-circuit frames taken from the capture of issue #61, 1-byte legacy frames, rejection of short, remote and extended frames, and outside-temperature spike/invalid frames not abandoning the rest of the drain.
+This environment compiles the real `src/can_processor.cpp` and `src/feed_temperature.cpp`. `test/can_decoder_support/context.h` replaces the MCP2515 driver with a receive queue the tests fill, so frames travel through the production `processCan()` drain loop, and redirects `millis()` in project code to a controllable `TestClock` (`TestClock::Now() += ms`) so time-based behavior runs without waiting. The 11 cases cover 2-byte `<circuit> <value>` mixed-circuit frames taken from the capture of issue #61, 1-byte legacy frames, rejection of short, remote and extended frames, outside-temperature spike/invalid frames not abandoning the rest of the drain, and the burner/heating-pump/season status values (issue #60) becoming unknown after 90 s without a frame (including across the `millis()` wrap and on a silent bus) and known again with the next frame.
 
 ## Interactive temperature simulator
 

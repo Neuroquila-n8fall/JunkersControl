@@ -7,8 +7,8 @@
 #include <Arduino.h>
 #include <ACAN2515.h>
 
-// Replaces only the MCP2515 driver: the real src/can_processor.cpp drains
-// receive() exactly as it does on the boiler bus. Tests fill it with push().
+// Replaces the MCP2515 driver and the clock: the real src/can_processor.cpp
+// drains receive() exactly as it does on the boiler bus. Tests fill it with push().
 class TestCan
 {
 public:
