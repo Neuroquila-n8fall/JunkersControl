@@ -394,14 +394,14 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
         double value = 0;
         if (!parseNumber(payload, value))
         {
-            Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
+            LogWarn("HA: invalid number payload on %s ignored", relativeTopic.c_str());
             return true;
         }
 
         JsonDocument command;
         command["Setpoint"] = value;
         ApplyHotWaterCommand(command.as<JsonVariantConst>(), true);
-        Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
+        LogInfo("HA: applied %s", relativeTopic.c_str());
         return true;
     }
 
@@ -423,7 +423,7 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
         bool value = false;
         if (!parseBoolean(payload, value))
         {
-            Log.printf("Ignoring invalid HA switch payload on %s\r\n", relativeTopic.c_str());
+            LogWarn("HA: invalid switch payload on %s ignored", relativeTopic.c_str());
             return true;
         }
         command[key] = value;
@@ -433,7 +433,7 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
         double value = 0;
         if (!parseNumber(payload, value))
         {
-            Log.printf("Ignoring invalid HA number payload on %s\r\n", relativeTopic.c_str());
+            LogWarn("HA: invalid number payload on %s ignored", relativeTopic.c_str());
             return true;
         }
         command[key] = value;
@@ -442,9 +442,9 @@ bool handleHomeAssistantCommand(const String &relativeTopic, const String &paylo
         return false;
 
     if (ApplyHeatingCommand(command.as<JsonVariantConst>(), true))
-        Log.printf("Applied MQTT command: %s\r\n", relativeTopic.c_str());
+        LogInfo("HA: applied %s", relativeTopic.c_str());
     else
-        Log.printf("Ignoring invalid HA control payload on %s\r\n", relativeTopic.c_str());
+        LogWarn("HA: invalid control payload on %s ignored", relativeTopic.c_str());
     return true;
 }
 } // namespace
@@ -495,10 +495,10 @@ void SetupHomeAssistantDiscovery()
     const bool published = client.publish(topic.c_str(), payload.c_str(), true);
     PublishHomeAssistantAvailability(true);
 
-    Log.printf("Home Assistant device discovery %s (%u components, %u bytes).\r\n",
-               published ? "published" : "failed",
-               static_cast<unsigned int>(components.size()),
-               static_cast<unsigned int>(payload.length()));
+    LogWrite(published ? LogLevel::Info : LogLevel::Error, "HA: discovery %s (%u components, %u bytes)",
+             published ? "published ✓" : "failed ✗",
+             static_cast<unsigned int>(components.size()),
+             static_cast<unsigned int>(payload.length()));
 }
 
 bool HandleHomeAssistantMessage(const char *topic, const String &payload)

@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.95.1 (Beta) — 2026-11-08
 
+- Wi-Fi recovery after an access-point change: about 60 s after any reconnect that is not a boot or the controller's own roaming switch, a signal below −67 dBm triggers one scan for a better AP. Roaming now needs an AP at least 8 dB stronger (was 12 dB plus a −70 dBm floor), confirmed by two consecutive scans. Connections, losses and roaming decisions are logged at info level.
+- New system logger replaces the telnet `ConsoleWriter`, which dropped characters whenever the client had sent data, mixed lines from different tasks and could block the main loop for seconds on a weak link. Lines are written whole under one lock, telnet output is queued and sent without blocking, and the telnet command reader ignores telnet negotiation bytes.
+- Added the **System Log** page (`/logs`) with live view, level/text filters and download, backed by `GET /api/logs`, `GET /api/logs/persistent` and the SSE stream `/api/logs/events`. A 4 KB buffer keeps errors, warnings and info across software restarts, crashes and watchdog resets, marked by `▶ Boot #N · reset: <reason>` lines.
+- Reworked all system log messages: consistent levels and colors (error red, warning yellow, info blue, debug uncolored), subsystem prefixes, short symbols and no per-message `String` building. Repeated CAN send failures and MQTT connect retries no longer flood the log. Removed the debug dump of the whole configuration, which included Wi-Fi and MQTT passwords.
 - Removed location-bearing entity IDs, private schedules, building details and recorded installation traces from the Home Assistant forecast guide. Shared documentation now uses generic setup guidance; private automation YAML/JSON examples remain intentionally excluded.
+
+[Release notes](assets/Releases/0.95.1.md) · [Full comparison with 0.95.0](https://github.com/Neuroquila-n8fall/JunkersControl/compare/0.95.0...0.95.1)
 
 ## 0.95.0 (Beta) — 2026-10-13
 

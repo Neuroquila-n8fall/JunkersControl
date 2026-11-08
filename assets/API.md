@@ -269,6 +269,18 @@ data: {"id":592,"len":8,"rcv":true,"ts":123456,"data":[1,2,3,4,5,6,7,8]}
 
 The stream powers the [CAN Analyzer](CANAnalyzer.md). Its investigation workflow, filters, cadence statistics, and export format are documented there.
 
+## System log
+
+System messages (not CAN traffic) are kept in a 16 KB RAM history and shown on the **System Log** page (`/logs`). Each line has the form `seq<TAB>level<TAB>time<TAB>message`: `seq` starts at 1 on every boot, `level` is `0` error, `1` warning, `2` info or `3` debug (debug only while `debug` is enabled), and `time` is local wall-clock time `YYYY-MM-DD HH:MM:SS` once time is synchronized, otherwise uptime such as `+12.345s`.
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/logs` | Whole RAM history, oldest first, `text/plain`. `?since=<seq>` returns only newer entries. The `X-Log-Boot` header carries a random 8-hex-digit id that changes on every boot. |
+| `GET /api/logs/persistent` | Up to 4 KB of errors, warnings and info lines that survive software restarts, crashes and watchdog resets (not power loss or the EN/reset button). Every boot adds a marker line such as `▶ Boot #2 · reset: panic`. |
+| `GET /api/logs/events` | Server-Sent Events stream; each new history entry is sent as event `log` with the same tab-separated line as data and `seq` as event id. Clients must send `Accept: text/event-stream`. |
+
+The same messages appear on Serial and the telnet console with colors: error red, warning yellow, info blue, debug uncolored. Like all other endpoints, these routes have no authentication; keep the controller on a trusted LAN.
+
 ## MQTT API
 
 When Home Assistant discovery is disabled, Cerasmarter publishes the configured legacy value topics and subscribes to the combined heating/water parameter, status request, boost, and fast-heat-up topics. See the maintained [command examples](Examples/MQTT_Message_Exchange/Receive/README.md) and [state payload examples](Examples/MQTT_Message_Exchange/Send/README.md).

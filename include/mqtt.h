@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <wifi_config.h>
 #include <forecast.h>
+#include <logger.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  MQTT Client (uses Wifi Client)
@@ -73,15 +74,6 @@ struct CommandedValues
 extern CommandedValues commandedValues;
 extern String TopicBuf;
 extern String PayloadBuf;
-
-enum LogLevel
-{
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Verbose
-};
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions

@@ -13,3 +13,7 @@ data/configuration.json
 CMakeLists.txt
 CMakeListsPrivate.txt
 /graphify-out
+/.obsidian
+/.omp
+/docs/agents
+AGENTS.md

@@ -213,7 +213,7 @@ bool RestoreConfigurationAfterFilesystemUpdate(String &errorMessage)
     }
     LittleFS.remove(backupConfigFileName);
     preferences.end();
-    Log.println("Restored the persistent configuration backup after the filesystem was replaced.");
+    LogInfo("Config: restored persistent backup after filesystem replacement");
     return true;
 }
 
@@ -240,13 +240,13 @@ bool ReadConfiguration()
 {
     if (!LittleFS.exists(configFileName) && LittleFS.exists(backupConfigFileName))
     {
-        Log.println("Recovering configuration from backup.");
+        LogWarn("Config: recovering from backup");
         LittleFS.rename(backupConfigFileName, configFileName);
     }
 
     if (!LittleFS.exists(configFileName))
     {
-        Log.println("Configuration file could not be found. Please upload it first.");
+        LogError("Config: file not found, upload it first");
         return false;
     }
 
@@ -254,7 +254,7 @@ bool ReadConfiguration()
 
     if (!file)
     {
-        Log.println("Configuration file could not be loaded. Consider checking and reuploading it.");
+        LogError("Config: file could not be loaded, check and re-upload it");
         file.close();
         return false;
     }
@@ -266,14 +266,9 @@ bool ReadConfiguration()
 
     if (error)
     {
-        Log.printf("Error processing configuration: %s\r\n", error.c_str());
+        LogError("Config: parse error: %s", error.c_str());
         file.close();
         return false;
-    }
-
-    if (configuration.General.Debug)
-    {
-        serializeJsonPretty(doc, Log);
     }
 
     strlcpy(configuration.Wifi.SSID, doc["Wifi"]["SSID"], sizeof(configuration.Wifi.SSID));             // "ssid"
@@ -548,24 +543,18 @@ bool ReadConfiguration()
             newSensor.Address[i++] = addrByte;
         }
         configuration.TemperatureSensors.Sensors[curSensor++] = newSensor;
-        if (configuration.General.Debug)
+        if (newSensor.UseAsReturnValueReference)
         {
-            if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
-            {
-                Log.printf("WARN: Sensor #%i is set as temperature reference but another sensor has been already set.", curSensor);
-            }
-            if (newSensor.UseAsReturnValueReference)
-            {
-                Log.println("INFO: The following sensor will be used as a return temperature reference.");
-                tempReferenceSensorSet = true;
-            }
-            Log.printf("Added Sensor #%i with Label '%s'\r\n", curSensor, newSensor.Label);
+            if (tempReferenceSensorSet)
+                LogWarn("Config: sensor #%i is also marked as return reference, another is already set", curSensor);
+            tempReferenceSensorSet = true;
         }
+        LogDebug("Config: sensor #%i '%s' added%s", curSensor, newSensor.Label, newSensor.UseAsReturnValueReference ? " (return reference)" : "");
     }
     file.close();
     String backupError;
     if (!PersistConfigurationBackup(backupError))
-        Log.println("Warning: configuration loaded, but its persistent backup could not be refreshed: " + backupError);
+        LogWarn("Config: loaded, but persistent backup refresh failed: %s", backupError.c_str());
     return true;
 }
 
@@ -575,7 +564,7 @@ bool WriteConfiguration()
     // Refuse to overwrite it with the stale runtime copy in the meantime.
     if (configurationUploadPending)
     {
-        Log.println("Configuration save skipped: an uploaded configuration is pending reboot.");
+        LogWarn("Config: save skipped, uploaded configuration pending reboot");
         return false;
     }
 
@@ -726,14 +715,14 @@ bool WriteConfiguration()
 
     if (doc.overflowed())
     {
-        Log.println("Configuration could not be saved: JSON document overflowed.");
+        LogError("Config: save failed, JSON document overflowed");
         return false;
     }
 
     File file = LittleFS.open(temporaryConfigFileName, FILE_WRITE, true);
     if (!file)
     {
-        Log.println("Configuration could not be saved: temporary file could not be opened.");
+        LogError("Config: save failed, temporary file could not be opened");
         return false;
     }
 
@@ -744,7 +733,7 @@ bool WriteConfiguration()
     if (bytesWritten == 0)
     {
         LittleFS.remove(temporaryConfigFileName);
-        Log.println("Configuration could not be saved: serialization failed.");
+        LogError("Config: save failed, serialization error");
         return false;
     }
 
@@ -754,14 +743,14 @@ bool WriteConfiguration()
     if (LittleFS.exists(configFileName) && !LittleFS.rename(configFileName, backupConfigFileName))
     {
         LittleFS.remove(temporaryConfigFileName);
-        Log.println("Configuration could not be saved: current file could not be backed up.");
+        LogError("Config: save failed, current file could not be backed up");
         return false;
     }
 
     if (!LittleFS.rename(temporaryConfigFileName, configFileName))
     {
         LittleFS.rename(backupConfigFileName, configFileName);
-        Log.println("Configuration could not be saved: temporary file could not be committed.");
+        LogError("Config: save failed, temporary file could not be committed");
         return false;
     }
 
@@ -774,13 +763,13 @@ bool WriteConfiguration()
     {
         LittleFS.remove(configFileName);
         LittleFS.rename(backupConfigFileName, configFileName);
-        Log.printf("Configuration verification failed: %s\r\n", verificationError.c_str());
+        LogError("Config: save verification failed: %s", verificationError.c_str());
         return false;
     }
 
     LittleFS.remove(backupConfigFileName);
     String backupError;
     if (!PersistConfigurationBackup(backupError))
-        Log.println("Warning: configuration saved, but its persistent backup could not be refreshed: " + backupError);
+        LogWarn("Config: saved, but persistent backup refresh failed: %s", backupError.c_str());
     return true;
 }

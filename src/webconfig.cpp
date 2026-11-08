@@ -253,13 +253,14 @@ void StartApMode()
     WiFi.disconnect();
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(configuration.Wifi.Hostname, NULL);
-    Serial.printf("\e[1;32mWiFi AP launched. Find me @ %s\r\n\e[0m", WiFi.softAPIP().toString().c_str());
+    LogInfo("WiFi: AP launched, find me @ %s", WiFi.softAPIP().toString().c_str());
 }
 
 void notFound(AsyncWebServerRequest *request)
 {
-    String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
-    Serial.println(logmessage);
+    // The String temporaries are only worth building when the line will be written.
+    if (configuration.General.Debug)
+        LogDebug("HTTP: 404 %s %s", request->client()->remoteIP().toString().c_str(), request->url().c_str());
     request->send(404, "text/plain", "Not found");
 }
 
@@ -297,6 +298,8 @@ void ConfigureAndStartWebserver()
 
     configureLedConfigEndpoints();
 
+    RegisterLogRoutes(server);
+
     server->on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request)
                {
                    request->send(LittleFS, "/frontend/reboot.html", "text/html");
@@ -312,6 +315,9 @@ void ConfigureAndStartWebserver()
 
     server->on("/control", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/frontend/control.html", "text/html"); });
+
+    server->on("/logs", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/frontend/logs.html", "text/html"); });
 
     server->serveStatic("/", LittleFS, "/");
 
@@ -1053,7 +1059,7 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
 {
     if (!index)
     {
-        Serial.println("Update");
+        LogInfo("Update: started");
         FirmwareUpdateResult *result = new FirmwareUpdateResult();
         request->_tempObject = result;
         // Decide what to update. If the filename contains "littlefs" it's a filesystem image.
@@ -1074,7 +1080,7 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
         }
         if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd))
         {
-            Update.printError(Serial);
+            LogError("Update: %s", Update.errorString());
             result->failed = true;
             result->message = String(R"({"status":500,"msg":")") + Update.errorString() + R"("})";
             return;
@@ -1087,7 +1093,7 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
 
     if (Update.write(data, len) != len)
     {
-        Update.printError(Serial);
+        LogError("Update: %s", Update.errorString());
         result->failed = true;
         result->message = String(R"({"status":500,"msg":")") + Update.errorString() + R"("})";
         return;
@@ -1097,13 +1103,13 @@ void handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size
     {
         if (!Update.end(true))
         {
-            Update.printError(Serial);
+            LogError("Update: %s", Update.errorString());
             result->failed = true;
             result->message = R"({"status":500,"msg":"Update has failed. Please retry again after rebooting."})";
         }
         else
         {
-            Serial.println("Update complete");
+            LogInfo("Update: complete ✓");
             result->status = 200;
             result->message = R"({"status":200,"msg":"Update completed. Reboot to apply. Device configuration will be restored automatically after a filesystem update."})";
         }
@@ -1228,7 +1234,7 @@ void listFsFiles(AsyncWebServerRequest *request, String path /* = "/" */)
 // handles uploads to the filserver
 void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
 {
-    Serial.printf("UPLOAD: Index %i Len %i Final %i Filename %s\r\n", index, len, final, filename.c_str());
+    LogDebug("Upload: %s offset %u len %u%s", filename.c_str(), static_cast<unsigned>(index), static_cast<unsigned>(len), final ? " (final)" : "");
 
     if (!index)
     {
@@ -1317,7 +1323,7 @@ void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t
         String persistenceError;
         if (!PersistConfigurationBackup(persistenceError))
         {
-            Log.println("Warning: uploaded configuration was committed, but its persistent backup could not be refreshed: " + persistenceError);
+            LogWarn("Config: upload committed, but persistent backup refresh failed: %s", persistenceError.c_str());
             result->message = R"({"status":200,"msg":"Configuration uploaded. Reload Configuration or reboot to apply it; pages continue showing the current in-memory values until then. Warning: the persistent backup could not be refreshed."})";
         }
         else if (configurationMigrated)
@@ -1636,19 +1642,13 @@ void onAuxSensorsConfigReceive(AsyncWebServerRequest *request, JsonVariant &json
             newSensor.Address[i++] = addrByte;
         }
         configuration.TemperatureSensors.Sensors[curSensor++] = newSensor;
-        if (configuration.General.Debug)
+        if (newSensor.UseAsReturnValueReference)
         {
-            if (newSensor.UseAsReturnValueReference && tempReferenceSensorSet)
-            {
-                Log.printf("\e[0;33mWARN: Sensor #%i is set as temperature reference but another sensor has been already set.\e[0m\r\n", curSensor);
-            }
-            if (newSensor.UseAsReturnValueReference)
-            {
-                Log.println("\e[0;36mINFO: The following sensor will be used as a return temperature reference.\e[0m\r\n");
-                tempReferenceSensorSet = true;
-            }
-            Log.printf("\e[0;32mAdded Sensor #%i with Label '%s'\r\n\e[0m", curSensor, newSensor.Label);
+            if (tempReferenceSensorSet)
+                LogWarn("Config: sensor #%i is also marked as return reference, another is already set", curSensor);
+            tempReferenceSensorSet = true;
         }
+        LogDebug("Config: sensor #%i '%s' added%s", curSensor, newSensor.Label, newSensor.UseAsReturnValueReference ? " (return reference)" : "");
     }
 
     sendConfigurationSaveResult(request, R"({"status":200, "msg":"Auxiliary Sensors have been saved."})");

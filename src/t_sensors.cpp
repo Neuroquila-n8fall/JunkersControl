@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <t_sensors.h>
 #include <main.h>
-#include <telnet.h>
+#include <logger.h>
 #include <heating.h>
 #include <configuration.h>
 
@@ -49,19 +49,13 @@ void ReadTemperatures(void *pvParameters)
                     ceraValues.Auxiliary.FeedReturnTemperatureReference = value;
                 }
 
-                if (configuration.General.Debug)
-                {
-                    Log.printf("DEBUG TEMP READING: %s Sensor: %.2f °C\r\n", configuration.TemperatureSensors.Sensors[i].Label, value);
-                }
+                LogDebug("Sensor: %s %.2f °C", configuration.TemperatureSensors.Sensors[i].Label, value);
             }
             else
             {
                 ceraValues.Auxiliary.Temperatures[i] = 0.0F;
                 configuration.TemperatureSensors.Sensors[i].reachable = false;
-                if (configuration.General.Debug)
-                {
-                    Log.printf("DEBUG TEMP READING: %s Sensor is not reachable!\r\n", configuration.TemperatureSensors.Sensors[i].Label);
-                }
+                LogDebug("Sensor: %s not reachable", configuration.TemperatureSensors.Sensors[i].Label);
             }
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS);

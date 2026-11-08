@@ -14,7 +14,7 @@ void ota()
         can.end();
         client.disconnect();
 
-        String type;
+        const char *type;
         if (ArduinoOTA.getCommand() == U_FLASH)
         {
           type = "sketch";
@@ -26,27 +26,28 @@ void ota()
         }
 
         // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using LittleFS.end()
-        Serial.println("Start updating " + type);
+        LogInfo("OTA: updating %s", type);
       })
       .onEnd([]() {
         otaRunning = false;
-        Serial.println("\nEnd");
+        LogInfo("OTA: update complete ✓");
       })
       .onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        // Log every 25 % only; each line is a stored entry, not an overwritten progress bar.
+        static unsigned int lastQuarter = 0;
+        const unsigned int quarter = (progress / (total / 100)) / 25;
+        if (quarter != lastQuarter)
+          LogInfo("OTA: %u%%", quarter * 25);
+        lastQuarter = quarter;
       })
       .onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR)
-          Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR)
-          Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR)
-          Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR)
-          Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR)
-          Serial.println("End Failed");
+        const char *reason = error == OTA_AUTH_ERROR      ? "auth failed"
+                             : error == OTA_BEGIN_ERROR   ? "begin failed"
+                             : error == OTA_CONNECT_ERROR ? "connect failed"
+                             : error == OTA_RECEIVE_ERROR ? "receive failed"
+                             : error == OTA_END_ERROR     ? "end failed"
+                                                          : "unknown error";
+        LogError("OTA: %s ✗ (error %u)", reason, static_cast<unsigned int>(error));
       });
       
   ArduinoOTA.setHostname(configuration.Wifi.Hostname);
