@@ -149,6 +149,58 @@ void InvalidOutsideTemperatureDoesNotAbortDrain()
     ExpectQueueDrained();
 }
 
+// 0x253 frames of the TA270 capture (rcv=True): 00 (19:11:56) → 01 (19:12:26) → 00 (19:15:26) → 01 (19:15:56) → 00 (19:16:57).
+void HeatingEconomyIsUnknownUntilFirstFrame()
+{
+    TEST_ASSERT_FALSE(ceraValues.Heating.HasReceivedEconomy);
+    Process(Frame(0x252, 1, 0x14));
+    Process(Frame(0x254, 1, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.Heating.HasReceivedEconomy);
+}
+
+void HeatingEconomyFollowsCaptureSequence()
+{
+    Process(Frame(0x253, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.Heating.HasReceivedEconomy);
+    TEST_ASSERT_FALSE(ceraValues.Heating.Economy);
+
+    Process(Frame(0x253, 1, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.Heating.HasReceivedEconomy);
+    TEST_ASSERT_TRUE(ceraValues.Heating.Economy);
+
+    Process(Frame(0x253, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.Heating.HasReceivedEconomy);
+    TEST_ASSERT_FALSE(ceraValues.Heating.Economy);
+}
+
+void MalformedHeatingEconomyFramesAreIgnored()
+{
+    Process(Frame(0x253, 0, 0x01));
+    CANMessage remote = Frame(0x253, 1, 0x01);
+    remote.rtr = true;
+    Process(remote);
+    CANMessage extended = Frame(0x253, 1, 0x01);
+    extended.ext = true;
+    Process(extended);
+    TEST_ASSERT_FALSE(ceraValues.Heating.HasReceivedEconomy);
+    TEST_ASSERT_FALSE(ceraValues.Heating.Economy);
+
+    // A malformed frame does not overwrite a known state either.
+    Process(Frame(0x253, 1, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.Heating.Economy);
+    Process(Frame(0x253, 0, 0x00));
+    Process(remote);
+    TEST_ASSERT_TRUE(ceraValues.Heating.Economy);
+}
+
+void HeatingEconomyIsIgnoredWithHeatingProfileOff()
+{
+    configuration.CanModuleConfig.Profiles.Heating = false;
+    Process(Frame(0x253, 1, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.Heating.HasReceivedEconomy);
+    TEST_ASSERT_FALSE(ceraValues.Heating.Economy);
+}
+
 } // namespace
 
 void setUp()
@@ -173,6 +225,7 @@ void setUp()
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = 0x405;
     configuration.CanAddresses.MixedCircuit.FeedCurrent = 0x440;
     configuration.CanAddresses.MixedCircuit.Economy = 0x407;
+    configuration.CanAddresses.Heating.Economy = 0x253;
     // Unrelated decoders must not match the test frames.
     configuration.CanAddresses.Heating.FeedSetpoint = 0x252;
     configuration.CanAddresses.Heating.Pump = 0x20A;
@@ -223,6 +276,10 @@ void setup()
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);
     RUN_TEST(InvalidOutsideTemperatureDoesNotAbortDrain);
+    RUN_TEST(HeatingEconomyIsUnknownUntilFirstFrame);
+    RUN_TEST(HeatingEconomyFollowsCaptureSequence);
+    RUN_TEST(MalformedHeatingEconomyFramesAreIgnored);
+    RUN_TEST(HeatingEconomyIsIgnoredWithHeatingProfileOff);
     UNITY_END();
 }
 

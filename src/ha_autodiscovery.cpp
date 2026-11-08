@@ -259,6 +259,8 @@ void addCoreComponents(JsonObject components)
                     "{{ value_json.Heating.Pump }}", "running", "mdi:pump");
     addBinarySensor(components, "heating_season", "Heating Season", "Heating",
                     "{{ value_json.Heating.Season }}", nullptr, "mdi:radiator");
+    addBinarySensor(components, "heating_economy", "Heating Economy", "Heating",
+                    "{{ value_json.Heating.Economy | default('None', true) }}", nullptr, "mdi:weather-night");
     addBinarySensor(components, "heating_working", "Heating Operation", "Heating",
                     "{{ value_json.Heating.Working }}", "running", "mdi:heating-coil");
     addBinarySensor(components, "water_now", "Hot Water Now", "Water",

@@ -287,6 +287,17 @@ void processCan()
       ceraValues.Heating.Season = Message.data[0];
     }
 
+    //[HC] - [RC] - Economy (night) state, sent by the TA270 about every 30 seconds
+    // Data Type: Bit
+    // Value: 1 = Economy/Night | 0 = Normal/Day
+    // Cerasmarter's own 0x253 request is never received back: the MCP2515 does not receive its own frames.
+    if (configuration.CanModuleConfig.Profiles.Heating && Message.id == configuration.CanAddresses.Heating.Economy &&
+        dataFrame && Message.len >= 1)
+    {
+      ceraValues.Heating.Economy = Message.data[0];
+      ceraValues.Heating.HasReceivedEconomy = true;
+    }
+
     //[HC] - [RC] - Heating Operating
     // Data Type: Bit
     // Value: 1 = On | 0 = Off

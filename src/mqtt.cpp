@@ -800,6 +800,10 @@ void PublishHeatingTemperaturesAndStatus()
   jsonObj["Outside"] = ceraValues.General.OutsideTemperature;
   jsonObj["Pump"] = boolToString(ceraValues.Heating.PumpActive);
   jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
+  if (ceraValues.Heating.HasReceivedEconomy)
+    jsonObj["Economy"] = boolToString(ceraValues.Heating.Economy);
+  else
+    jsonObj["Economy"] = nullptr;
   jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;

@@ -39,8 +39,11 @@ struct CeraValues
     bool Active = true;
     //-- Analog value of heating power
     int HeatingPower = 0;
-    //-- Economy Setting
+    //-- Economy (night) state as sent by the room controller (TA270) on CAN. This is the measured value;
+    //-- Cerasmarter's own economy request is derived from commandedValues.Heating.Active in main.cpp.
     bool Economy = false;
+    //-- Whether an economy frame has actually been observed on CAN
+    bool HasReceivedEconomy = false;
   } Heating;
   //-- General Values, i.e. Flame, Error, ...
   struct General_

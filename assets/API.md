@@ -108,6 +108,8 @@ Consumers should check the enabled installation profiles in `System.CanProfiles`
 
 `Heating.HasFeedMaximum` indicates that the boiler's physical maximum has been received on CAN. Before that observation the calculated request stays at the 10 °C off value. Every heating feed mode, including override and boost, is capped at the received maximum; half-degree encoding never rounds above it. `ForecastCorrection` and `ForecastRemainingSeconds` describe the available transient forecast sample, not a claim that it affects off, override, boost or fail-safe operation, or that a negative correction is applied in valve mode.
 
+`Heating.Economy` is the economy (night) state last received from the room controller on `CAN.Addresses.Heating.Economy` (default `0x253`, 1 byte: `01` = economy, `00` = normal), or `null` until the first frame has been received. The TA270 repeats it about every 30 seconds. It is a measured value only: it does not reflect Cerasmarter's own economy request, which is not received back from the bus, and it does not change any control behaviour.
+
 ### `POST /api/control`
 
 The existing endpoint preserves immediate ordinary controls and returns the complete runtime document with HTTP `200`, including valid repeat submissions. An empty document, unknown-only document or other request with neither an accepted ordinary control nor a forecast returns `400`. With a valid forecast sample it returns `202`: ordinary controls are applied immediately, while the forecast is handed to the main loop. The new stable settings `WeatherSupportMaximum`, `ForecastEnabled` and `ForecastCoefficient` are rejected on this route before any mutation; use `/api/control/queued` for them. Setup mode returns `503` rather than accepting controls without a consumer.

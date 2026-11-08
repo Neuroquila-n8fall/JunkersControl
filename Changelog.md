@@ -6,6 +6,7 @@
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
+- The heating economy frame (`CAN.Addresses.Heating.Economy`, default `0x253`) sent by a room controller such as the TA270 is now decoded. It is exposed as `Heating.Economy` in `/api/runtime` (`null` until the first frame), as `Economy` in the heating MQTT JSON, as the **Heating Economy** Home Assistant binary sensor and in the dashboard's heating section. It is informational only and changes no control behaviour.
 
 ## 0.95.1 (Beta) — 2026-11-08
 
