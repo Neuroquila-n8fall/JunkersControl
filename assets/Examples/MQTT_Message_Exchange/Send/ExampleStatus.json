@@ -1,6 +1,7 @@
 {
     "GasBurner": "true",
     "Error": 0,
+    "ControllerClockOff": "false",
     "FreeHeap": 183456,
     "HeapSize": 327680,
     "FilesystemUsed": 524288,

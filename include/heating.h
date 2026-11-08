@@ -125,6 +125,14 @@ struct CeraValues
 
     //-- Current Minutes component
     int Minutes = 0;
+
+    //-- Comparison of the received controller clock with Cerasmarter's NTP clock.
+    //-- False until a frame arrived while Cerasmarter's clock was set.
+    bool HasClockComparison = false;
+    //-- True when the controller clock differs from the real time by more than the tolerance
+    bool ControllerClockOff = false;
+    //-- Controller minus real time in minutes, wrapped to ±half a week
+    int ControllerClockOffsetMinutes = 0;
   } Time;
 
   struct Auxiliary_
