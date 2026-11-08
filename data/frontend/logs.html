@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cerasmarter - System Log</title>
+    <link rel="stylesheet" href="frontend/css/bootstrap.min.css">
+    <link rel="stylesheet" href="frontend/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="frontend/css/theme.css">
+    <style>
+        .log-view { font-family: var(--bs-font-monospace); font-size: .8125rem; max-height: 55vh; min-height: 8rem; overflow: auto; }
+        html[data-theme="dark"] .log-view { border-color: var(--ui-border) !important; }
+        .log-view-persistent { max-height: 40vh; }
+        .log-view:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: -2px; }
+        .log-row { border-bottom: 1px solid var(--bs-border-color); border-left: 3px solid transparent; display: flex; flex-wrap: wrap; gap: 0 .6rem; padding: .2rem .5rem; }
+        html[data-theme="dark"] .log-row { border-bottom-color: var(--ui-border); }
+        .log-row code { color: inherit; font-size: inherit; }
+        .log-time { opacity: .8; white-space: nowrap; }
+        .log-message { flex: 1 1 20rem; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+        .log-level { align-self: center; min-width: 4.6rem; }
+        /* Same hues as the serial/telnet colours; darkened so white text keeps >= 4.5:1 contrast. */
+        .log-level-0 { background-color: #b02a37; color: #fff; }
+        .log-level-1 { background-color: #ffc107; color: #000; }
+        .log-level-2 { background-color: #0a58ca; color: #fff; }
+        .log-level-3 { background-color: transparent; border: 1px solid currentColor; color: inherit; }
+        .log-row-0 { background-color: rgba(220, 53, 69, .08); border-left-color: #dc3545; }
+        .log-row-1 { background-color: rgba(255, 193, 7, .1); border-left-color: #ffc107; }
+        .log-row-2 { border-left-color: #0d6efd; }
+        .log-boot, .log-restart { border-top: 2px solid var(--bs-secondary); font-weight: 600; }
+        .log-restart { justify-content: center; opacity: .85; }
+        .log-empty { padding: 1.5rem; text-align: center; }
+    </style>
+</head>
+<body>
+<div id="navigation-container"></div>
+<main class="container-fluid px-lg-4 py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div>
+            <h2 class="mt-4 mb-1" data-i18n="logs.title">System Log</h2>
+            <p class="text-muted mb-0" data-i18n="logs.intro">Live messages from the controller. Debug messages appear only when debug messages are enabled in the General Settings.</p>
+        </div>
+        <button id="log-download" class="btn btn-outline-secondary" type="button"><i class="bi bi-download" aria-hidden="true"></i> <span data-i18n="logs.download">Download log</span></button>
+    </div>
+
+    <section class="card mb-3" aria-labelledby="live-title">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span id="live-title" data-i18n="logs.live_title">Live log</span>
+            <small id="log-count" class="text-muted"></small>
+        </div>
+        <div class="card-body pt-0 pb-2">
+            <div id="log-status" role="status" aria-live="polite"><div class="alert alert-secondary py-2 my-2"><span data-i18n="logs.connecting">Connecting to the live log…</span></div></div>
+            <div class="row g-2 align-items-center">
+                <fieldset class="col-lg-auto d-flex flex-wrap gap-3">
+                    <legend class="visually-hidden" data-i18n="logs.levels">Levels</legend>
+                    <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="level-0" checked><label class="form-check-label" for="level-0"><span class="badge log-level log-level-0" data-i18n="logs.level_0">Error</span></label></div>
+                    <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="level-1" checked><label class="form-check-label" for="level-1"><span class="badge log-level log-level-1" data-i18n="logs.level_1">Warning</span></label></div>
+                    <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="level-2" checked><label class="form-check-label" for="level-2"><span class="badge log-level log-level-2" data-i18n="logs.level_2">Info</span></label></div>
+                    <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="level-3" checked><label class="form-check-label" for="level-3"><span class="badge log-level log-level-3" data-i18n="logs.level_3">Debug</span></label></div>
+                </fieldset>
+                <div class="col-sm col-lg-4 ms-lg-auto">
+                    <label class="visually-hidden" for="log-filter" data-i18n="logs.filter">Filter messages</label>
+                    <input id="log-filter" class="form-control form-control-sm" type="search" placeholder="Filter messages" data-i18n-placeholder="logs.filter">
+                </div>
+                <div class="col-sm-auto">
+                    <div class="form-check form-switch mb-0"><input id="log-follow" class="form-check-input" type="checkbox" role="switch" checked><label class="form-check-label" for="log-follow" data-i18n="logs.follow">Auto-scroll</label></div>
+                </div>
+            </div>
+        </div>
+        <div id="log-view" class="log-view border-top" role="log" tabindex="0" aria-labelledby="live-title"></div>
+    </section>
+
+    <section class="card" aria-labelledby="persistent-title">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <span id="persistent-title" data-i18n="logs.persistent_title">Events across reboots</span>
+                <div class="form-text mt-0" data-i18n="logs.persistent_help">Errors, warnings and information kept across restarts. Boot markers start each session.</div>
+            </div>
+            <button id="persistent-refresh" class="btn btn-sm btn-outline-secondary" type="button"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> <span data-i18n="logs.refresh">Refresh</span></button>
+        </div>
+        <div id="persistent-status" class="px-3" role="status" aria-live="polite"></div>
+        <div id="persistent-view" class="log-view log-view-persistent border-top" role="log" tabindex="0" aria-labelledby="persistent-title"></div>
+    </section>
+</main>
+
+<script src="frontend/js/i18n.js"></script>
+<script src="frontend/js/framework.js"></script>
+<script src="frontend/js/bootstrap.bundle.min.js"></script>
+<script src="frontend/js/logs.js"></script>
+</body>
+</html>

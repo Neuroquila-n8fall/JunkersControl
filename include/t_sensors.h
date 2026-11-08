@@ -37,36 +37,16 @@ extern double aux_exhaustEmperature;
     {
         int sensorDeviceCount = 1 (number of sensors on the bus)
         sensors.requestTemperatures();
-        Serial.println("Printing addresses...");
         for (int i = 0; i < sensorDeviceCount; i++)
         {
-          Serial.print("Sensor ");
-          Serial.print(i + 1);
-          Serial.print(" : ");
           sensors.getAddress(foundDevice, i);
           sensors.setResolution(foundDevice, TEMPERATURE_PRECISION);
-          printAddress(foundDevice);
           value = sensors.getTempC(foundDevice);
-          Serial.println(value);
+          LogInfo("Sensor %d: 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X = %.2f °C", i + 1,
+                  foundDevice[0], foundDevice[1], foundDevice[2], foundDevice[3],
+                  foundDevice[4], foundDevice[5], foundDevice[6], foundDevice[7], value);
         }
     }
-
-    void printAddress(DeviceAddress deviceAddress)
-    {
-     for (uint8_t i = 0; i < 8; i++)
-     {
-       Serial.print("0x");
-       if (deviceAddress[i] < 0x10)
-         Serial.print("0");
-       Serial.print(deviceAddress[i], HEX);
-       if (i < 7)
-         Serial.print(", ");
-     }
-     Serial.println("");
-    }
-
-
-
 */
 
 // arrays to hold device addresses. Adapt to your design!

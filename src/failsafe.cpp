@@ -4,7 +4,7 @@
 #include <configuration.h>
 #include <heating.h>
 #include <mqtt.h>
-#include <telnet.h>
+#include <logger.h>
 #include <timesync.h>
 
 namespace
@@ -73,7 +73,7 @@ void enterFailSafe(const char *reason)
 
     failSafeActive = true;
     clearRemoteOverrides();
-    Log.println(reason);
+    LogWarn("Fail-safe: %s", reason);
 }
 
 void leaveFailSafe(const char *reason)
@@ -87,7 +87,7 @@ void leaveFailSafe(const char *reason)
     hasSavedRemoteValues = false;
     failSafeActive = false;
     SetFeedTemperature();
-    Log.println(reason);
+    LogInfo("Fail-safe: %s", reason);
 }
 } // namespace
 
@@ -100,7 +100,7 @@ void SetupFailSafe()
         remoteValuesBeforeFailSafe = commandedValues;
         hasSavedRemoteValues = true;
         clearRemoteOverrides();
-        Log.println("Starting in fail-safe mode until MQTT is connected.");
+        LogWarn("Fail-safe: active until MQTT connects");
     }
 }
 
@@ -114,7 +114,7 @@ void UpdateFailSafe()
 {
     if (!configuration.FailSafe.Enabled)
     {
-        leaveFailSafe("Fail-safe disabled. Restoring runtime control values.");
+        leaveFailSafe("disabled, runtime control values restored");
         mqttDisconnectedSince = 0;
         return;
     }
@@ -122,7 +122,7 @@ void UpdateFailSafe()
     if (client.connected())
     {
         mqttDisconnectedSince = 0;
-        leaveFailSafe("MQTT connected. Leaving fail-safe mode and restoring runtime control values.");
+        leaveFailSafe("MQTT connected, left fail-safe, runtime control values restored");
         return;
     }
 
@@ -132,7 +132,7 @@ void UpdateFailSafe()
 
     const unsigned long timeoutMs = configuration.FailSafe.CommandTimeoutSeconds * 1000UL;
     if (!failSafeActive && now - mqttDisconnectedSince >= timeoutMs)
-        enterFailSafe("MQTT offline timeout expired. Entering fail-safe mode.");
+        enterFailSafe("MQTT offline timeout expired, entering fail-safe");
 
     if (!failSafeActive)
         return;

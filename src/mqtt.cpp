@@ -2,7 +2,7 @@
 #include <mqtt.h>
 #include <configuration.h>
 #include <main.h>
-#include <telnet.h>
+#include <logger.h>
 #include <heating.h>
 #include <ArduinoJson.h>
 #include <ha_autodiscovery.h>
@@ -430,13 +430,13 @@ void ProcessRuntimeControlPersistence()
   {
     runtimeControlSavePending = false;
     runtimeControlSaveWait = runtimeControlSaveDelay;
-    Log.println("Persisted MQTT runtime control state.");
+    LogDebug("MQTT: runtime control state saved ✓");
   }
   else
   {
     runtimeControlSaveRequestedAt = millis();
     runtimeControlSaveWait = runtimeControlSaveRetryDelay;
-    Log.println("MQTT runtime control state save failed; retry scheduled.");
+    LogWarn("MQTT: runtime control state save failed ✗, ⟳ retry scheduled");
   }
 }
 
@@ -459,6 +459,19 @@ void ApplyFastHeatupCommand(bool enabled)
   PublishHeatingTemperaturesAndStatus();
 }
 
+// Only the first failure of an outage is a Warn; retries stay Debug so a long
+// broker outage cannot flood the stored history.
+static bool mqttOutageReported = false;
+
+static void logMqttConnectFailure(const char *reason)
+{
+  if (mqttOutageReported)
+    LogDebug("MQTT: %s ✗, ⟳ retry in %lu s, CAN control continues", reason, mqttRetryInterval / 1000);
+  else
+    LogWarn("MQTT: %s ✗, ⟳ retry in %lu s, CAN control continues", reason, mqttRetryInterval / 1000);
+  mqttOutageReported = true;
+}
+
 // \brief (Re)connect to MQTT broker
 void reconnectMqtt()
 {
@@ -470,13 +483,11 @@ void reconnectMqtt()
     return;
   lastMqttAttempt = now;
 
-  Log.print("Attempting MQTT connection...");
   // Establish TCP with an explicit deadline. PubSubClient reuses this socket
   // instead of invoking the core's default-timeout connect overload.
   if (!espClient.connect(configuration.Mqtt.Server, configuration.Mqtt.Port, 250))
   {
-    Log.printf("TCP connection failed. Retrying in %lu seconds while CAN control continues.\r\n",
-               mqttRetryInterval / 1000);
+    logMqttConnectFailure("TCP connect failed");
     return;
   }
 
@@ -500,12 +511,14 @@ void reconnectMqtt()
 
   if (!connected)
   {
-    Log.printf("failed, rc=%d. Retrying in %lu seconds while CAN control continues.\r\n",
-               client.state(), mqttRetryInterval / 1000);
+    char reason[32];
+    snprintf(reason, sizeof(reason), "broker refused, rc=%d", client.state());
+    logMqttConnectFailure(reason);
     return;
   }
 
-  Log.println("connected");
+  mqttOutageReported = false;
+  LogInfo("MQTT: connected ✓");
   client.subscribe(configuration.Mqtt.Topics.HeatingParameters);
   client.subscribe(configuration.Mqtt.Topics.WaterParameters);
   client.subscribe(configuration.Mqtt.Topics.StatusRequest);
@@ -541,7 +554,7 @@ void setupMqttClient()
   // document. The complete command surface currently serializes to about
   // 20 KiB, so leave enough room for the MQTT topic and future components.
   if (!client.setBufferSize(24576))
-    Log.println("Unable to allocate the MQTT buffer required for Home Assistant discovery.");
+    LogError("MQTT: buffer for Home Assistant discovery could not be allocated");
 }
 
 String boolToString(bool src)
@@ -569,7 +582,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      Log.printf("[Status Request] Error Processing JSON: %s\r\n", error.c_str());
+      LogWarn("MQTT: status request JSON invalid: %s", error.c_str());
       return;
     }
     /* Example JSON:
@@ -647,7 +660,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (error)
     {
-      Log.printf("[Heating Parameters] Error Processing JSON: %s\r\n", error.c_str());
+      LogWarn("MQTT: heating parameters JSON invalid: %s", error.c_str());
       return;
     }
 
@@ -670,7 +683,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
       if (error)
       {
-        Log.printf("[Water Parameters] Error Processing JSON: %s\r\n", error.c_str());
+        LogWarn("MQTT: water parameters JSON invalid: %s", error.c_str());
         return;
       }
 

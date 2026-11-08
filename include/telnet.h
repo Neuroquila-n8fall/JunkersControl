@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <Print.h>
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Server for remote console. We're using the telnet port here
@@ -11,7 +10,6 @@
 
 extern const uint TelnetServerPort;
 extern WiFiServer TelnetServer;
-extern WiFiClient TelnetRemoteClient;
 
 //——————————————————————————————————————————————————————————————————————————————
 //  Functions
@@ -20,21 +18,10 @@ extern WiFiClient TelnetRemoteClient;
 extern void CheckForConnections();
 extern void ReadFromTelnet();
 
-/// @brief Enables Writing to Serial and Telnet at once.
-class ConsoleWriter : public Print
-{
-public:
-    size_t write(byte a)
-    {
-        if (TelnetRemoteClient.connected() && TelnetRemoteClient.available() == 0)
-        {
-            TelnetRemoteClient.write(a);
-        }
-        return Serial.write(a);
-    }
-};
-
-/// @brief Used to Log messages to both Serial and Telnet
-extern ConsoleWriter Log;
+/// @brief Queues bytes for the telnet client. Callable from any task, never touches the socket.
+/// Whole writes only: returns false (and counts a dropped line) when the queue is full or no client is connected.
+extern bool TelnetWrite(const char *data, size_t length);
+/// @brief Sends queued bytes without blocking. Main loop only.
+extern void TelnetFlush();
 
 #endif

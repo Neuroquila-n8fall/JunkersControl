@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "wifi_config.h"
 #include "main.h"
-#include "telnet.h"
+#include "logger.h"
 #include "timesync.h"
 #include <configuration.h>
 
@@ -49,7 +49,7 @@ static void completeWifiRoamScan()
 
   if (scanResult == WIFI_SCAN_FAILED)
   {
-    Log.println("WiFi roaming scan failed.");
+    LogWarn("WiFi: roam scan failed ✗");
     wifiRoamConfirmPending = false;
     return;
   }
@@ -86,17 +86,17 @@ static void completeWifiRoamScan()
 
   if (bestChannel == 0)
   {
-    Log.printf("WiFi roaming: no other AP found (current %ld dBm).\r\n",
-               static_cast<long>(wifiRoamSourceRssi));
+    LogInfo("WiFi: roam scan found no other AP (current %ld dBm)",
+            static_cast<long>(wifiRoamSourceRssi));
     return;
   }
 
   if (bestRssi < wifiRoamSourceRssi + wifiRoamMinimumImprovement)
   {
-    Log.printf("WiFi roaming: best other AP %s at %ld dBm is not %ld dB better than current %ld dBm.\r\n",
-               bestBssidText.c_str(), static_cast<long>(bestRssi),
-               static_cast<long>(wifiRoamMinimumImprovement),
-               static_cast<long>(wifiRoamSourceRssi));
+    LogInfo("WiFi: best other AP %s at %ld dBm, needs +%ld dB over current %ld dBm",
+            bestBssidText.c_str(), static_cast<long>(bestRssi),
+            static_cast<long>(wifiRoamMinimumImprovement),
+            static_cast<long>(wifiRoamSourceRssi));
     return;
   }
 
@@ -104,18 +104,18 @@ static void completeWifiRoamScan()
   {
     memcpy(wifiRoamCandidateBssid, bestBssid, sizeof(bestBssid));
     wifiRoamConfirmPending = true;
-    Log.printf("WiFi roaming: candidate %s at %ld dBm (current %ld dBm). Confirming with a second scan.\r\n",
-               bestBssidText.c_str(), static_cast<long>(bestRssi),
-               static_cast<long>(wifiRoamSourceRssi));
+    LogInfo("WiFi: roam candidate %s at %ld dBm (current %ld dBm), ⟳ confirming with second scan",
+            bestBssidText.c_str(), static_cast<long>(bestRssi),
+            static_cast<long>(wifiRoamSourceRssi));
     return;
   }
 
   if (!WiFi.isConnected())
     return;
 
-  Log.printf("Roaming WiFi from %ld dBm to %s at %ld dBm on channel %ld.\r\n",
-             static_cast<long>(wifiRoamSourceRssi), bestBssidText.c_str(),
-             static_cast<long>(bestRssi), static_cast<long>(bestChannel));
+  LogInfo("WiFi: roaming %ld dBm → %s at %ld dBm, channel %ld",
+          static_cast<long>(wifiRoamSourceRssi), bestBssidText.c_str(),
+          static_cast<long>(bestRssi), static_cast<long>(bestChannel));
 
   // This is an intentional, short break-before-make handover. begin() returns
   // immediately, leaving the networking task to perform the connection while
@@ -145,13 +145,13 @@ static void startWifiRoamScan(unsigned long now, int32_t currentRssi, const char
   if (result == WIFI_SCAN_RUNNING)
   {
     wifiRoamScanActive = true;
-    Log.printf("WiFi roaming: %s (%ld dBm). Scanning for a better AP.\r\n",
-               reason, static_cast<long>(currentRssi));
+    LogInfo("WiFi: %s (%ld dBm), scanning for a better AP",
+            reason, static_cast<long>(currentRssi));
     return;
   }
 
   wifiRoamConfirmPending = false;
-  Log.printf("Unable to start WiFi roaming scan (result %d).\r\n", result);
+  LogWarn("WiFi: roam scan could not start (result %d)", result);
 }
 
 static void updateWifiRoaming()
@@ -226,7 +226,7 @@ void connectWifi()
 {
   if (strlen(configuration.Wifi.SSID) == 0 && strlen(configuration.Wifi.Password) == 0)
   {
-    Serial.println("Invalid WiFi configuration. Launching AP mode.");
+    LogWarn("WiFi: no SSID configured, launching AP mode");
     SetupMode = true;
     StartApMode();
     return;
@@ -243,11 +243,11 @@ void connectWifi()
       wifiConnectedBefore = true;
       wifiRoamHandoverPending = false;
       wifiRoamConfirmPending = false;
-      Log.printf("WiFi connected to %s on channel %ld at %ld dBm. Address: %s\r\n",
-                 WiFi.BSSIDstr().c_str(), static_cast<long>(WiFi.channel()),
-                 static_cast<long>(WiFi.RSSI()), WiFi.localIP().toString().c_str());
+      LogInfo("WiFi: connected ✓ %s ch %ld, %ld dBm, IP %s",
+              WiFi.BSSIDstr().c_str(), static_cast<long>(WiFi.channel()),
+              static_cast<long>(WiFi.RSSI()), WiFi.localIP().toString().c_str());
       if (!MDNS.begin(configuration.Wifi.Hostname))
-        Serial.println("mDNS responder could not be started.");
+        LogWarn("WiFi: mDNS responder could not be started");
     }
 
     SyncTimeIfRequired();
@@ -256,7 +256,7 @@ void connectWifi()
   else if (!SetupMode)
   {
     if (wifiWasConnected)
-      Log.println("WiFi connection lost. Heating control remains active while reconnecting.");
+      LogWarn("WiFi: connection lost ✗, heating control stays active while reconnecting");
     wifiWasConnected = false;
 
     const unsigned long now = millis();
@@ -279,12 +279,7 @@ void connectWifi()
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
-    Serial.println("WiFi not connected. Reconnecting...");
-
-    if(configuration.General.Debug) {
-      Serial.printf("Connecting to %s using hostname %s\r\n", configuration.Wifi.SSID,
-                    configuration.Wifi.Hostname);
-    }
+    LogDebug("WiFi: ⟳ connecting to %s as %s", configuration.Wifi.SSID, configuration.Wifi.Hostname);
 
     WiFi.begin(configuration.Wifi.SSID, configuration.Wifi.Password);
   }
@@ -301,20 +296,7 @@ void connectWifi()
 void printWifiStatus()
 {
   if (WiFi.isConnected() && configuration.General.Debug)
-    {
-      Serial.println("-------------------------------");
-      Serial.println("Wifi Connected");
-      Serial.print("SSID:\t");
-      Serial.println(WiFi.SSID());
-      Serial.print("IP Address:\t");
-      Serial.println(WiFi.localIP());
-      Serial.print("Mask:\t\t");
-      Serial.println(WiFi.subnetMask());
-      Serial.print("Gateway:\t");
-      Serial.println(WiFi.gatewayIP());
-      Serial.print("RSSI:\t\t");
-      Serial.println(WiFi.RSSI());
-
-      Serial.printf("Time: [%s]\r\n", myTZ.dateTime().c_str());
-    }
+    LogDebug("WiFi: %s, IP %s, mask %s, gateway %s, %ld dBm", WiFi.SSID().c_str(),
+             WiFi.localIP().toString().c_str(), WiFi.subnetMask().toString().c_str(),
+             WiFi.gatewayIP().toString().c_str(), static_cast<long>(WiFi.RSSI()));
 }

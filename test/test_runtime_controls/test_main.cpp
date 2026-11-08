@@ -147,8 +147,11 @@ TaskHandle_t MqttActivityHandle = reinterpret_cast<TaskHandle_t>(1);
 CeraValues ceraValues;
 Configuration configuration;
 WiFiClient espClient;
-WiFiClient TelnetRemoteClient;
-ConsoleWriter Log;
+
+void LogError(const char *, ...) {}
+void LogWarn(const char *, ...) {}
+void LogInfo(const char *, ...) {}
+void LogDebug(const char *, ...) {}
 
 void ShowMqttActivity(void *) {}
 bool WriteConfiguration() { return false; }

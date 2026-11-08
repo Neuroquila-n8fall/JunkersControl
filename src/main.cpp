@@ -57,8 +57,7 @@ static void SendConfiguredHeartbeat()
       !HeartbeatIsDue() || !SafeToSendMessage())
     return;
   CANMessage msg = PrepareMessage(configuration.CanModuleConfig.HeartbeatAddress, 0);
-  if (configuration.General.Debug)
-    Log.printf("CAN heartbeat: sending 0x%.3X DLC0\r\n", configuration.CanModuleConfig.HeartbeatAddress);
+  LogDebug("CAN: heartbeat 0x%.3X", configuration.CanModuleConfig.HeartbeatAddress);
   SendMessage(msg);
   lastHeartbeatMillis = millis();
 }
@@ -66,28 +65,30 @@ static void SendConfiguredHeartbeat()
 void setup()
 {
   // Setup Serial
+  // A TX buffer lets Serial.write return before the line is on the wire, keeping the log lock short.
+  Serial.setTxBufferSize(1024);
   Serial.begin(115200);
-  Serial.printf("\e[1;32mRunning Environment: %s\r\n\e[0m", JC_STRINGIFY(ENV));
-  Serial.printf("\e[1;32mRunning Build: %s\r\n\e[0m", JC_STRINGIFY(VERSION));
+  LogBegin();
+  LogInfo("Build: %s · env: %s", JC_STRINGIFY(VERSION), JC_STRINGIFY(ENV));
 
   // Init LittleFS. Formatting remains the recovery path for an unreadable
   // partition, but report it explicitly because it removes all stored files.
   if (!LittleFS.begin())
   {
-    Serial.println("\e[1;33mLittleFS could not be mounted. Attempting to format the filesystem partition.\e[0m");
+    LogWarn("LittleFS: mount failed, formatting partition");
     if (!LittleFS.begin(true))
     {
-      Serial.println("\e[1;31mLittleFS could not be mounted or formatted. Check the partition layout and flash a matching littlefs.bin.\e[0m");
+      LogError("LittleFS: mount and format failed, check partition layout and flash a matching littlefs.bin");
       return;
     }
-    Serial.println("\e[1;33mLittleFS was formatted and is empty. Upload littlefs.bin before continuing.\e[0m");
+    LogWarn("LittleFS: formatted and empty, upload littlefs.bin");
   }
 
   String restoreError;
   if (!RestoreConfigurationAfterFilesystemUpdate(restoreError))
-    Serial.printf("\e[1;31m%s\e[0m\r\n", restoreError.c_str());
+    LogError("Config: %s", restoreError.c_str());
 
-  Serial.println("\e[1;36mPress BOOT within 5 seconds for Setup Mode; hold it for 10 seconds to factory-reset configuration.\e[0m");
+  LogInfo("Press BOOT within 5 s for Setup Mode (hold 10 s to factory-reset configuration)");
 
 #pragma region "Setup Mode"
 
@@ -114,7 +115,7 @@ void setup()
     String resetError;
     if (!ClearPersistentConfigurationBackup(resetError))
     {
-      Serial.printf("\e[1;31mFactory reset aborted: %s\e[0m\r\n", resetError.c_str());
+      LogError("Config: factory reset aborted: %s", resetError.c_str());
     }
     else
     {
@@ -123,7 +124,7 @@ void setup()
       LittleFS.remove("/configuration.tmp");
       LittleFS.remove("/configuration.restore");
       SetConfigurationUploadPending(false);
-      Serial.println("\e[1;33mFactory reset complete. Persistent and LittleFS configuration were cleared.\e[0m");
+      LogWarn("Config: factory reset done, persistent and LittleFS configuration cleared");
     }
   }
 
@@ -134,11 +135,11 @@ void setup()
                                    LittleFS.exists("/frontend/index.html.gz");
     if (!frontendAvailable)
     {
-      Serial.println("\e[1;31mLittleFS is mounted, but the web frontend is missing. Upload a matching littlefs.bin.\e[0m");
+      LogError("LittleFS: web frontend missing, upload a matching littlefs.bin");
       return;
     }
     if (!LittleFS.exists("/configuration.json"))
-      Serial.println("\e[1;33m/configuration.json is missing. Starting Setup Mode so it can be uploaded.\e[0m");
+      LogWarn("Config: /configuration.json missing, starting Setup Mode for upload");
     // Launch AP Mode to let the user configure the basics.
     StartApMode();
     ConfigureAndStartWebserver();
@@ -148,7 +149,7 @@ void setup()
 
 #pragma endregion
 
-Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time by pressing the \"BOOT\" button once. \e[0m");
+  LogInfo("Setup Mode off, press BOOT once to enter it at any time");
 
   // Read configuration
   bool result = ReadConfiguration();
@@ -159,11 +160,11 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
                                    LittleFS.exists("/frontend/index.html.gz");
     if (!frontendAvailable)
     {
-      Serial.println("\e[1;31mConfiguration could not be loaded and the web frontend is missing. Upload a matching littlefs.bin.\e[0m");
+      LogError("Config: load failed and web frontend missing, upload a matching littlefs.bin");
       return;
     }
 
-    Serial.println("\e[1;33mConfiguration is missing or invalid. Starting the CERASMARTER setup access point.\e[0m");
+    LogWarn("Config: missing or invalid, starting setup access point");
     SetupMode = true;
     StartApMode();
     ConfigureAndStartWebserver();
@@ -174,12 +175,12 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
   if (configuration.CanModuleConfig.ReadOnly)
   {
     OverrideControl = false;
-    Serial.println("\e[1;33mCAN read-only mode is enabled. No bus messages will be transmitted.\e[0m");
+    LogWarn("CAN: read-only mode, no bus messages will be sent");
   }
 
   SetupFailSafe();
   if (!myTZ.setPosix(configuration.General.PosixTimezone))
-    Serial.println("Invalid POSIX timezone rule. Fail-safe will use boiler time or its unknown-time policy.");
+    LogWarn("Config: invalid POSIX timezone, fail-safe uses boiler time or its unknown-time policy");
 
   // Setup Pins
   pinMode(configuration.LEDs.StatusLed, OUTPUT);
@@ -231,6 +232,8 @@ Serial.println("\e[1;36mSetup Mode not enabled. You can enable it at every time 
 
 void loop()
 {
+  // First, so the live log keeps flowing in Setup Mode, during OTA and before a requested reboot.
+  LogService();
   // Init reboot if requested
   if (ShouldReboot) {
     // Wait a bit so the client is redirected properly...
@@ -292,9 +295,8 @@ void loop()
   // Coalesce stable MQTT/HA control changes before writing configuration. This
   // stays in the main loop and avoids both flash churn and another task.
   ProcessRuntimeControlPersistence();
-  // Telnet Communication
+  // Telnet Communication and system log
   CheckForConnections();
-  // Read Telnet commands
   ReadFromTelnet();
   // Set Date & Time
   SetDateTime();
@@ -313,7 +315,7 @@ void loop()
       if (!OverrideControl)
       {
         OverrideControl = true;
-        Log.println("No other controller on the network. Enabling Override.");
+        LogInfo("CAN: no other controller, override enabled");
       }
     }
   }
@@ -354,10 +356,7 @@ void loop()
         // Switch economy mode. This is always the opposite of the desired operational state
         msg = PrepareMessage(configuration.CanAddresses.Heating.Economy, 1);
         msg.data[0] = !commandedValues.Heating.Active;
-        if (configuration.General.Debug)
-        {
-          Log.printf("DEBUG STEP CHAIN #%i: Heating Economy: %d\r\n", currentStep, !commandedValues.Heating.Active);
-        }
+        LogDebug("CAN step #%i: economy %d", currentStep, !commandedValues.Heating.Active);
         break;
 
       // Temperature regulation mode
@@ -374,10 +373,7 @@ void loop()
           break;
         SetFeedTemperature();
 
-        if (configuration.General.Debug)
-        {
-          Log.printf("DEBUG STEP CHAIN #%i: Heating is %s, Fail-safe is %s\r\n", currentStep, ceraValues.Heating.Active ? "ON" : "OFF", IsFailSafeActive() ? "YES" : "NO");
-        }
+        LogDebug("CAN step #%i: heating %s, fail-safe %s", currentStep, ceraValues.Heating.Active ? "on" : "off", IsFailSafeActive() ? "yes" : "no");
 
         break;
 
@@ -387,10 +383,7 @@ void loop()
           break;
         msg = PrepareMessage(configuration.CanAddresses.HotWater.Now, 1);
         msg.data[0] = 0x01;
-        if (configuration.General.Debug)
-        {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Now to %s\r\n", currentStep, ceraValues.Hotwater.Now ? "ON" : "OFF");
-        }
+        LogDebug("CAN step #%i: DHW now %s", currentStep, ceraValues.Hotwater.Now ? "on" : "off");
         break;
 
       // DHW Temperature Setpoint
@@ -399,10 +392,7 @@ void loop()
           break;
         msg = PrepareMessage(configuration.CanAddresses.HotWater.SetpointTemperature, 1);
         msg.data[0] = static_cast<uint8_t>(commandedValues.HotWater.SetPoint * 2);
-        if (configuration.General.Debug)
-        {
-          Log.printf("DEBUG STEP CHAIN #%i: Set DHW Setpoint to %i\r\n", currentStep, commandedValues.HotWater.SetPoint);
-        }
+        LogDebug("CAN step #%i: DHW setpoint → %i", currentStep, commandedValues.HotWater.SetPoint);
         break;
 
       case 5:
@@ -489,10 +479,7 @@ void SendMessage(CANMessage msg)
   // timeout logic. Address zero remains reserved as the empty-message marker.
   if (msg.id != 0 && OverrideControl && !configuration.CanModuleConfig.ReadOnly)
   {
-    if (configuration.General.Debug)
-    {
-      Log.printf("DEBUG STEP CHAIN #%i: Sending CAN Message\r\n", currentStep);
-    }
+    LogDebug("CAN step #%i: sending", currentStep);
     if (!can.tryToSend(msg))
     {
       CanSendErrorCount = CanSendErrorCount + 1;
@@ -500,7 +487,11 @@ void SendMessage(CANMessage msg)
       {
         xTaskCreate(ShowCanError, "Can Error", 2000, NULL, 1, &CanErrorActivityHandle);
       }
-      Log.printf("\e[0;31[%s] Failed to send message [0x%.3X] over CAN. This has happened %i times before in a row.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), msg.id, CanSendErrorCount);
+      // One Error per streak (and at powers of ten) keeps a CAN outage from evicting the stored history.
+      if (CanSendErrorCount == 1 || CanSendErrorCount == 10 || CanSendErrorCount == 100 || CanSendErrorCount == 1000)
+        LogError("CAN: send 0x%.3X failed (%i in a row)", msg.id, CanSendErrorCount);
+      else
+        LogDebug("CAN: send 0x%.3X failed (%i in a row)", msg.id, CanSendErrorCount);
       char logMsg[64];
       sprintf(logMsg, "CAN send error msg id [0x%.3X]. Err Count: %i", msg.id, CanSendErrorCount);
       PublishLog(logMsg, __func__, LogLevel::Error);
@@ -515,7 +506,7 @@ void SendMessage(CANMessage msg)
         CanErrorActivityHandle = NULL;
 
         PublishLog("CAN send error CLEARED", __func__, LogLevel::Info);
-        Log.printf("\e[0;32[%s] CAN send error CLEARED after %i previously failed attempts.\r\n\e[0m", myTZ.dateTime("d-M-y H:i:s.v").c_str(), CanSendErrorCount);
+        LogInfo("CAN: send error cleared after %i failed attempts", CanSendErrorCount);
         CanSendErrorCount = 0;
       }
     }
@@ -525,9 +516,6 @@ void SendMessage(CANMessage msg)
 
 void WriteMessage(CANMessage msg, bool received /* = true */)
 {
-  // Buffer for storing the formatted values. We have to expect 'FF (255)' which is 8 bytes + 1 for string overhead \0
-  char dataBuf[255];
-  String data;
   JsonDocument doc;
   doc["id"] = msg.id;
   doc["len"] = msg.len;
@@ -536,29 +524,22 @@ void WriteMessage(CANMessage msg, bool received /* = true */)
   JsonArray msgData = doc["data"].to<JsonArray>();
 
   for (int x = 0; x < msg.len; x++)
-  {
-    // A little bit of trickery to assemble the data bytes into a nicely formatted string
-    sprintf(dataBuf, "\e[1;35m0x%.2X \e[0m(\e[1;36m%i\e[0m)", msg.data[x], msg.data[x]);
-    // Convert char array to string
-    String temp(dataBuf);
-    // Get rid of trailing spaces
-    temp.trim();
-    // Concat
-    data += temp;
-
     msgData.add((int)msg.data[x]);
-    // Add tab between data
-    if (x < msg.len - 1)
-    {
-      data += "\t";
-    }
-  }
+
   String json;
   serializeJson(doc, json);
   if (eventSource)
     eventSource->send(json.c_str(), "can");
   if (configuration.General.Debug || configuration.General.Sniffing)
-    Log.printf("[%s]\t\e[0m[%s]CAN: [\e[1;32m0x%.3X\e[0m] Data:\t%s\r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), received ? "\e[1;36m◄\e[0m" : "\e[1;35m►\e[0m", msg.id, data.c_str());
+  {
+    // "0xFF(255)" plus separator is 10 characters; a classic CAN frame has at most 8 bytes.
+    char data[88];
+    size_t used = 0;
+    for (int x = 0; x < msg.len && used + 10 < sizeof(data); x++)
+      used += snprintf(data + used, sizeof(data) - used, x ? " 0x%.2X(%u)" : "0x%.2X(%u)", msg.data[x], msg.data[x]);
+    data[used] = '\0';
+    LogCan("CAN: %s 0x%.3X  %s", received ? "◄" : "►", msg.id, data);
+  }
 }
 
 void SetDateTime()
@@ -578,10 +559,7 @@ void SetDateTime()
       msg.data[2] = myTZ.minute();
       // As of now we don't know what this value is for but it seems mandatory.
       msg.data[3] = 4;
-      if (configuration.General.Debug)
-      {
-        Log.printf("DEBUG: Date and Time DOW:%li H:%i M:%i\r\n", myTZ.dateTime("N").toInt(), myTZ.hour(), myTZ.minute());
-      }
+      LogDebug("CAN: date/time DOW %u %02u:%02u", msg.data[0], msg.data[1], msg.data[2]);
 
       SendMessage(msg);
     }
@@ -698,10 +676,7 @@ void TrackBoostFunction(void *pvParameter)
       if (commandedValues.Heating.BoostTimeCountdown > 0)
       {
         commandedValues.Heating.BoostTimeCountdown--;
-        if (configuration.General.Debug)
-        {
-          Log.printf("[%s][%s] Time: %i Left: %i \r\n", myTZ.dateTime("d-M-y H:i:s.v").c_str(), __func__, commandedValues.Heating.BoostDuration, commandedValues.Heating.BoostTimeCountdown);
-        }
+        LogDebug("Boost: %i of %i s left", commandedValues.Heating.BoostTimeCountdown, commandedValues.Heating.BoostDuration);
       }
       else
       {

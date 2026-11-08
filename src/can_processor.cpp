@@ -4,7 +4,7 @@
 #include <main.h>
 #include <ACAN2515.h>
 #include <mqtt.h>
-#include <telnet.h>
+#include <logger.h>
 #include <timesync.h>
 #include <configuration.h>
 #include <failsafe.h>
@@ -66,10 +66,7 @@ void SetFeedTemperature()
   // Transform it into the int representation
   feedSetpoint = ConvertFeedTemperature(commandedValues.Heating.CalculatedFeedSetpoint);
 
-  if (configuration.General.Debug)
-  {
-    Log.printf("DEBUG SETFEEDTEMPERATURE: Feed Setpoint is %.2f, INT representation (half steps) is %i\r\n", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
-  }
+  LogDebug("CAN: feed setpoint %.2f °C (raw %i half steps)", commandedValues.Heating.CalculatedFeedSetpoint, feedSetpoint);
 
   msg.data[0] = feedSetpoint;
 
@@ -84,33 +81,18 @@ void setupCan()
 
   CanConfigErrorCode = can.begin(settings, []
                                        { can.isr(); });
-  if (CanConfigErrorCode == 0 && configuration.General.Debug)
+  if (CanConfigErrorCode == 0)
   {
-    Log.print("Bit Rate prescaler: ");
-    Log.println(settings.mBitRatePrescaler);
-    Log.print("Propagation Segment: ");
-    Log.println(settings.mPropagationSegment);
-    Log.print("Phase segment 1: ");
-    Log.println(settings.mPhaseSegment1);
-    Log.print("Phase segment 2: ");
-    Log.println(settings.mPhaseSegment2);
-    Log.print("SJW: ");
-    Log.println(settings.mSJW);
-    Log.print("Triple Sampling: ");
-    Log.println(settings.mTripleSampling ? "yes" : "no");
-    Log.print("Actual bit rate: ");
-    Log.print(settings.actualBitRate());
-    Log.println(" bit/s");
-    Log.print("Exact bit rate ? ");
-    Log.println(settings.exactBitRate() ? "yes" : "no");
-    Log.print("Sample point: ");
-    Log.print(settings.samplePointFromBitStart());
-    Log.println("%");
+    LogDebug("CAN: %lu bit/s (%s), prescaler %u, prop %u, phase %u/%u, SJW %u, triple sampling %s, sample point %u%%",
+             static_cast<unsigned long>(settings.actualBitRate()), settings.exactBitRate() ? "exact" : "approx",
+             static_cast<unsigned>(settings.mBitRatePrescaler), static_cast<unsigned>(settings.mPropagationSegment),
+             static_cast<unsigned>(settings.mPhaseSegment1), static_cast<unsigned>(settings.mPhaseSegment2),
+             static_cast<unsigned>(settings.mSJW), settings.mTripleSampling ? "yes" : "no",
+             static_cast<unsigned>(settings.samplePointFromBitStart()));
   }
-  if (CanConfigErrorCode != 0)
+  else
   {
-    Log.print("Configuration error 0x");
-    Log.println(CanConfigErrorCode, HEX);
+    LogError("CAN: controller configuration error 0x%X", CanConfigErrorCode);
   }
 }
 
@@ -140,7 +122,7 @@ void processCan()
       {
         // Switch off override if another controller sends messages on the network.
         OverrideControl = false;
-        Log.println("Detected another controller on the network. Disabling Override");
+        LogInfo("CAN: other controller detected, override disabled");
       }
     }
 
@@ -242,14 +224,14 @@ void processCan()
       // Temperature Delta is too high
       if(abs(ceraValues.General.OutsideTemperature - temp) > 30 && ceraValues.General.HasReceivedOT)
       {
-        Log.printf("Detected a massive spike in Outside Temperature readings. Was %.2f is now %.2f. Check if the cabling is correct of both CAN Bus and Temperature Sensor!", ceraValues.General.OutsideTemperature, temp);
+        LogWarn("CAN: outside temperature spike %.2f → %.2f °C ignored, check CAN and sensor cabling", ceraValues.General.OutsideTemperature, temp);
         return;
       }
 
       // Temperatures above 200 are considered invalid.
       if (temp > 200.0)
       {
-        Log.println("Received invalid outside temperature reading. Check if the Sensor is connected properly and isn't faulty.");
+        LogWarn("CAN: invalid outside temperature %.2f °C ignored, check sensor connection", temp);
         return;
       }
 

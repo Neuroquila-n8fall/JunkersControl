@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <heating.h>
 #include <mqtt.h>
-#include <telnet.h>
+#include <logger.h>
 #include <feed_temperature.h>
 #include <forecast.h>
 #include <failsafe.h>
@@ -20,9 +20,9 @@ bool setpointShutdownActive = false;
 void activateSetpointShutdown()
 {
     if (!setpointShutdownActive)
-        Log.printf("Feed setpoint remained at %.1f C for %lu seconds. Switching heating off.\r\n",
-                   manufacturerHeatingOffSetpointC,
-                   configuration.General.SetpointOffDelaySeconds);
+        LogInfo("Heating: feed setpoint at %.1f °C for %lu s, switching heating off",
+                manufacturerHeatingOffSetpointC,
+                static_cast<unsigned long>(configuration.General.SetpointOffDelaySeconds));
     setpointShutdownActive = true;
 }
 } // namespace
