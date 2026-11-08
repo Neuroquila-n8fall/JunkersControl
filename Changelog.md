@@ -6,6 +6,7 @@
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
 - CAN Analyzer: the frame log shows candidate values for every frame, and CSV/JSON exports carry them (`candidates`, appended). Filtering to a single identifier lists its distinct payloads in order of first appearance with count and first/last seen time, so value transitions such as `0x415` `01 01` → `01 00` read at a glance.
+- CAN Analyzer markers: type a label and select **Mark** (or press Enter) to record the moment of an action. Markers show as highlighted rows in the frame log regardless of filters and in a marker list, and are exported (CSV columns `wall_clock` and `marker`, JSON array `markers`). **Clear** removes them.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
 
 ## 0.95.1 (Beta) — 2026-11-08

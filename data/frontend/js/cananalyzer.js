@@ -5,6 +5,9 @@ const capture = {
     previous: new Map(),
     knownNames: new Map(),
     startedAt: null,
+    // Frame clock minus performance.now() at the latest frame; places markers on the frame clock.
+    clockOffset: null,
+    markers: [],
     maximumFrames: 10000,
     maximumPayloads: 64
 };
@@ -15,6 +18,7 @@ initializeAnalyzer();
 async function initializeAnalyzer() {
     await i18nReady;
     bindAnalyzerControls();
+    renderMarkers();
     await loadCanAddressNames();
     startCanEvents();
 }
@@ -33,7 +37,13 @@ function bindAnalyzerControls() {
     _("export-json").addEventListener("click", () => exportCapture("json"));
     _("export-csv").addEventListener("click", () => exportCapture("csv"));
     ["filter-text", "direction-filter", "row-limit", "changed-only"].forEach(id => _(id).addEventListener(id === "filter-text" ? "input" : "change", renderAnalyzer));
-    document.addEventListener("ui-language-changed", renderAnalyzer);
+    _("add-marker").addEventListener("click", addMarker);
+    _("marker-label").addEventListener("keydown", event => {
+        if (event.key !== "Enter" || event.isComposing) return;
+        event.preventDefault();
+        addMarker();
+    });
+    document.addEventListener("ui-language-changed", () => { renderMarkers(); renderAnalyzer(); });
 }
 
 function resetFilters() {
@@ -103,7 +113,13 @@ function recordFrame(raw) {
     capture.previous.set(`${frame.received}:${frame.id}`, frame);
     capture.frames.push(frame);
     if (capture.frames.length > capture.maximumFrames) capture.frames.shift();
-    if (capture.startedAt === null) capture.startedAt = frame.timestamp;
+    capture.clockOffset = frame.timestamp - performance.now();
+    if (capture.startedAt === null) {
+        capture.startedAt = frame.timestamp;
+        // Markers set before the first frame ever take their place on the frame clock now.
+        capture.markers.forEach(marker => marker.timestamp ??= Math.round(marker.at + capture.clockOffset));
+        renderMarkers();
+    }
 
     let stat = capture.stats.get(frame.id);
     if (!stat) stat = {id: frame.id, idHex: frame.idHex, count: 0, changed: 0, first: frame.timestamp, last: frame.timestamp, intervals: [], lengths: new Set(), lastFrame: frame, payloads: new Map(), unlistedFrames: 0};
@@ -129,7 +145,51 @@ function clearCapture() {
     capture.stats.clear();
     capture.previous.clear();
     capture.startedAt = null;
+    capture.markers = [];
+    renderMarkers();
     renderAnalyzer();
+}
+
+function addMarker() {
+    const at = performance.now();
+    const label = _("marker-label").value.trim() || translate("can_analyzer.marker_default", {n: capture.markers.length + 1});
+    const marker = {label, wallClock: new Date().toISOString(), at, timestamp: capture.clockOffset === null ? null : Math.round(at + capture.clockOffset)};
+    capture.markers.push(marker);
+    _("marker-label").value = "";
+    renderMarkers();
+    renderAnalyzer();
+    // time before label: a label containing "{time}" must stay literal.
+    _("marker-announcement").textContent = capture.startedAt === null
+        ? translate("can_analyzer.marker_set_before_frames", {label})
+        : translate("can_analyzer.marker_set", {time: markerTime(marker), label});
+}
+
+function renderMarkers() {
+    _("marker-count").textContent = capture.markers.length;
+    const items = capture.markers.map(marker => {
+        const item = document.createElement("li");
+        const time = document.createElement("code");
+        time.className = "me-2";
+        time.textContent = markerTime(marker);
+        const label = document.createElement("span");
+        label.className = "text-break me-2";
+        label.textContent = marker.label;
+        // An empty data-i18n keeps the legacy text translation from rewriting a label such as "Clear".
+        label.dataset.i18n = "";
+        const wallClock = document.createElement("time");
+        wallClock.className = "text-muted";
+        wallClock.dateTime = marker.wallClock;
+        wallClock.textContent = new Date(marker.wallClock).toLocaleTimeString(getUiLanguage());
+        item.append(time, label, wallClock);
+        return item;
+    });
+    if (!items.length) {
+        const empty = document.createElement("li");
+        empty.className = "text-muted";
+        empty.textContent = translate("can_analyzer.no_markers");
+        items.push(empty);
+    }
+    _("marker-list").replaceChildren(...items);
 }
 
 function renderAnalyzer() {
@@ -151,7 +211,10 @@ function renderAnalyzer() {
     const end = capture.frames.length ? capture.frames[capture.frames.length - 1].timestamp : capture.startedAt;
     _("capture-duration").textContent = capture.startedAt === null ? "0.0 s" : `${((end - capture.startedAt) / 1000).toFixed(1)} s`;
     renderSummary(filter);
-    renderFrames(filtered.slice(-rowLimit));
+    const shown = filtered.slice(-rowLimit);
+    // Markers ignore filters; when the row limit cuts older frames, it cuts older markers too.
+    const markersFrom = shown.length < filtered.length ? shown[0].timestamp : -Infinity;
+    renderFrames(interleave(shown, capture.markers.filter(marker => (marker.timestamp ?? -Infinity) >= markersFrom)));
 }
 
 function renderSummary(filter) {
@@ -174,13 +237,17 @@ function renderPayloads(stat) {
     _("summary-body").querySelectorAll("tr[data-can-id]").forEach(row => row.addEventListener("click", () => { _("filter-text").value = row.dataset.canId; renderAnalyzer(); }));
 }
 
-function renderFrames(frames) {
-    _("frame-body").innerHTML = frames.length ? frames.map(frame => {
+function renderFrames(items) {
+    _("frame-body").innerHTML = items.length ? items.map(item => {
+        if ("label" in item) return `<tr class="can-marker"><td class="text-nowrap"><i class="bi bi-flag-fill" aria-hidden="true"></i> ${markerTime(item)}</td><td colspan="7"><span class="visually-hidden">${escapeHtml(translate("can_analyzer.marker"))}: </span><span class="text-break" data-i18n="" data-marker="${capture.markers.indexOf(item)}"></span></td></tr>`;
+        const frame = item;
         const delta = frame.delta.map(value => value === null || value === 0 ? "" : `${value > 0 ? "+" : ""}${value}`).join(" · ");
         // Candidate text is built from byte values or a fixed translation, so it needs no escaping.
         const candidates = candidateText(frame.candidates);
         return `<tr class="${frame.changed ? "can-changed" : ""}"><td class="text-nowrap">${formatTime(frame.timestamp - capture.startedAt)}</td><td title="${translate(frame.received ? "can_analyzer.received" : "can_analyzer.sent")}"><i class="bi ${frame.received ? "bi-arrow-left" : "bi-arrow-right"}"></i></td><td><code>${frame.idHex}</code></td><td>${escapeHtml(getNames(frame.idHex) || translate("can_analyzer.unknown"))}</td><td>${frame.length}</td><td class="can-bytes">${formatBytes(frame.data)}</td><td><code>${delta}</code></td><td class="small can-candidates" title="${candidates}">${candidates}</td></tr>`;
     }).join("") : emptyRow(8);
+    // Marker labels are user input: set as text, never parsed as markup.
+    _("frame-body").querySelectorAll("[data-marker]").forEach(element => element.textContent = capture.markers[element.dataset.marker].label);
     if (_("auto-scroll").checked) _("frame-log-wrap").scrollTop = _("frame-log-wrap").scrollHeight;
 }
 
@@ -200,15 +267,19 @@ function candidateValues(data) {
 function candidateText(candidates) { return candidates || translate("can_analyzer.empty_payload"); }
 
 function exportCapture(format) {
-    const metadata = {name: _("capture-name").value.trim(), exportedAt: new Date().toISOString(), frameCount: capture.frames.length, addressNames: Object.fromEntries(capture.knownNames)};
+    const metadata = {name: _("capture-name").value.trim(), exportedAt: new Date().toISOString(), frameCount: capture.frames.length, markerCount: capture.markers.length, addressNames: Object.fromEntries(capture.knownNames)};
     let content;
     let mime;
     if (format === "json") {
-        content = JSON.stringify({metadata, frames: capture.frames}, null, 2);
+        const markers = capture.markers.map(({label, wallClock, timestamp}) => ({label, wallClock, timestamp, captureTimeMs: timestamp === null || capture.startedAt === null ? null : timestamp - capture.startedAt}));
+        content = JSON.stringify({metadata, frames: capture.frames, markers}, null, 2);
         mime = "application/json";
     } else {
-        const rows = [["sequence", "timestamp_ms", "direction", "id", "name", "dlc", "data_hex", "data_decimal", "changed", "candidates"]];
-        capture.frames.forEach(frame => rows.push([frame.sequence, frame.timestamp, frame.received ? "rx" : "tx", frame.idHex, getNames(frame.idHex), frame.length, frame.data.map(hexByte).join(" "), frame.data.join(" "), frame.changed, frame.candidates]));
+        const rows = [["sequence", "timestamp_ms", "direction", "id", "name", "dlc", "data_hex", "data_decimal", "changed", "candidates", "wall_clock", "marker"]];
+        // Marker rows fill only timestamp_ms, wall_clock and marker; frame rows leave the last two empty.
+        interleave(capture.frames, capture.markers).forEach(item => rows.push("label" in item
+            ? ["", item.timestamp, "", "", "", "", "", "", "", "", item.wallClock, csvText(item.label)]
+            : [item.sequence, item.timestamp, item.received ? "rx" : "tx", item.idHex, getNames(item.idHex), item.length, item.data.map(hexByte).join(" "), item.data.join(" "), item.changed, item.candidates, "", ""]));
         content = rows.map(row => row.map(csvValue).join(",")).join("\r\n");
         mime = "text/csv";
     }
@@ -220,12 +291,28 @@ function exportCapture(format) {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
+// Frames and markers are each in time order; a marker follows frames of the same time, one not yet placed on the frame clock comes first.
+function interleave(frames, markers) {
+    const items = [];
+    let next = 0;
+    frames.forEach(frame => {
+        while (next < markers.length && (markers[next].timestamp ?? -Infinity) < frame.timestamp) items.push(markers[next++]);
+        items.push(frame);
+    });
+    return items.concat(markers.slice(next));
+}
+
+function markerTime(marker) { return marker.timestamp === null || capture.startedAt === null ? "—" : formatTime(marker.timestamp - capture.startedAt); }
+
 function normalizeId(value) { return `0x${Number(typeof value === "string" ? parseInt(value, 0) : value).toString(16).padStart(3, "0").toUpperCase()}`; }
 function getNames(id) { return (capture.knownNames.get(id) || []).join(" / "); }
 function hexByte(value) { return Number(value).toString(16).padStart(2, "0").toUpperCase(); }
 function formatBytes(data) { return data.length ? data.map(value => `<code>${hexByte(value)}</code>`).join("") : "<code>—</code>"; }
 function formatInterval(milliseconds) { return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(2)} s` : `${milliseconds.toFixed(0)} ms`; }
-function formatTime(milliseconds) { const minutes = Math.floor(milliseconds / 60000); return `${String(minutes).padStart(2, "0")}:${((milliseconds % 60000) / 1000).toFixed(3).padStart(6, "0")}`; }
+// Negative for a marker set before the first frame.
+function formatTime(milliseconds) { const sign = milliseconds < 0 ? "−" : ""; const value = Math.abs(milliseconds); return `${sign}${String(Math.floor(value / 60000)).padStart(2, "0")}:${((value % 60000) / 1000).toFixed(3).padStart(6, "0")}`; }
 function emptyRow(columns) { return `<tr><td colspan="${columns}" class="text-center text-muted py-4">${translate("can_analyzer.no_frames")}</td></tr>`; }
 function escapeHtml(value) { const element = document.createElement("span"); element.textContent = value; return element.innerHTML; }
 function csvValue(value) { const text = String(value ?? ""); return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; }
+// Spreadsheets run text starting with = + - @ (or tab/CR) as a formula; a leading quote keeps user text inert.
+function csvText(value) { return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value; }
