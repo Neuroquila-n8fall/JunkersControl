@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.95.2 (Beta) — 2026-11-08
 
 - Added the boiler hot-water dial holiday flag (#61): the dial position on the `HotWater.MaxTemperature` address (`0x204`, 10 °C = holiday/umbrella position, 60 °C = maximum, observed on the maintainer's own boiler) is exposed as `DialHoliday` in `GET /api/runtime` `HotWater`, in the MQTT water JSON, as the Home Assistant binary sensor **Hot Water Dial Holiday** and as a row in the dashboard hot-water section. It reflects only the boiler's own dial; a TA270 vacation is not detected (`0x204` stays `0x78` during it in the issue capture). It is `null`/unknown until the first frame; no control logic changed. Covered by `can_decoder_test`.
 - Fixed mixed-circuit decoding (#59): pump, feed setpoint, current feed and economy frames are `<circuit> <value>` (DLC 2) on installations with a TA270 and HMM mixing module, but the firmware read the circuit byte, so the setpoint showed 0.5 °C and the pump always read "on". The value is now read from byte 1; 1-byte frames are still read from byte 0.
@@ -15,7 +15,9 @@
 - Added a room controller clock check: when a valid date/time frame (`0x256`) arrives and Cerasmarter's NTP clock is set, the two are compared (week-wrapped, 5-minute tolerance). A warning is logged once when the controller's clock is off (its time programs would switch at the wrong times) and an info line once when it matches again; nothing is ever sent to the controller. If no valid date/time frame arrives for 180 s (for example the controller is unplugged), the check resets to unknown and one info line is logged; the next frame compares again. The verdict is `General.ControllerClockOff` and `General.ControllerClockOffsetMinutes` in `GET /api/runtime` (`null` until known), a Home Assistant diagnostic problem sensor, and a "Room controller clock" row in the dashboard system status (en/de). Covered by new `can_decoder_test` cases.
 - Fixed Wi-Fi roaming scans failing while connected: the core aborts a scan after 20 × the per-channel time (2.4 s), but on the production controller a scan while connected took longer. Roaming scans now get up to 10 s.
 - Fixed the controller sending a wrong date and time to the boiler after every boot: before the first NTP sync the clock still read its power-on default (Thursday 01:00), and that was sent on the date/time frame. Date and time are now sent only once the clock has been synchronized.
-- Fixed Cerasmarter briefly taking over control while another room controller (e.g. a TA270) was active: when a controller frame arrived in the same loop pass as the once-per-second takeover check, the elapsed-time calculation wrapped around and counted the timeout as expired, so override was enabled for a moment and Cerasmarter could send its own heating frames alongside the room controller.
+- Fixed Cerasmarter briefly taking over control while another room controller (e.g. a TA270) was active (#63): when a controller frame arrived in the same loop pass as the once-per-second takeover check, the elapsed-time calculation wrapped around and counted the timeout as expired, so override was enabled for a moment and Cerasmarter could send its own heating frames alongside the room controller.
+
+[Release notes](assets/Releases/0.95.2.md) · [Full comparison with 0.95.1](https://github.com/Neuroquila-n8fall/JunkersControl/compare/0.95.1...0.95.2)
 
 ## 0.95.1 (Beta) — 2026-11-08
 

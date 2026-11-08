@@ -12,7 +12,7 @@
 
 Documentation tracks the current development firmware. Please open an issue when controller-specific behavior differs from the documented BM1 installation profiles.
 
-**Beta release: `0.95.1` (2026-11-08).** Improves Wi-Fi recovery after an access-point change and replaces the telnet console with a reliable system log, including a web log page and events kept across crashes. Read the [release notes](assets/Releases/0.95.1.md) before upgrading; the [0.95.0 notes](assets/Releases/0.95.0.md) still apply for installation assets and configuration backups.
+**Beta release: `0.95.2` (2026-11-08).** Fixes mixed-circuit values on TA270/HMM installations, stale burner/pump/season states and a brief control takeover while a room controller is active; adds room-controller economy and clock checks and CAN Analyzer markers. MQTT/API consumers must handle `null` for burner, pump and season. Read the [release notes](assets/Releases/0.95.2.md) before upgrading; the [0.95.0 notes](assets/Releases/0.95.0.md) still apply for installation assets and configuration backups.
 
 ## Community
 You can reach out on [Discord](https://discord.gg/9Wrndbqu7t) to discuss the project and get help from the community.
