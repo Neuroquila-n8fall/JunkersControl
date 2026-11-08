@@ -49,7 +49,7 @@ Captures exist only in the current browser page. Reloading or leaving the page d
 - **Mean interval** is the average arrival interval from the most recent samples. A stable interval often distinguishes periodic status data from event-driven commands.
 - **DLC** lists observed payload lengths.
 - **Last payload** is the most recent sequence of data bytes.
-- **Candidate values** shows common interpretations of the leading bytes. For payloads of two or more bytes it lists byte 0 (`u8`, `u8/2`, `bool`), a 16-bit big-endian value (`s16be/100`) and byte 1 (`u8[1]`, `u8[1]/2`, `bool[1]`); the latter fits mixed-circuit frames in the form `<circuit> <value>`, where `01 55` reads as `u8[1]/2 = 42.5 °C`. These are investigation hints only; they do not prove the unit, scaling, signedness, byte order, or meaning.
+- **Candidate values** shows common interpretations of the leading bytes. For payloads of two or more bytes it lists byte 0 (`u8`, `u8/2`, `bool`), byte 1 (`u8[1]`, `u8[1]/2`, `bool[1]`) and a 16-bit big-endian value (`s16be/100`); the byte-1 values fit mixed-circuit frames in the form `<circuit> <value>`, where `01 55` reads as `u8[1]/2 = 42.5 °C`. These are investigation hints only; they do not prove the unit, scaling, signedness, byte order, or meaning.
 
 ## Reading the frame log
 
