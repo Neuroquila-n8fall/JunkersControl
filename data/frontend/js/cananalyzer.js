@@ -5,7 +5,8 @@ const capture = {
     previous: new Map(),
     knownNames: new Map(),
     startedAt: null,
-    maximumFrames: 10000
+    maximumFrames: 10000,
+    maximumPayloads: 64
 };
 
 loadNavigation();
@@ -32,6 +33,7 @@ function bindAnalyzerControls() {
     _("export-json").addEventListener("click", () => exportCapture("json"));
     _("export-csv").addEventListener("click", () => exportCapture("csv"));
     ["filter-text", "direction-filter", "row-limit", "changed-only"].forEach(id => _(id).addEventListener(id === "filter-text" ? "input" : "change", renderAnalyzer));
+    document.addEventListener("ui-language-changed", renderAnalyzer);
 }
 
 function resetFilters() {
@@ -78,7 +80,9 @@ function startCanEvents() {
 function setConnectionState(connected) {
     const element = _("connection-status");
     element.className = `alert py-2 ${connected ? "alert-success" : "alert-warning"}`;
-    element.textContent = translate(connected ? "can_analyzer.connected" : "can_analyzer.disconnected");
+    // Keep data-i18n in step so a language switch re-translates the current state, not "connecting".
+    element.dataset.i18n = connected ? "can_analyzer.connected" : "can_analyzer.disconnected";
+    element.textContent = translate(element.dataset.i18n);
 }
 
 function recordFrame(raw) {
@@ -95,13 +99,14 @@ function recordFrame(raw) {
     const previous = capture.previous.get(`${frame.received}:${frame.id}`);
     frame.delta = data.map((value, index) => previous && index < previous.data.length ? value - previous.data[index] : null);
     frame.changed = Boolean(previous) && (previous.length !== frame.length || data.some((value, index) => previous.data[index] !== value));
+    frame.candidates = candidateValues(data);
     capture.previous.set(`${frame.received}:${frame.id}`, frame);
     capture.frames.push(frame);
     if (capture.frames.length > capture.maximumFrames) capture.frames.shift();
     if (capture.startedAt === null) capture.startedAt = frame.timestamp;
 
     let stat = capture.stats.get(frame.id);
-    if (!stat) stat = {id: frame.id, idHex: frame.idHex, count: 0, changed: 0, first: frame.timestamp, last: frame.timestamp, intervals: [], lengths: new Set(), lastFrame: frame};
+    if (!stat) stat = {id: frame.id, idHex: frame.idHex, count: 0, changed: 0, first: frame.timestamp, last: frame.timestamp, intervals: [], lengths: new Set(), lastFrame: frame, payloads: new Map(), unlistedFrames: 0};
     if (stat.count > 0) stat.intervals.push(frame.timestamp - stat.last);
     if (stat.intervals.length > 200) stat.intervals.shift();
     stat.count++;
@@ -109,6 +114,12 @@ function recordFrame(raw) {
     stat.last = frame.timestamp;
     stat.lengths.add(frame.length);
     stat.lastFrame = frame;
+    // Map keeps insertion order, so payloads stay sorted by first appearance.
+    const payloadKey = data.map(hexByte).join(" ");
+    const payload = stat.payloads.get(payloadKey);
+    if (payload) { payload.count++; payload.last = frame.timestamp; }
+    else if (stat.payloads.size < capture.maximumPayloads) stat.payloads.set(payloadKey, {data, candidates: frame.candidates, count: 1, first: frame.timestamp, last: frame.timestamp});
+    else stat.unlistedFrames++;
     capture.stats.set(frame.id, stat);
     renderAnalyzer();
 }
@@ -147,21 +158,34 @@ function renderSummary(filter) {
     const rows = [...capture.stats.values()].filter(stat => !filter || stat.idHex.toLowerCase().includes(filter) || getNames(stat.idHex).toLowerCase().includes(filter)).sort((a, b) => a.id - b.id);
     _("summary-body").innerHTML = rows.length ? rows.map(stat => {
         const mean = stat.intervals.length ? stat.intervals.reduce((sum, value) => sum + value, 0) / stat.intervals.length : null;
-        return `<tr role="button" data-can-id="${stat.idHex}"><td><code>${stat.idHex}</code></td><td>${escapeHtml(getNames(stat.idHex) || translate("can_analyzer.unknown"))}</td><td>${stat.count}${stat.changed ? ` <span class="badge text-bg-warning">${stat.changed} Δ</span>` : ""}</td><td>${mean === null ? "—" : formatInterval(mean)}</td><td>${[...stat.lengths].sort().join(", ")}</td><td class="can-bytes">${formatBytes(stat.lastFrame.data)}</td><td class="small">${candidateValues(stat.lastFrame.data)}</td></tr>`;
+        return `<tr role="button" data-can-id="${stat.idHex}"><td><code>${stat.idHex}</code></td><td>${escapeHtml(getNames(stat.idHex) || translate("can_analyzer.unknown"))}</td><td>${stat.count}${stat.changed ? ` <span class="badge text-bg-warning">${stat.changed} Δ</span>` : ""}</td><td>${mean === null ? "—" : formatInterval(mean)}</td><td>${[...stat.lengths].sort().join(", ")}</td><td class="can-bytes">${formatBytes(stat.lastFrame.data)}</td><td class="small">${candidateText(stat.lastFrame.candidates)}</td></tr>`;
     }).join("") : emptyRow(7);
+    _("summary-body").querySelectorAll("tr[data-can-id]").forEach(row => row.addEventListener("click", () => { _("filter-text").value = row.dataset.canId; renderAnalyzer(); }));
+    renderPayloads(filter && rows.length === 1 ? rows[0] : null);
+}
+
+function renderPayloads(stat) {
+    _("payload-section").hidden = !stat;
+    if (!stat) return;
+    _("payload-title").textContent = translate("can_analyzer.distinct_payloads", {count: stat.payloads.size, id: stat.idHex});
+    _("payload-body").innerHTML = [...stat.payloads.values()].map(payload =>
+        `<tr><td class="can-bytes">${formatBytes(payload.data)}</td><td>${payload.count}</td><td class="text-nowrap">${formatTime(payload.first - capture.startedAt)}</td><td class="text-nowrap">${formatTime(payload.last - capture.startedAt)}</td><td class="small">${candidateText(payload.candidates)}</td></tr>`
+    ).join("") + (stat.unlistedFrames ? `<tr><td colspan="5" class="text-muted small">${escapeHtml(translate("can_analyzer.unlisted_payloads", {count: stat.unlistedFrames, limit: capture.maximumPayloads}))}</td></tr>` : "");
     _("summary-body").querySelectorAll("tr[data-can-id]").forEach(row => row.addEventListener("click", () => { _("filter-text").value = row.dataset.canId; renderAnalyzer(); }));
 }
 
 function renderFrames(frames) {
     _("frame-body").innerHTML = frames.length ? frames.map(frame => {
         const delta = frame.delta.map(value => value === null || value === 0 ? "" : `${value > 0 ? "+" : ""}${value}`).join(" · ");
-        return `<tr class="${frame.changed ? "can-changed" : ""}"><td class="text-nowrap">${formatTime(frame.timestamp - capture.startedAt)}</td><td title="${translate(frame.received ? "can_analyzer.received" : "can_analyzer.sent")}"><i class="bi ${frame.received ? "bi-arrow-left" : "bi-arrow-right"}"></i></td><td><code>${frame.idHex}</code></td><td>${escapeHtml(getNames(frame.idHex) || translate("can_analyzer.unknown"))}</td><td>${frame.length}</td><td class="can-bytes">${formatBytes(frame.data)}</td><td><code>${delta}</code></td></tr>`;
-    }).join("") : emptyRow(7);
+        // Candidate text is built from byte values or a fixed translation, so it needs no escaping.
+        const candidates = candidateText(frame.candidates);
+        return `<tr class="${frame.changed ? "can-changed" : ""}"><td class="text-nowrap">${formatTime(frame.timestamp - capture.startedAt)}</td><td title="${translate(frame.received ? "can_analyzer.received" : "can_analyzer.sent")}"><i class="bi ${frame.received ? "bi-arrow-left" : "bi-arrow-right"}"></i></td><td><code>${frame.idHex}</code></td><td>${escapeHtml(getNames(frame.idHex) || translate("can_analyzer.unknown"))}</td><td>${frame.length}</td><td class="can-bytes">${formatBytes(frame.data)}</td><td><code>${delta}</code></td><td class="small can-candidates" title="${candidates}">${candidates}</td></tr>`;
+    }).join("") : emptyRow(8);
     if (_("auto-scroll").checked) _("frame-log-wrap").scrollTop = _("frame-log-wrap").scrollHeight;
 }
 
 function candidateValues(data) {
-    if (!data.length) return translate("can_analyzer.empty_payload");
+    if (!data.length) return "";
     const values = [`u8=${data[0]}`, `u8/2=${(data[0] / 2).toFixed(1)} °C`, `bool=${data[0] ? 1 : 0}`];
     if (data.length >= 2) {
         // Mixed-circuit frames are "<circuit> <value>"; the value sits in byte 1.
@@ -173,6 +197,8 @@ function candidateValues(data) {
     return values.join(" · ");
 }
 
+function candidateText(candidates) { return candidates || translate("can_analyzer.empty_payload"); }
+
 function exportCapture(format) {
     const metadata = {name: _("capture-name").value.trim(), exportedAt: new Date().toISOString(), frameCount: capture.frames.length, addressNames: Object.fromEntries(capture.knownNames)};
     let content;
@@ -181,8 +207,8 @@ function exportCapture(format) {
         content = JSON.stringify({metadata, frames: capture.frames}, null, 2);
         mime = "application/json";
     } else {
-        const rows = [["sequence", "timestamp_ms", "direction", "id", "name", "dlc", "data_hex", "data_decimal", "changed"]];
-        capture.frames.forEach(frame => rows.push([frame.sequence, frame.timestamp, frame.received ? "rx" : "tx", frame.idHex, getNames(frame.idHex), frame.length, frame.data.map(hexByte).join(" "), frame.data.join(" "), frame.changed]));
+        const rows = [["sequence", "timestamp_ms", "direction", "id", "name", "dlc", "data_hex", "data_decimal", "changed", "candidates"]];
+        capture.frames.forEach(frame => rows.push([frame.sequence, frame.timestamp, frame.received ? "rx" : "tx", frame.idHex, getNames(frame.idHex), frame.length, frame.data.map(hexByte).join(" "), frame.data.join(" "), frame.changed, frame.candidates]));
         content = rows.map(row => row.map(csvValue).join(",")).join("\r\n");
         mime = "text/csv";
     }

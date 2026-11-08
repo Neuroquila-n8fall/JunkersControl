@@ -5,6 +5,7 @@
 - Fixed mixed-circuit decoding (#59): pump, feed setpoint, current feed and economy frames are `<circuit> <value>` (DLC 2) on installations with a TA270 and HMM mixing module, but the firmware read the circuit byte, so the setpoint showed 0.5 °C and the pump always read "on". The value is now read from byte 1; 1-byte frames are still read from byte 0.
 - CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
 - CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
+- CAN Analyzer: the frame log shows candidate values for every frame, and CSV/JSON exports carry them (`candidates`, appended). Filtering to a single identifier lists its distinct payloads in order of first appearance with count and first/last seen time, so value transitions such as `0x415` `01 01` → `01 00` read at a glance.
 - Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
 
 ## 0.95.1 (Beta) — 2026-11-08
