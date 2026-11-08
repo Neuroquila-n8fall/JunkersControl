@@ -83,6 +83,10 @@ static void populateRuntimeJson(JsonDocument &doc)
     water["Now"] = ceraValues.Hotwater.Now;
     water["Buffer"] = ceraValues.Hotwater.BufferMode;
     water["ContinuousFlowSetpoint"] = ceraValues.Hotwater.ContinousFlowSetpoint;
+    if (ceraValues.Hotwater.HasReceivedDialHoliday)
+        water["DialHoliday"] = ceraValues.Hotwater.DialHoliday;
+    else
+        water["DialHoliday"] = nullptr;
 
     JsonObject mixed = doc["MixedCircuit"].to<JsonObject>();
     mixed["Pump"] = ceraValues.MixedCircuit.PumpActive;
@@ -1418,6 +1422,7 @@ void getCanbusConfig(AsyncWebServerRequest *request)
     CAN_Addresses_MixedCircuit["FeedSetpoint"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedSetpoint);
     CAN_Addresses_MixedCircuit["FeedCurrent"] = IntToHex(configuration.CanAddresses.MixedCircuit.FeedCurrent);
     CAN_Addresses_MixedCircuit["Economy"] = IntToHex(configuration.CanAddresses.MixedCircuit.Economy);
+    CAN_Addresses_MixedCircuit["DayMode"] = IntToHex(configuration.CanAddresses.MixedCircuit.DayMode);
 
     sendJson(doc, request);
 }
@@ -1490,7 +1495,10 @@ void onCanbusConfigReceive(AsyncWebServerRequest *request, JsonVariant &json)
         parseAddress(CAN_Addresses_MixedCircuit["Pump"], newAddresses.MixedCircuit.Pump) &&
         parseAddress(CAN_Addresses_MixedCircuit["FeedSetpoint"], newAddresses.MixedCircuit.FeedSetpoint) &&
         parseAddress(CAN_Addresses_MixedCircuit["FeedCurrent"], newAddresses.MixedCircuit.FeedCurrent) &&
-        parseAddress(CAN_Addresses_MixedCircuit["Economy"], newAddresses.MixedCircuit.Economy);
+        parseAddress(CAN_Addresses_MixedCircuit["Economy"], newAddresses.MixedCircuit.Economy) &&
+        // DayMode is newer than the other addresses: clients that predate it omit it, keeping the current value.
+        (CAN_Addresses_MixedCircuit["DayMode"].isNull() ||
+         parseAddress(CAN_Addresses_MixedCircuit["DayMode"], newAddresses.MixedCircuit.DayMode));
 
     if (!validAddresses || controllerMin > controllerMax)
     {

@@ -125,7 +125,8 @@
                 "Pump": "0x404",
                 "FeedSetpoint": "0x405",
                 "FeedCurrent": "0x440",
-                "Economy": "0x407"
+                "Economy": "0x407",
+                "DayMode": "0x415"
             }
         }
     },

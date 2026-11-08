@@ -254,6 +254,9 @@ void processCan()
     {
       temp = Message.data[0] / 2.0;
       ceraValues.Hotwater.MaximumTemperature = temp;
+      // Dial positions seen on a boiler: holiday (umbrella) 0x14 = 10 °C, maximum ("E") 0x78 = 60 °C.
+      ceraValues.Hotwater.DialHoliday = temp > 0.0 && temp <= 10.0;
+      ceraValues.Hotwater.HasReceivedDialHoliday = true;
     }
 
     //[DHW] - [Controller] - Current water feed or battery temperature
@@ -454,6 +457,16 @@ void processCan()
         dataFrame && Message.len >= 1)
     {
       ceraValues.MixedCircuit.Economy = Message.data[mixedCircuitValueIndex];
+    }
+
+    //[MC] - [RC] - Mixed-Circuit Day Mode (Economy switch of the TA270)
+    // Data Type: Bit
+    // Value: 1 = Day/Normal | 0 = Economy (inverse of the Economy address above)
+    // Observed on 0x415 as <circuit> <value>, repeated every 30 s (issue #61).
+    if (configuration.CanModuleConfig.Profiles.MixedCircuit && Message.id == configuration.CanAddresses.MixedCircuit.DayMode &&
+        dataFrame && Message.len >= 1)
+    {
+      ceraValues.MixedCircuit.Economy = Message.data[mixedCircuitValueIndex] == 0;
     }
 
     //[MC] - [Controller] - Mixed-Circuit Current Feed Temperature

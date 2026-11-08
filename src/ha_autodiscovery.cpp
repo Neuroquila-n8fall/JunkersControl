@@ -267,6 +267,9 @@ void addCoreComponents(JsonObject components)
                     "{{ value_json.Water.Now }}", "running", "mdi:water-boiler");
     addBinarySensor(components, "water_buffer", "Hot Water Buffer Mode", "Water",
                     "{{ value_json.Water.Buffer }}", "running", "mdi:water-boiler-auto");
+    // Null until the first 0x204 frame has been received; HA maps the payload "None" to the unknown state.
+    addBinarySensor(components, "water_dial_holiday", "Hot Water Dial Holiday", "Water",
+                    "{{ value_json.Water.DialHoliday | default('None', true) }}", nullptr, "mdi:umbrella-beach");
 
     addNumber(components, "heating_requested_setpoint", "Requested Feed Setpoint", "Heating", "FeedSetpoint",
               "{{ value_json.Heating.RequestedFeedSetpoint | float(default=0) }}", 0, 100, 0.5, temperatureUnit,

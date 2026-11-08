@@ -84,6 +84,123 @@ void OneByteMixedCircuitFramesStillUseFirstByte()
     TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
 }
 
+// TA270 economy switch (issue #61): 0x415 <circuit> <value>, 1 = day/normal, 0 = economy.
+// Capture: 'Sparbetrieb ein' 16:39:53 -> 01 01 then 16:40:23 -> 01 00; 'aus' 16:40:40 -> 01 01 at 16:40:53.
+void DayModeFramesFromCaptureSetInverseEconomy()
+{
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:39:53, normal operation
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x00)); // 16:40:23, economy switched on
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x00)); // periodic repeat keeps economy
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:40:53, economy switched off
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 2, 0x01, 0x01)); // 16:41:23 and later: unchanged
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+}
+
+void DayModeOneByteFrameUsesFirstByte()
+{
+    Process(Frame(0x415, 1, 0x00));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x415, 1, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+}
+
+void EconomyAddressKeepsOriginalMeaning()
+{
+    Process(Frame(0x407, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 2, 0x01, 0x00));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 1, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+
+    // The two sources feed the same field; each frame is decoded by its own address.
+    Process(Frame(0x415, 2, 0x01, 0x01));
+    TEST_ASSERT_FALSE(ceraValues.MixedCircuit.Economy);
+    Process(Frame(0x407, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+}
+
+void DayModeIgnoredWhenProfileDisabledOrFrameMalformed()
+{
+    ceraValues.MixedCircuit.Economy = true;
+    CANMessage remote = Frame(0x415, 2, 0x01, 0x01);
+    remote.rtr = true;
+    Process(remote);
+    Process(Frame(0x415, 0, 0x01, 0x01)); // zero-length frame supplies no value byte
+    CANMessage extended = Frame(0x415, 2, 0x01, 0x01);
+    extended.ext = true;
+    Process(extended);
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+
+    configuration.CanModuleConfig.Profiles.MixedCircuit = false;
+    Process(Frame(0x415, 2, 0x01, 0x01));
+    TEST_ASSERT_TRUE(ceraValues.MixedCircuit.Economy);
+}
+
+// Boiler hot-water dial, reported on 0x204 (HotWater.MaxTemperature) as value/2 °C:
+// holiday (umbrella) 0x14 = 10 °C, maximum ("E") 0x78 = 60 °C.
+void DialHolidayIsUnknownUntilFirstFrame()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    Process(Frame(0x207, 2, 0x03, 0xE8)); // unrelated traffic leaves it unknown
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    AssertNear(ceraValues.Hotwater.MaximumTemperature, 10.0);
+}
+
+void DialHolidayFollowsLastDialPosition()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    Process(Frame(0x204, 1, 0x78));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    AssertNear(ceraValues.Hotwater.MaximumTemperature, 60.0);
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x15)); // 10.5 °C is above the holiday position
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x01)); // 0.5 °C: still the lowest range
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.DialHoliday);
+    Process(Frame(0x204, 1, 0x00)); // 0 °C is not a dial position: not holiday
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+}
+
+void DialHolidayIgnoresMalformedFramesAndDisabledProfile()
+{
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = true;
+    CANMessage remote = Frame(0x204, 1, 0x14);
+    remote.rtr = true;
+    Process(remote);
+    CANMessage extended = Frame(0x204, 1, 0x14);
+    extended.ext = true;
+    Process(extended);
+    Process(Frame(0x204, 0, 0x14)); // zero-length frame supplies no value byte
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+
+    Process(Frame(0x204, 1, 0x78));
+    Process(remote);
+    Process(extended);
+    Process(Frame(0x204, 0, 0x14));
+    TEST_ASSERT_TRUE(ceraValues.Hotwater.HasReceivedDialHoliday);
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.DialHoliday);
+
+    ceraValues.Hotwater = CeraValues::HotWater_{};
+    configuration.CanModuleConfig.Profiles.DomesticHotWater = false;
+    Process(Frame(0x204, 1, 0x14));
+    TEST_ASSERT_FALSE(ceraValues.Hotwater.HasReceivedDialHoliday);
+}
+
 void ShortRemoteAndExtendedFramesAreIgnored()
 {
     ceraValues.MixedCircuit.FeedSetpoint = 20.0;
@@ -331,6 +448,13 @@ void setUp()
     configuration.CanAddresses.MixedCircuit.FeedSetpoint = 0x405;
     configuration.CanAddresses.MixedCircuit.FeedCurrent = 0x440;
     configuration.CanAddresses.MixedCircuit.Economy = 0x407;
+    configuration.CanAddresses.HotWater.SetpointTemperature = 0x203;
+    configuration.CanAddresses.HotWater.MaxTemperature = 0x204;
+    configuration.CanAddresses.HotWater.CurrentTemperature = 0x205;
+    configuration.CanAddresses.HotWater.Now = 0x254;
+    configuration.CanAddresses.HotWater.BufferOperation = 0x20B;
+    configuration.CanAddresses.HotWater.ContinousFlowSetpointTemperature = 0x255;
+    configuration.CanAddresses.MixedCircuit.DayMode = 0x415;
     // Unrelated decoders must not match the test frames.
     configuration.CanAddresses.Heating.FeedSetpoint = 0x252;
     configuration.CanAddresses.Heating.Pump = 0x20A;
@@ -377,6 +501,13 @@ void setup()
     delay(2000);
     UNITY_BEGIN();
     RUN_TEST(TwoByteMixedCircuitFramesFromCaptureUseValueByte);
+    RUN_TEST(DayModeFramesFromCaptureSetInverseEconomy);
+    RUN_TEST(DayModeOneByteFrameUsesFirstByte);
+    RUN_TEST(EconomyAddressKeepsOriginalMeaning);
+    RUN_TEST(DayModeIgnoredWhenProfileDisabledOrFrameMalformed);
+    RUN_TEST(DialHolidayIsUnknownUntilFirstFrame);
+    RUN_TEST(DialHolidayFollowsLastDialPosition);
+    RUN_TEST(DialHolidayIgnoresMalformedFramesAndDisabledProfile);
     RUN_TEST(OneByteMixedCircuitFramesStillUseFirstByte);
     RUN_TEST(ShortRemoteAndExtendedFramesAreIgnored);
     RUN_TEST(OutsideTemperatureSpikeDoesNotAbortDrain);
