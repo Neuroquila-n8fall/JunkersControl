@@ -16,6 +16,16 @@ static constexpr unsigned long wifiRoamRssiCheckInterval = 10000;
 static constexpr unsigned long wifiRoamLowRssiHoldTime = 30000;
 static constexpr unsigned long wifiRoamCooldown = 300000;
 static constexpr uint32_t wifiRoamScanTimePerChannel = 120;
+// The core gives up after 20 x the per-channel time (2.4 s), but a scan while
+// connected keeps returning to the home channel and took longer on the
+// production controller. Allow the whole scan instead of reporting failure.
+static constexpr uint32_t wifiRoamScanTimeout = 10000;
+
+// _scanTimeout is protected and scanNetworks() overwrites it on every call.
+struct WifiRoamScanAccess : WiFiScanClass
+{
+  static void setTimeout(uint32_t milliseconds) { _scanTimeout = milliseconds; }
+};
 // After a reconnect (not boot, not our own handover) the strongest AP may have
 // been missing during the reconnect scan, e.g. while it restarted. Check once
 // shortly afterwards whether a mediocre link can be improved.
@@ -145,6 +155,7 @@ static void startWifiRoamScan(unsigned long now, int32_t currentRssi, const char
   if (result == WIFI_SCAN_RUNNING)
   {
     wifiRoamScanActive = true;
+    WifiRoamScanAccess::setTimeout(wifiRoamScanTimeout);
     LogInfo("WiFi: %s (%ld dBm), scanning for a better AP",
             reason, static_cast<long>(currentRssi));
     return;
