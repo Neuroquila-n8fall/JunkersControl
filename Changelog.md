@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fixed mixed-circuit decoding (#59): pump, feed setpoint, current feed and economy frames are `<circuit> <value>` (DLC 2) on installations with a TA270 and HMM mixing module, but the firmware read the circuit byte, so the setpoint showed 0.5 °C and the pump always read "on". The value is now read from byte 1; 1-byte frames are still read from byte 0.
+- CAN decoders now ignore remote and extended frames and frames shorter than the bytes they read. A rejected outside-temperature frame (spike or invalid) no longer discards the rest of the receive queue in that pass.
+- CAN Analyzer candidate values also show the byte-1 interpretation (`u8[1]/2`) for payloads of two or more bytes.
+- Added the `can_decoder_test` Unity environment, which replays frames of a real capture through the production `processCan()` on the bench ESP32.
+
 ## 0.95.1 (Beta) — 2026-11-08
 
 - Wi-Fi recovery after an access-point change: about 60 s after any reconnect that is not a boot or the controller's own roaming switch, a signal below −67 dBm triggers one scan for a better AP. Roaming now needs an AP at least 8 dB stronger (was 12 dB plus a −70 dBm floor), confirmed by two consecutive scans. Connections, losses and roaming decisions are logged at info level.
