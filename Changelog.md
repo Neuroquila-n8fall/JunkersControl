@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed Wi-Fi roaming scans always failing while connected: the core aborted them after 2.4 s, but a scan that returns to the home channel between channels takes longer. Roaming scans now get up to 10 s.
+- Fixed Wi-Fi roaming scans failing while connected: the core aborts a scan after 20 × the per-channel time (2.4 s), but on the production controller a scan while connected took longer. Roaming scans now get up to 10 s.
 
 ## 0.95.1 (Beta) — 2026-11-08
 
