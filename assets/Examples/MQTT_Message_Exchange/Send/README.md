@@ -34,6 +34,7 @@ Important fields:
 - `RequestedFeedSetpoint`: last requested direct setpoint, which can differ from the effective calculated setpoint.
 - `Outside`: boiler or configured auxiliary outside temperature.
 - `Pump`, `Season`, `Working`: decoded heating operating states. `Pump` and `Season` are `null` while unknown (see [General status](#general-status-and-diagnostics)); the example files show the usual string values.
+- `Economy`: economy (night) state last received from the room controller on the heating economy frame (`CAN.Addresses.Heating.Economy`, default `0x253`); `"true"` = economy, `"false"` = normal. It is `null` until a frame has been received and is independent of the `Enabled` command state. Home Assistant exposes it as the **Heating Economy** binary sensor.
 - `Enabled`, `FeedBaseSetpoint`, `FeedCutOff`, `FeedMinimum`, `Adaption`, `DynamicAdaption`, `OverrideSetpoint`: current stable command state.
 - `AuxiliaryTemperature`, `AmbientTemperature`, `TargetAmbientTemperature`: external and room-reference inputs.
 - `ValveScaling`, `ValveScalingMaxOpening`, `ValveScalingOpening`: valve-based control state.

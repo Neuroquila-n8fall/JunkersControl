@@ -64,7 +64,10 @@ static void populateRuntimeJson(JsonDocument &doc)
         heating["Season"] = ceraValues.Heating.Season;
     else
         heating["Season"] = nullptr;
-    heating["Economy"] = ceraValues.Heating.Economy;
+    if (ceraValues.Heating.HasReceivedEconomy)
+        heating["Economy"] = ceraValues.Heating.Economy;
+    else
+        heating["Economy"] = nullptr;
     heating["BufferMaximum"] = ceraValues.Heating.BufferWaterTemperatureMaximum;
     heating["BufferCurrent"] = ceraValues.Heating.BufferWaterTemperatureCurrent;
     const ForecastState forecast = GetForecastState();

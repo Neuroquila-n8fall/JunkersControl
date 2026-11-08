@@ -810,6 +810,10 @@ void PublishHeatingTemperaturesAndStatus()
     jsonObj["Season"] = boolToString(ceraValues.Heating.Season);
   else
     jsonObj["Season"] = nullptr;
+  if (ceraValues.Heating.HasReceivedEconomy)
+    jsonObj["Economy"] = boolToString(ceraValues.Heating.Economy);
+  else
+    jsonObj["Economy"] = nullptr;
   jsonObj["Working"] = boolToString(ceraValues.Heating.Active);
   jsonObj["Boost"] = boolToString(commandedValues.Heating.Boost);
   jsonObj["BoostTimeLeft"] = commandedValues.Heating.BoostTimeCountdown;
